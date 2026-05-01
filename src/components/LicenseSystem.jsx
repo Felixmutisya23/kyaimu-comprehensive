@@ -114,14 +114,14 @@ export function useLicense(data) {
   const totalDue    = isFirstTerm ? FIRST_TERM_FLAT_FEE : studentCount * PER_STUDENT_FEE;
 
   // Track partial payments so we can show remaining balance
+  const [lic, setLicRaw]        = useState(() => loadLicense());
+  const [tokenState, setTok]    = useState(() => loadTokenState());
+
   const _currentTerm = data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
   const _currentYear = data.currentYear || new Date().getFullYear();
   const alreadyPaid  = (lic.term === _currentTerm && lic.year === _currentYear)
     ? (lic.amountPaid || 0) : 0;
   const amountDue    = Math.max(0, totalDue - alreadyPaid);
-
-  const [lic, setLicRaw]        = useState(() => loadLicense());
-  const [tokenState, setTok]    = useState(() => loadTokenState());
   const [checking, setChecking] = useState(false);
 
   function setLic(val) { setLicRaw(val); saveLicense(val); }

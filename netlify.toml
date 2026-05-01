@@ -1,4 +1,5 @@
 [build]
+  base = "edumanage"
   command = "npm run build"
   publish = "dist"
 
