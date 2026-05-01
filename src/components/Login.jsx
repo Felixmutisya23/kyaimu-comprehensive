@@ -39,7 +39,7 @@ export default function Login({ data, onLogin }) {
       if (!staff) { setError('No account found with that email address.'); return; }
 
       const correctPw = staff.password || staff.staffId;
-      if (password !== correctPw) { setError(`Incorrect password. Your default password is your Staff ID: ${staff.staffId}`); return; }
+      if (password !== correctPw) { setError('Incorrect password. Please contact your administrator.'); return; }
 
       const role = staff.admin ? 'principal'
         : staff.staffType === 'teaching'
@@ -62,16 +62,7 @@ export default function Login({ data, onLogin }) {
     }, 500);
   }
 
-  // Build demo list from actual data
-  const demoAccounts = [
-    { label: 'Principal',    email: data.principalEmail || 'principal@school.ac.ke', pw: 'admin123', color: '#7c3aed', icon: '👩‍💼' },
-    ...data.teachers.filter(t => !t.admin).slice(0, 5).map(t => ({
-      label: t.name, email: t.email, pw: t.staffId,
-      color: t.staffType === 'teaching' ? '#4f8ef7' : '#10b981',
-      icon: t.staffType === 'teaching' ? (t.isClassTeacher ? '👩‍🏫' : '📚') : (t.dept === 'Kitchen' ? '👨‍🍳' : t.dept === 'Finance' ? '💼' : '🏢'),
-      sub: getRoleLabel(t),
-    })),
-  ];
+
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -118,27 +109,7 @@ export default function Login({ data, onLogin }) {
           </form>
         </div>
 
-        {/* Demo accounts */}
-        <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Demo Accounts — click to fill</div>
-          {demoAccounts.map((c, i) => (
-            <div key={i} onClick={() => { setEmail(c.email); setPassword(c.pw); setError(''); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', marginBottom: 2 }}
-              onMouseEnter={e => e.currentTarget.style.background = '#1e2435'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{c.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>{c.label}</div>
-                {c.sub && <div style={{ fontSize: 10, color: '#64748b' }}>{c.sub}</div>}
-                <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</div>
-              </div>
-              <code style={{ fontSize: 11, color: '#94a3b8', background: '#252d42', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>{c.pw}</code>
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 8, paddingTop: 8, borderTop: '1px solid #2a3350' }}>
-            💡 Default password for all staff = their Staff ID (e.g. T001, T002…)
-          </div>
-        </div>
+
       </div>
       <style>{`@keyframes spin { to { transform:rotate(360deg); } } input::placeholder { color:#4a5568; }`}</style>
     </div>
