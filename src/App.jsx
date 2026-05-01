@@ -15,6 +15,10 @@ import TermManagement, { getCurrentTermInfo, TermBadge } from './components/Term
 import ParentMessaging from './components/ParentMessaging';
 import { useLicense, LicenseGate, TokenGenerator } from './components/LicenseSystem';
 
+// ── Secret developer key sequence ────────────────────
+// Typing "felix" anywhere (when not in an input) toggles the dev panel
+const DEV_SEQUENCE = 'felix';
+
 /* ── localStorage persistence ─────────────────────────
    Data is saved automatically on every change.
    This means data survives page refresh / closing browser.
@@ -411,8 +415,25 @@ export default function App() {
   const roleColor = ROLE_COLORS[user.role] || '#4f8ef7';
   const initials  = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-  // Show license gate (read-only mode) as overlay — not full block
-  const showLicenseGate = !license.isUnlocked && user?.role === 'principal';
+  // Show license gate — but NEVER on Settings so Felix can always reach it
+  const showLicenseGate = !license.isUnlocked && user?.role === 'principal' && page !== 'settings';
+
+  // ── Secret dev panel: type "felix" anywhere (outside inputs) to toggle ──
+  const [showDevPanel, setShowDevPanel] = React.useState(false);
+  const keyBuffer = React.useRef('');
+  React.useEffect(() => {
+    function handleKey(e) {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      keyBuffer.current = (keyBuffer.current + e.key).slice(-5);
+      if (keyBuffer.current === 'felix') {
+        setShowDevPanel(v => !v);
+        keyBuffer.current = '';
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   function renderPage() {
     if (!nav.find(n => n.id === page)) return <Dashboard data={data} setData={setData} user={user} />;
@@ -429,7 +450,7 @@ export default function App() {
       case 'messages':      return <Messages      {...props} />;
       case 'departments':   return <Departments   {...props} />;
       case 'kitchen':       return <Kitchen       {...props} />;
-      case 'settings':      return <Settings      {...props} tokenGenerator={<TokenGenerator data={data} />} />;
+      case 'settings':      return <Settings      {...props} />;
       case 'terms':         return <TermManagement {...props} />;
       case 'parentmsg':     return <ParentMessaging {...props} />;
       default:              return <Dashboard     {...props} />;
@@ -440,6 +461,27 @@ export default function App() {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* LICENSE GATE — shows over read-only mode */}
       {showLicenseGate && <LicenseGate license={license} data={data} />}
+
+      {/* ── SECRET DEV PANEL (triggered by typing "felix") ── */}
+      {showDevPanel && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0008', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDevPanel(false); }}>
+          <div style={{ background: '#0f1117', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 2 }}>🛠 Developer Panel</div>
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Only you can see this, Felix</div>
+              </div>
+              <button onClick={() => setShowDevPanel(false)}
+                style={{ background: '#1e2435', border: '1px solid #2a3350', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+            <TokenGenerator data={data} />
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#1e2435', borderRadius: 10, fontSize: 11, color: '#475569', textAlign: 'center' }}>
+              Press <kbd style={{ background: '#0f1117', border: '1px solid #2a3350', borderRadius: 4, padding: '1px 6px', color: '#7c3aed', fontFamily: 'monospace' }}>felix</kbd> again anywhere to close
+            </div>
+          </div>
+        </div>
+      )}
       {/* READ-ONLY BANNER */}
       {!license.isUnlocked && user?.role === 'principal' && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 998, background: '#ef4444', color: '#fff', textAlign: 'center', padding: '6px 0', fontSize: 12, fontWeight: 700 }}>

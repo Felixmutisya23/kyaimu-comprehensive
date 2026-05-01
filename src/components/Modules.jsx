@@ -1,4 +1,3 @@
-import { TokenGenerator } from './LicenseSystem';
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
 import { GRADES_CBC } from '../data/initialData';
@@ -1099,11 +1098,6 @@ export function Settings({ data, setData }) {
             </div>
           </Card>
         </div>
-      </div>
-
-      {/* Developer: Token Generator */}
-      <div style={{ marginTop: 20 }}>
-        <TokenGenerator data={data} />
       </div>
 
       {/* Add Bell Modal */}
