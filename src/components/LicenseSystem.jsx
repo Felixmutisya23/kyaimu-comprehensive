@@ -11,15 +11,17 @@ import React, { useState } from 'react';
    • Auto-detects payment every 5 seconds — no manual confirmation
 ═══════════════════════════════════════════════════════ */
 
-// ── YOUR INSTASEND LIVE KEYS ─────────────────────────
-const INSTASEND_PUBLIC_KEY = 'ISPubKey_live_28e666c4-0849-4e33-9541-59e9f7119760';
-// ⚠️  SECRET KEY → goes in Netlify Environment Variables only
-//     Key name:  INSTASEND_SECRET_KEY
-//     Value:     ISSecretKey_live_199da78c-26bb-4617-9caf-510233e90c43
-//     NEVER paste the secret key here in the code!
+// ── YOUR INSTASEND KEYS (secret key in Netlify env vars only) ───────
+// INSTASEND_PUBLIC_KEY is no longer needed in frontend — all API calls
+// go through /.netlify/functions/verify-payment (server-side, secret key only)
+// ⚠️  Set INSTASEND_SECRET_KEY in Netlify → Site Settings → Environment Variables
 
-// ── INSTASEND LIVE API URLS ──────────────────────────
-const INSTASEND_BASE = 'https://app.instasend.io/api/v1';
+// ── API PROXY (Netlify function — avoids CORS) ───────
+const VERIFY_PAYMENT_URL = '/.netlify/functions/verify-payment';
+
+// ── PRICING CONSTANTS ────────────────────────────────
+const FIRST_TERM_FLAT_FEE = 5000;  // KES 5,000 flat for first-ever term (no students yet)
+const PER_STUDENT_FEE     = 100;   // KES 100 per student per term from next term onward
 
 // ── STORAGE KEYS ─────────────────────────────────────
 const LICENSE_STORAGE_KEY = 'edumanage_license_v1';
@@ -106,7 +108,17 @@ export function useLicense(data) {
   const studentCount = (data.students || []).filter(
     s => !s.status || s.status === 'active'
   ).length;
-  const amountDue = studentCount * 100;
+
+  // First term ever (no students yet) → flat KES 5,000; thereafter KES 100/student
+  const isFirstTerm = studentCount === 0;
+  const totalDue    = isFirstTerm ? FIRST_TERM_FLAT_FEE : studentCount * PER_STUDENT_FEE;
+
+  // Track partial payments so we can show remaining balance
+  const _currentTerm = data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
+  const _currentYear = data.currentYear || new Date().getFullYear();
+  const alreadyPaid  = (lic.term === _currentTerm && lic.year === _currentYear)
+    ? (lic.amountPaid || 0) : 0;
+  const amountDue    = Math.max(0, totalDue - alreadyPaid);
 
   const [lic, setLicRaw]        = useState(() => loadLicense());
   const [tokenState, setTok]    = useState(() => loadTokenState());
@@ -114,15 +126,13 @@ export function useLicense(data) {
 
   function setLic(val) { setLicRaw(val); saveLicense(val); }
 
-  const currentTerm = data.currentTerm ||
-    (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
-  const currentYear = data.currentYear || new Date().getFullYear();
+  const currentTerm = _currentTerm;
+  const currentYear = _currentYear;
 
   const tokenActive  = tokenState && new Date(tokenState.expiry) > new Date();
-  const licenseValid = lic.paid &&
+  const licenseValid = amountDue === 0 && lic.paid &&
     lic.term === currentTerm &&
-    lic.year === currentYear &&
-    studentCount <= lic.studentCount + 5;
+    lic.year === currentYear;
 
   const isUnlocked = tokenActive || licenseValid;
   const daysLeft   = tokenActive
@@ -144,6 +154,7 @@ export function useLicense(data) {
 
   async function initiatePayment(phone, onSuccess) {
     if (!phone.trim()) { alert('Please enter your M-Pesa phone number.'); return; }
+    if (amountDue <= 0) { alert('No outstanding balance. You are fully paid up!'); return; }
     setChecking(true);
 
     // Format: 254XXXXXXXXX
@@ -151,24 +162,22 @@ export function useLicense(data) {
     if (!fp.startsWith('254')) fp = '254' + fp;
 
     try {
-      const res = await fetch(`${INSTASEND_BASE}/payment-links/one-time/`, {
+      // ✅ Route through Netlify function — avoids CORS and keeps secret key server-side
+      const res = await fetch(VERIFY_PAYMENT_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-insta-token': INSTASEND_PUBLIC_KEY,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'initiate',
+          phone: fp,
           amount: amountDue,
-          currency: 'KES',
-          phone_number: fp,
-          api_ref: `EDU-${(data.schoolName || 'SCH').slice(0, 8).replace(/\s/g, '')}-T${currentTerm}-${currentYear}-${Date.now()}`,
+          apiRef: `EDU-${(data.schoolName || 'SCH').slice(0, 8).replace(/\s/g, '')}-T${currentTerm}-${currentYear}-${Date.now()}`,
           name: data.schoolName || 'School',
           email: data.principalEmail || 'school@school.ac.ke',
         }),
       });
       const json = await res.json();
       if (json.invoice?.invoice_id) {
-        pollPayment(json.invoice.invoice_id, onSuccess);
+        pollPayment(json.invoice.invoice_id, amountDue, onSuccess);
       } else {
         alert(`Payment initiation failed: ${json.message || json.detail || 'Unknown error'}\n\nCheck your phone number and try again.`);
         setChecking(false);
@@ -179,34 +188,53 @@ export function useLicense(data) {
     }
   }
 
-  async function pollPayment(invoiceId, onSuccess) {
+  async function pollPayment(invoiceId, paidAmount, onSuccess) {
     let attempts = 0;
     const maxAttempts = 36; // 3 minutes
 
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const res = await fetch(`${INSTASEND_BASE}/payment-links/${invoiceId}/`, {
-          headers: { 'X-insta-token': INSTASEND_PUBLIC_KEY },
+        const res = await fetch(VERIFY_PAYMENT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceId }),
         });
         const json = await res.json();
-        const status = json.invoice?.state?.toLowerCase();
+        const status = json.state?.toLowerCase();
 
         if (status === 'complete' || status === 'paid') {
           clearInterval(interval);
           setChecking(false);
+          const newAmountPaid = alreadyPaid + paidAmount;
+          const nowFullyPaid  = newAmountPaid >= totalDue;
           const newLic = {
-            paid: true, paidUntil: null,
-            term: currentTerm, year: currentYear,
-            txRef: invoiceId, studentCount,
-            paidAt: new Date().toISOString(), amount: amountDue,
+            paid: nowFullyPaid,
+            paidUntil: null,
+            term: currentTerm,
+            year: currentYear,
+            txRef: invoiceId,
+            studentCount,
+            amountPaid: newAmountPaid,
+            totalDue,
+            paidAt: new Date().toISOString(),
           };
           setLic(newLic);
           if (onSuccess) onSuccess();
-          alert(
-            `✅ Payment confirmed!\n\nKES ${amountDue.toLocaleString()} received.\n` +
-            `System unlocked for Term ${currentTerm} ${currentYear}.\n\nTransaction: ${invoiceId}`
-          );
+          if (nowFullyPaid) {
+            alert(
+              `✅ Payment confirmed!\n\nKES ${paidAmount.toLocaleString()} received.\n` +
+              `System unlocked for Term ${currentTerm} ${currentYear}.\n\nTransaction: ${invoiceId}`
+            );
+          } else {
+            const remaining = totalDue - newAmountPaid;
+            alert(
+              `✅ Payment of KES ${paidAmount.toLocaleString()} received!\n\n` +
+              `⚠️ Balance remaining: KES ${remaining.toLocaleString()}\n` +
+              `Total required: KES ${totalDue.toLocaleString()}\n\n` +
+              `Please pay the remaining balance to unlock full access.`
+            );
+          }
         } else if (status === 'failed' || status === 'cancelled') {
           clearInterval(interval);
           setChecking(false);
@@ -227,7 +255,7 @@ export function useLicense(data) {
 
   return {
     isUnlocked, licenseValid, tokenActive, daysLeft,
-    checking, amountDue, studentCount, currentTerm, currentYear,
+    checking, amountDue, totalDue, alreadyPaid, isFirstTerm, studentCount, currentTerm, currentYear,
     lic, applyToken, initiatePayment,
   };
 }
@@ -262,7 +290,16 @@ export function LicenseGate({ license, data }) {
           <span style={{ fontSize: 28, fontWeight: 900, color: '#10b981' }}>
             KES {license.amountDue.toLocaleString()}
           </span><br />
-          <span style={{ fontSize: 12 }}>{license.studentCount} students × KES 100 per term</span>
+          {license.isFirstTerm
+            ? <span style={{ fontSize: 12 }}>First-term flat fee (no students enrolled yet)</span>
+            : <span style={{ fontSize: 12 }}>{license.studentCount} students × KES 100 per term</span>
+          }
+          {license.alreadyPaid > 0 && (
+            <div style={{ marginTop: 8, padding: '8px 12px', background: '#f59e0b15', borderRadius: 8, border: '1px solid #f59e0b30', fontSize: 12 }}>
+              ⚠️ <strong style={{ color: '#f59e0b' }}>Partial payment:</strong> KES {license.alreadyPaid.toLocaleString()} paid &nbsp;·&nbsp;
+              <strong style={{ color: '#ef4444' }}>Balance: KES {license.amountDue.toLocaleString()}</strong> of KES {license.totalDue.toLocaleString()} total
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
