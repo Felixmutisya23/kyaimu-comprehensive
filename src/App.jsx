@@ -367,11 +367,44 @@ export default function App() {
     });
   }
 
-  const isConfigured = !!(data.schoolName && data.schoolName.trim());
+  const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
 
-  // ── License / Subscription system ──────────────────────
+  // ── License / Subscription system — must be called before any early returns ──
   const license = useLicense(data);
 
+  // ── Dev panel hook — must be before early returns ──
+  const [showDevPanel, setShowDevPanel] = React.useState(false);
+
+  // ── Secret dev panel: type "felix" anywhere (outside inputs) to toggle ──
+  const keyBuffer = React.useRef('');
+  React.useEffect(() => {
+    function handleKey(e) {
+      // Only block if user is actively typing (has a value in the input)
+      // But still allow the secret sequence via Ctrl+Shift+F shortcut
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setShowDevPanel(v => !v);
+        keyBuffer.current = '';
+        return;
+      }
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      keyBuffer.current = (keyBuffer.current + e.key).slice(-5);
+      if (keyBuffer.current === 'felix') {
+        setShowDevPanel(v => !v);
+        keyBuffer.current = '';
+      }
+    }
+    function handleDevOpen() { setShowDevPanel(v => !v); }
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('felix-dev-open', handleDevOpen);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('felix-dev-open', handleDevOpen);
+    };
+  }, []);
+
+  // Early returns AFTER all hooks
   if (!user) return <Login data={data} onLogin={u => { setUser(u); setPage('dashboard'); }} />;
   if (user.role === 'principal' && !isConfigured && !setupDone) {
     return <SetupWizard data={data} setData={setData} onDone={() => setSetupDone(true)} />;
@@ -418,22 +451,7 @@ export default function App() {
   // Show license gate — but NEVER on Settings so Felix can always reach it
   const showLicenseGate = !license.isUnlocked && user?.role === 'principal' && page !== 'settings';
 
-  // ── Secret dev panel: type "felix" anywhere (outside inputs) to toggle ──
-  const [showDevPanel, setShowDevPanel] = React.useState(false);
-  const keyBuffer = React.useRef('');
-  React.useEffect(() => {
-    function handleKey(e) {
-      const tag = document.activeElement?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      keyBuffer.current = (keyBuffer.current + e.key).slice(-5);
-      if (keyBuffer.current === 'felix') {
-        setShowDevPanel(v => !v);
-        keyBuffer.current = '';
-      }
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+
 
   function renderPage() {
     if (!nav.find(n => n.id === page)) return <Dashboard data={data} setData={setData} user={user} />;
