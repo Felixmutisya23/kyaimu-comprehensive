@@ -26,6 +26,14 @@ export default function Exams({ data, setData, user }) {
   const [showEditReq, setShowEditReq] = useState(false);
   const [editTarget, setEditTarget] = useState(null); // { studentName, subject, currentScore, examId }
   const [editNewScore, setEditNewScore] = useState('');
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [commentStudent, setCommentStudent] = useState(null);
+  const [ctComment, setCtComment] = useState('');
+  const [principalComment, setPrincipalComment] = useState('');
+  const [bulkCommentModal, setBulkCommentModal] = useState(false);
+  const [bulkCtComment, setBulkCtComment] = useState('');
+  const [bulkPrincipalComment, setBulkPrincipalComment] = useState('');
+  const [combinedReportModal, setCombinedReportModal] = useState(false);
   const [examForm, setExamForm] = useState({ name: '', term: '1', type: 'beginning', class: selClass, year: new Date().getFullYear().toString() });
   const [scores, setScores]     = useState({});
   const [enterSubjects, setEnterSubjects] = useState([]);
@@ -267,9 +275,18 @@ export default function Exams({ data, setData, user }) {
               <Btn variant="ghost" size="sm" onClick={() => printClassList(ranked, visibleSubjects, selExam, data)}>
                 <Icon name="print" size={13} /> Class List
               </Btn>
-              <Btn variant="ghost" size="sm" onClick={() => printAllReportForms(selExam, data)}>
+              <Btn variant="ghost" size="sm" onClick={() => {
+                setBulkCtComment('');
+                setBulkPrincipalComment('');
+                setBulkCommentModal(true);
+              }}>
                 <Icon name="report" size={13} /> All Reports
               </Btn>
+              {selExam && getSiblingStreams(selExam.class, data).length > 1 && (
+                <Btn variant="ghost" size="sm" onClick={() => setCombinedReportModal(true)}>
+                  <Icon name="report" size={13} /> All Reports (Combined)
+                </Btn>
+              )}
               <Btn variant="ghost" size="sm" onClick={() => printSubjectPerformance(selExam, data)}>
                 📊 Subject Performance
               </Btn>
@@ -318,7 +335,7 @@ export default function Exams({ data, setData, user }) {
                   <th style={TS.th}>Name</th>
                   <th style={TS.th}>Adm No</th>
                   {visibleSubjects.map(s => <th key={s} style={TS.th}>{s}</th>)}
-                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th><th style={TS.th}>Strm Pos</th></>}
+                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Pts</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th><th style={TS.th}>Strm Pos</th></>}
                   <th style={TS.th}>Action</th>
                 </tr>
               </thead>
@@ -354,6 +371,17 @@ export default function Exams({ data, setData, user }) {
                     {(isClassTeacher || isPrincipal) && (
                       <>
                         <td style={{ ...TS.td, fontWeight: 700 }}>{s.total}</td>
+                        <td style={{ ...TS.td, fontWeight: 700, color: '#7c3aed' }}>
+                          {Object.keys(s.results).reduce((acc, sub) => {
+                            const cell = s.results[sub];
+                            const score = cell?.score ?? cell ?? null;
+                            if (score !== null) {
+                              const g = (data.gradesConfig || []).concat([]).sort((a,b) => b.scoreMin - a.scoreMin).find(g => score >= g.scoreMin);
+                              return acc + (g ? g.points : 0);
+                            }
+                            return acc;
+                          }, 0)}
+                        </td>
                         <td style={TS.td}>{s.mean}</td>
                         <td style={TS.td}><GradeBadge score={s.mean} /></td>
                         <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>{s.overallPos}</td>
@@ -362,7 +390,13 @@ export default function Exams({ data, setData, user }) {
                     )}
                     <td style={TS.td}>
                       {(isClassTeacher || isPrincipal) && (
-                        <Btn size="sm" variant="ghost" onClick={() => printReportForm(s, selExam, data)}>
+                        <Btn size="sm" variant="ghost" onClick={() => {
+                          setCommentStudent(s);
+                          const saved = selExam.studentComments?.[s.name];
+                          setCtComment(saved?.classTeacher || '');
+                          setPrincipalComment(saved?.principal || '');
+                          setShowCommentModal(true);
+                        }}>
                           <Icon name="print" size={12} />
                         </Btn>
                       )}
@@ -484,6 +518,75 @@ export default function Exams({ data, setData, user }) {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowEnter(false)}>Cancel</Btn>
           <Btn variant="success" onClick={saveScores}>Save Scores</Btn>
+        </div>
+      </Modal>
+
+      {/* Feature 6: Comment Modal for single report */}
+      <Modal show={showCommentModal} onClose={() => setShowCommentModal(false)} title={`Print Report — ${commentStudent?.name || ''}`}>
+        <div style={{ marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>Optionally add comments before printing. Leave blank for empty comment boxes.</div>
+        <FormGroup label="Class Teacher's Comment">
+          <textarea rows={3} value={ctComment} onChange={e => setCtComment(e.target.value)} placeholder="e.g. A hardworking student who shows great potential..." style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <FormGroup label="Principal's Comment">
+          <textarea rows={3} value={principalComment} onChange={e => setPrincipalComment(e.target.value)} placeholder="e.g. Keep up the excellent work..." style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn variant="ghost" onClick={() => setShowCommentModal(false)}>Cancel</Btn>
+          <Btn onClick={() => {
+            // Save comments to exam data
+            if (commentStudent) {
+              setData(d => ({
+                ...d,
+                exams: d.exams.map(ex => ex.id !== selExam.id ? ex : {
+                  ...ex,
+                  studentComments: { ...(ex.studentComments || {}), [commentStudent.name]: { classTeacher: ctComment, principal: principalComment } }
+                })
+              }));
+            }
+            printReportForm(commentStudent, selExam, data, { classTeacherComment: ctComment, principalComment });
+            setShowCommentModal(false);
+          }}>
+            <Icon name="print" size={13} /> Print
+          </Btn>
+        </div>
+      </Modal>
+
+      {/* Bulk comment modal */}
+      <Modal show={bulkCommentModal} onClose={() => setBulkCommentModal(false)} title="Print All Reports">
+        <div style={{ marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>Set default comments for all students. Individual overrides (set per-student) are preserved.</div>
+        <FormGroup label="Default Class Teacher's Comment">
+          <textarea rows={3} value={bulkCtComment} onChange={e => setBulkCtComment(e.target.value)} placeholder="e.g. Keep working hard this term..." style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <FormGroup label="Default Principal's Comment">
+          <textarea rows={3} value={bulkPrincipalComment} onChange={e => setBulkPrincipalComment(e.target.value)} placeholder="e.g. Congratulations on your performance..." style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn variant="ghost" onClick={() => setBulkCommentModal(false)}>Cancel</Btn>
+          <Btn onClick={() => {
+            printAllReportForms(selExam, data, { defaultCtComment: bulkCtComment, defaultPrincipalComment: bulkPrincipalComment });
+            setBulkCommentModal(false);
+          }}>
+            <Icon name="print" size={13} /> Print All Reports
+          </Btn>
+        </div>
+      </Modal>
+
+      {/* Combined streams report modal */}
+      <Modal show={combinedReportModal} onClose={() => setCombinedReportModal(false)} title="Print All Reports (Combined Streams)">
+        <div style={{ marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>
+          This will print reports for ALL streams of {selExam ? selExam.class.replace(/\s+(East|West|North|South|A|B|C|D)$/i, '') : ''} combined, using overall position across all streams.
+        </div>
+        <FormGroup label="Default Principal's Comment">
+          <textarea rows={3} value={bulkPrincipalComment} onChange={e => setBulkPrincipalComment(e.target.value)} style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn variant="ghost" onClick={() => setCombinedReportModal(false)}>Cancel</Btn>
+          <Btn onClick={() => {
+            printAllReportForms(selExam, data, { defaultPrincipalComment: bulkPrincipalComment, combined: true });
+            setCombinedReportModal(false);
+          }}>
+            <Icon name="print" size={13} /> Print Combined Reports
+          </Btn>
         </div>
       </Modal>
 

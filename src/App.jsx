@@ -417,8 +417,8 @@ export default function App() {
     </div>
   );
 
-  // No school in DB yet — show setup wizard before login
-  if (!isConfigured && !setupDone && !user) {
+  // No school in DB yet AND no school ID stored — show setup wizard
+  if (!isConfigured && !setupDone && !user && !getLocalSchoolId()) {
     return (
       <SetupWizard
         data={data}
@@ -442,6 +442,19 @@ export default function App() {
   if (!user) return (
     <Login
       data={data}
+      onCreateSchool={async (setupData) => {
+        try {
+          const schoolId = await createSchool(setupData);
+          setLocalSchoolId(schoolId);
+          const schoolData = await loadSchoolData(schoolId);
+          if (schoolData) setDataRaw(schoolData);
+          // Auto-login as principal
+          setUser({ role: 'principal', name: setupData.principalName || 'Principal', email: setupData.principalEmail });
+          setPage('dashboard');
+        } catch (e) {
+          throw new Error(e.message || 'Failed to create school');
+        }
+      }}
       onLogin={async (email, password) => {
         // Try principal login first
         const school = await loginPrincipal(email, password);

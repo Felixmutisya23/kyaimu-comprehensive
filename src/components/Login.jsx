@@ -6,12 +6,17 @@ function getRoleLabel(staff) {
   return `Non-Teaching Staff (${staff.dept})`;
 }
 
-export default function Login({ data, onLogin }) {
-  const [email, setEmail]     = useState('');
+export default function Login({ data, onLogin, onCreateSchool }) {
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]     = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showPw, setShowPw]   = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [mode, setMode]         = useState('login'); // 'login' | 'create'
+  // Create school form
+  const [cForm, setCForm] = useState({ schoolName: '', yourName: '', email: '', password: '', confirm: '' });
+  const [cError, setCError] = useState('');
+  const [cLoading, setCLoading] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -26,6 +31,28 @@ export default function Login({ data, onLogin }) {
       setError('Connection error: ' + (err?.message || JSON.stringify(err)));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCreateSchool(e) {
+    e.preventDefault();
+    setCError('');
+    if (!cForm.schoolName.trim()) { setCError('School name is required.'); return; }
+    if (!cForm.email.trim()) { setCError('Email is required.'); return; }
+    if (cForm.password.length < 6) { setCError('Password must be at least 6 characters.'); return; }
+    if (cForm.password !== cForm.confirm) { setCError('Passwords do not match.'); return; }
+    setCLoading(true);
+    try {
+      await onCreateSchool({
+        schoolName: cForm.schoolName.trim(),
+        principalName: cForm.yourName.trim(),
+        principalEmail: cForm.email.trim(),
+        principalPassword: cForm.password,
+      });
+    } catch (err) {
+      setCError('Failed to create school: ' + (err?.message || 'Please try again.'));
+    } finally {
+      setCLoading(false);
     }
   }
 
@@ -76,6 +103,51 @@ export default function Login({ data, onLogin }) {
           </form>
         </div>
 
+        {/* Create School Account link */}
+        <div style={{ textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+          New school?{' '}
+          <span style={{ color: '#4f8ef7', cursor: 'pointer', fontWeight: 600 }} onClick={() => { setMode('create'); setError(''); }}>
+            Create School Account
+          </span>
+        </div>
+
+        {/* Create School Modal */}
+        {mode === 'create' && (
+          <div style={{ position: 'fixed', inset: 0, background: '#000a', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px #000a', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Create School Account</div>
+              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Set up your school on EduManage Pro</div>
+              <form onSubmit={handleCreateSchool}>
+                {[
+                  { label: 'School Name *', key: 'schoolName', placeholder: 'e.g. Kyaimu Comprehensive', type: 'text' },
+                  { label: 'Your Name', key: 'yourName', placeholder: 'e.g. Felix Mutisya', type: 'text' },
+                  { label: 'Email Address *', key: 'email', placeholder: 'you@school.ac.ke', type: 'email' },
+                  { label: 'Password *', key: 'password', placeholder: 'Min 6 characters', type: 'password' },
+                  { label: 'Confirm Password *', key: 'confirm', placeholder: 'Re-enter password', type: 'password' },
+                ].map(f => (
+                  <div key={f.key} style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', display: 'block', marginBottom: 5 }}>{f.label}</label>
+                    <input type={f.type} value={cForm[f.key]} onChange={e => setCForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                      style={{ width: '100%', padding: '10px 13px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+                {cError && (
+                  <div style={{ background: '#ef444415', border: '1px solid #ef444440', color: '#ef4444', borderRadius: 8, padding: '10px 13px', fontSize: 13, marginBottom: 14 }}>
+                    ⚠ {cError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button type="button" onClick={() => setMode('login')} style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #2a3350', background: 'transparent', color: '#94a3b8', fontSize: 14, cursor: 'pointer' }}>
+                    Back to Login
+                  </button>
+                  <button type="submit" disabled={cLoading} style={{ flex: 2, padding: '11px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontSize: 14, fontWeight: 600, cursor: cLoading ? 'not-allowed' : 'pointer' }}>
+                    {cLoading ? 'Creating...' : 'Create School Account →'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </div>
       <style>{`@keyframes spin { to { transform:rotate(360deg); } } input::placeholder { color:#4a5568; }`}</style>

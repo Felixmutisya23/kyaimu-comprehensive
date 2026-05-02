@@ -6,21 +6,21 @@ export const GRADES_CBC = [
   { label: 'AE1', points: 4, color: '#f59e0b', scoreMin: 34, scoreMax: 42 },
   { label: 'AE2', points: 3, color: '#f97316', scoreMin: 25, scoreMax: 33 },
   { label: 'BE1', points: 2, color: '#ef4444', scoreMin: 16, scoreMax: 24 },
-  { label: 'BE2', points: 1, color: '#dc2626', scoreMin: 9,  scoreMax: 15 },
+  { label: 'BE2', points: 1, color: '#dc2626', scoreMin: 0,  scoreMax: 15 },
 ];
 
-export function getGrade(score) {
-  if (score >= 68) return GRADES_CBC[0];
-  if (score >= 60) return GRADES_CBC[1];
-  if (score >= 52) return GRADES_CBC[2];
-  if (score >= 43) return GRADES_CBC[3];
-  if (score >= 34) return GRADES_CBC[4];
-  if (score >= 25) return GRADES_CBC[5];
-  if (score >= 16) return GRADES_CBC[6];
-  return GRADES_CBC[7];
+// getGrade: pass optional data to use school custom grading config
+export function getGrade(score, data) {
+  const grades = (data && data.gradesConfig && data.gradesConfig.length) ? data.gradesConfig : GRADES_CBC;
+  const sorted = [...grades].sort((a, b) => b.scoreMin - a.scoreMin);
+  for (const g of sorted) {
+    if (score >= g.scoreMin) return g;
+  }
+  return sorted[sorted.length - 1];
 }
 
 export const INITIAL_DATA = {
+  gradesConfig: GRADES_CBC,
   // ── School identity — ALL BLANK by default, principal fills in Settings ──
   schoolName:        '',   // e.g. "Kiriene Day Primary School"
   schoolMotto:       '',   // e.g. "Strive To Excel"

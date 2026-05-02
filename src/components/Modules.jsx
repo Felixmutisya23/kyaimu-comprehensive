@@ -1055,19 +1055,67 @@ export function Settings({ data, setData }) {
             ))}
           </Card>
 
-          {/* CBC Scale */}
+          {/* CBC Scale - Editable */}
           <Card>
             <SectionTitle icon="chart">CBC Grading Scale</SectionTitle>
-            {GRADES_CBC.map(g => (
-              <div key={g.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #2a3350', fontSize: 12 }}>
-                <span style={{ minWidth: 36, fontWeight: 700, color: g.color }}>{g.label}</span>
-                <div style={{ flex: 1, height: 6, background: '#1e2435', borderRadius: 20, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${g.points * 12.5}%`, background: g.color, borderRadius: 20 }} />
-                </div>
-                <span style={{ color: '#94a3b8', minWidth: 100 }}>Score: {g.scoreMin}–{g.scoreMax}</span>
-                <span style={{ color: '#64748b', minWidth: 60 }}>{g.points} pts</span>
-              </div>
-            ))}
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Edit score ranges, points and labels. Changes apply immediately to all reports.</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#1e2435' }}>
+                    {['Label','Min Score','Max Score','Points','Color'].map(h => (
+                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #2a3350' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.gradesConfig || GRADES_CBC).map((g, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #2a3350' }}>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input value={g.label} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], label: e.target.value };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: g.color, fontWeight: 700 }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.scoreMin} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], scoreMin: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.scoreMax} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], scoreMax: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.points} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], points: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="color" value={g.color} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], color: e.target.value };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid #2a3350', borderRadius: 4, background: '#1e2435', cursor: 'pointer' }} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Btn variant="ghost" size="sm" onClick={() => setData(d => ({ ...d, gradesConfig: GRADES_CBC }))}>
+                Reset to Default
+              </Btn>
+            </div>
           </Card>
 
           {/* Data Backup & Restore */}

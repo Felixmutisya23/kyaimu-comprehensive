@@ -1,5 +1,28 @@
 import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass } from '../data/initialData';
 
+function formatDate(dateStr) {
+  if (!dateStr) return '___________________________';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const day = d.getDate();
+  const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th';
+  return d.toLocaleDateString('en-KE', { month: 'long', year: 'numeric' }).replace(/^/, `${day}${suffix} `);
+}
+
+function getTermDates(exam, data) {
+  const terms = data.terms || [];
+  const cur = terms.find(t => Number(t.term) === Number(exam.term) && Number(t.year) === Number(exam.year));
+  // Next term: same year term+1, or year+1 term 1
+  const nextTerm = Number(exam.term) + 1;
+  const nextYear = nextTerm > 3 ? Number(exam.year) + 1 : Number(exam.year);
+  const nextTermNum = nextTerm > 3 ? 1 : nextTerm;
+  const next = terms.find(t => Number(t.term) === nextTermNum && Number(t.year) === nextYear);
+  return {
+    closingDate: cur?.endDate ? formatDate(cur.endDate) : '___________________________',
+    nextTermBegins: next?.startDate ? formatDate(next.startDate) : '___________________________',
+  };
+}
+
 /* ═══════════════════════════════════════════════════════
    SHARED HEADER — used by all printed documents
 ═══════════════════════════════════════════════════════ */
@@ -177,7 +200,7 @@ const TD = 'border:1px solid #ccc;padding:4px 3px;text-align:center;font-size:10
 /* ═══════════════════════════════════════════════════════
    INDIVIDUAL STUDENT REPORT FORM
 ═══════════════════════════════════════════════════════ */
-export function printReportForm(student, exam, data) {
+export function printReportForm(student, exam, data, { classTeacherComment = '', principalComment = '' } = {}) {
   const res  = exam.results[student.name] || {};
   const subs = Object.keys(res);
   if (!subs.length) { alert('No results recorded for this student in this exam.'); return; }
@@ -311,14 +334,14 @@ export function printReportForm(student, exam, data) {
       <tr>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
           <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Class Teacher's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px"></div>
+          <div style="min-height:48px;margin-bottom:16px;font-size:12px;color:#333">\${classTeacherComment || ''}</div>
           <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
             Name: ___________________________ &nbsp; Sign: _______________
           </div>
         </td>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
           <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Principal's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px"></div>
+          <div style="min-height:48px;margin-bottom:16px;font-size:12px;color:#333">\${principalComment || ''}</div>
           <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
             Sign: ___________________________ &nbsp; Stamp: 
             <span style="border:1px solid #ccc;display:inline-block;width:60px;height:24px"></span>
@@ -340,10 +363,10 @@ export function printReportForm(student, exam, data) {
     <table style="font-size:11px;margin-top:4px">
       <tr>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
-          <strong>Next Term Begins:</strong> ___________________________
+          <strong>Next Term Begins:</strong> \${getTermDates(exam, data).nextTermBegins}
         </td>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
-          <strong>Closing Date:</strong> ___________________________
+          <strong>Closing Date:</strong> \${getTermDates(exam, data).closingDate}
         </td>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#fff0f0">
           <strong>Fees Balance:</strong> KES ___________________________
@@ -366,8 +389,11 @@ export function printReportForm(student, exam, data) {
 /* ═══════════════════════════════════════════════════════
    BULK: PRINT ALL REPORT FORMS FOR A CLASS
 ═══════════════════════════════════════════════════════ */
-export function printAllReportForms(exam, data) {
-  const students = data.students.filter(s => s.class === exam.class);
+export function printAllReportForms(exam, data, { defaultCtComment = '', defaultPrincipalComment = '', combined = false } = {}) {
+  const siblingClasses = getSiblingStreams(exam.class, data);
+  const students = combined
+    ? data.students.filter(s => siblingClasses.includes(s.class))
+    : data.students.filter(s => s.class === exam.class);
   if (students.length === 0) { alert('No students in this class.'); return; }
 
   const { posMap } = computeRankings(exam, data.students, data);
@@ -442,20 +468,20 @@ export function printAllReportForms(exam, data) {
         <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px">
           <tr>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399">Class Teacher:</strong>
-              <div style="min-height:32px"></div>
+              <strong style="color:#003399">Class Teacher's Comment:</strong>
+              <div style="min-height:32px;font-size:12px;color:#333;padding:4px 0">\${exam.studentComments?.[student.name]?.classTeacher || defaultCtComment || ''}</div>
               <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: _____________________ Date: ____________</div>
             </td>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399">Principal:</strong>
-              <div style="min-height:32px"></div>
+              <strong style="color:#003399">Principal's Comment:</strong>
+              <div style="min-height:32px;font-size:12px;color:#333;padding:4px 0">\${exam.studentComments?.[student.name]?.principal || defaultPrincipalComment || ''}</div>
               <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: ___________________ Stamp: <span style="border:1px solid #ccc;display:inline-block;width:40px;height:18px"></span></div>
             </td>
           </tr>
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:10px">
           <tr>
-            <td style="padding:5px 8px;border:1px solid #ccc;background:#f0f4ff"><strong>Next Term Begins:</strong> ________________________</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;background:#f0f4ff"><strong>Next Term Begins:</strong> \${getTermDates(exam, data).nextTermBegins}</td>
             <td style="padding:5px 8px;border:1px solid #ccc;background:#fff0f0"><strong>Fees Balance:</strong> KES ___________________</td>
             <td style="padding:5px 8px;border:1px solid #ccc;font-size:9px;color:#888">Printed: ${new Date().toLocaleDateString('en-KE')}</td>
           </tr>
