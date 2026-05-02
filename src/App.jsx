@@ -416,6 +416,29 @@ export default function App() {
       {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
     </div>
   );
+
+  // No school in DB yet — show setup wizard before login
+  if (!isConfigured && !setupDone && !user) {
+    return (
+      <SetupWizard
+        data={data}
+        setData={setData}
+        onDone={async (setupData) => {
+          try {
+            const schoolId = await createSchool(setupData);
+            setLocalSchoolId(schoolId);
+            const schoolData = await loadSchoolData(schoolId);
+            if (schoolData) setDataRaw(schoolData);
+            setSetupDone(true);
+          } catch (e) {
+            console.error('Setup error:', e);
+            alert('Failed to create school: ' + e.message);
+          }
+        }}
+      />
+    );
+  }
+
   if (!user) return (
     <Login
       data={data}
