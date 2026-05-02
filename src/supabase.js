@@ -358,19 +358,18 @@ async function syncFeePayments(schoolId, feePayments) {
 
 // ── Login: find teacher across all schools by email+password ─────
 export async function loginTeacher(email, password) {
-  const { data: teachers } = await supabase
+  const { data: teachers } = await getSupabase()
     .from('teachers')
     .select('*, schools(*)')
     .eq('email', email)
     .eq('password', password);
 
   if (!teachers || !teachers.length) return null;
-  return teachers[0]; // returns teacher row with embedded school
+  return teachers[0];
 }
 
-// ── Login: find school by principal email+password ───────────────
 export async function loginPrincipal(email, password) {
-  const { data: schools } = await supabase
+  const { data: schools } = await getSupabase()
     .from('schools')
     .select('*')
     .eq('principal_email', email)
