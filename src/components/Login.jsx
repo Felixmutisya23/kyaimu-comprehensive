@@ -13,53 +13,19 @@ export default function Login({ data, onLogin }) {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw]   = useState(false);
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
     setError(''); setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-
-      // Principal
-      const pEmail = (data.principalEmail || 'principal@school.ac.ke').toLowerCase();
-      if (email.toLowerCase() === pEmail && password === (data.principalPassword || 'admin123')) {
-        const principalStaff = data.teachers.find(t => t.admin);
-        onLogin({
-          role: 'principal', name: data.principalName || 'Principal',
-          email, dept: 'Management',
-          staffId: principalStaff?.staffId || 'T000',
-          classTeacherOf: null, teacherSubjects: [],
-          canSeeFees: true, canSeeKitchenAlerts: true,
-        });
-        return;
+    try {
+      const success = await onLogin(email, password);
+      if (!success) {
+        setError('Incorrect email or password. Please try again.');
       }
-
-      // Staff
-      const staff = data.teachers.find(t => t.email.toLowerCase() === email.toLowerCase());
-      if (!staff) { setError('No account found with that email address.'); return; }
-
-      const correctPw = staff.password || staff.staffId;
-      if (password !== correctPw) { setError('Incorrect password. Please contact your administrator.'); return; }
-
-      const role = staff.admin ? 'principal'
-        : staff.staffType === 'teaching'
-          ? (staff.isClassTeacher ? 'class_teacher' : 'subject_teacher')
-          : 'non_teaching';
-
-      onLogin({
-        role,
-        name:               staff.name,
-        email:              staff.email,
-        dept:               staff.dept,
-        staffId:            staff.staffId,
-        staffType:          staff.staffType,
-        isClassTeacher:     staff.isClassTeacher || false,
-        classTeacherOf:     staff.classTeacherOf || null,
-        teacherSubjects:    staff.subjects || [],
-        canSeeFees:         staff.canSeeFees || false,
-        canSeeKitchenAlerts:staff.canSeeKitchenAlerts || false,
-      });
-    }, 500);
+    } catch (err) {
+      setError('Connection error. Please check your internet and try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
 

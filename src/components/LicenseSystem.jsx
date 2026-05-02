@@ -276,15 +276,6 @@ export function LicenseGate({ license, data }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0a0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      {/* Hidden dev trigger — tiny dot in bottom-right corner, invisible unless you know it's there */}
-      <div
-        title=""
-        onClick={() => {
-          // Dispatch a custom event that App.jsx listens for
-          window.dispatchEvent(new CustomEvent('felix-dev-open'));
-        }}
-        style={{ position: 'fixed', bottom: 8, right: 8, width: 12, height: 12, borderRadius: '50%', background: '#7c3aed22', cursor: 'pointer', zIndex: 10000 }}
-      />
       <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 20, padding: 40, maxWidth: 500, width: '92%', textAlign: 'center', boxShadow: '0 24px 80px #0008' }}>
 
         <div style={{ fontSize: 48, marginBottom: 10 }}>🏫</div>

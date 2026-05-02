@@ -14,42 +14,11 @@ import StudentStatus from './components/StudentStatus';
 import TermManagement, { getCurrentTermInfo, TermBadge } from './components/TermManagement';
 import ParentMessaging from './components/ParentMessaging';
 import { useLicense, LicenseGate, TokenGenerator } from './components/LicenseSystem';
-
-// ── Secret developer key sequence ────────────────────
-// Typing "felix" anywhere (when not in an input) toggles the dev panel
-const DEV_SEQUENCE = 'felix';
-
-/* ── localStorage persistence ─────────────────────────
-   Data is saved automatically on every change.
-   This means data survives page refresh / closing browser.
-   Each school's deployment has its own isolated data.
-────────────────────────────────────────────────────── */
-const STORAGE_KEY = 'edumanage_data_v1';
-
-function loadData() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge with INITIAL_DATA to pick up any new fields added in updates
-      return { ...INITIAL_DATA, ...parsed };
-    }
-  } catch (e) {
-    console.warn('Could not load saved data:', e);
-  }
-  return { ...INITIAL_DATA };
-}
-
-function saveData(data) {
-  try {
-    // Don't save the getter function — just the plain properties
-    const toSave = { ...data };
-    delete toSave.classes; // derived from classGroups getter
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch (e) {
-    console.warn('Could not save data:', e);
-  }
-}
+import {
+  loadSchoolData, saveSchoolData, createSchool,
+  loginPrincipal, loginTeacher,
+  getLocalSchoolId, setLocalSchoolId,
+} from './supabase';
 
 /*
   NAV VISIBILITY RULES
@@ -259,9 +228,8 @@ function SetupWizard({ data, setData, onDone }) {
     schoolCounty: '', schoolType: 'Primary', principalName: '', newPass: '',
   });
 
-  function save() {
-    setData(d => ({
-      ...d,
+  async function save() {
+    const setupData = {
       schoolName:        form.schoolName.trim(),
       schoolMotto:       form.schoolMotto.trim(),
       schoolPOBox:       form.schoolPOBox.trim(),
@@ -269,9 +237,10 @@ function SetupWizard({ data, setData, onDone }) {
       schoolCounty:      form.schoolCounty.trim(),
       schoolType:        form.schoolType,
       principalName:     form.principalName.trim(),
-      principalPassword: form.newPass.trim() || d.principalPassword,
-    }));
-    onDone();
+      principalEmail:    'principal@school.ac.ke',
+      principalPassword: form.newPass.trim() || 'admin123',
+    };
+    await onDone(setupData);
   }
 
   const inp = (val, onChange, ph) => ({
@@ -353,21 +322,67 @@ function SetupWizard({ data, setData, onDone }) {
 }
 
 export default function App() {
-  const [data, setDataRaw]    = React.useState(() => loadData());
-  const [user, setUser]       = React.useState(null);
-  const [page, setPage]       = React.useState('dashboard');
+  const [data, setDataRaw]        = React.useState({ ...INITIAL_DATA });
+  const [user, setUser]           = React.useState(null);
+  const [page, setPage]           = React.useState('dashboard');
   const [collapsed, setCollapsed] = React.useState(false);
   const [setupDone, setSetupDone] = React.useState(false);
+  const [loading, setLoading]     = React.useState(true);
+  const [dbError, setDbError]     = React.useState(null);
 
+  // ── Load school data from Supabase on mount ──────────────────
+  React.useEffect(() => {
+    async function init() {
+      try {
+        const schoolId = getLocalSchoolId();
+        if (schoolId) {
+          const schoolData = await loadSchoolData(schoolId);
+          if (schoolData) {
+            setDataRaw(schoolData);
+          } else {
+            // School ID in localStorage but not in DB — clear it
+            localStorage.removeItem('edumanage_school_id');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load school data:', e);
+        setDbError('Could not connect to database. Check your internet connection.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
+
+  // ── Save to Supabase on every data change ────────────────────
+  const saveTimer = React.useRef(null);
   function setData(updater) {
     setDataRaw(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      saveData(next);
+      // Debounce saves by 800ms to avoid hammering the DB on rapid changes
+      if (next._schoolId) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => {
+          saveSchoolData(next).catch(e => console.error('Save error:', e));
+        }, 800);
+      }
       return next;
     });
   }
 
   const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
+
+  // ── Show loading screen while fetching from Supabase ────────
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
+        <div style={{ fontSize: 48 }}>🏫</div>
+        <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
+        <div style={{ color: '#64748b', fontSize: 13 }}>Loading school data...</div>
+        {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
+      </div>
+    );
+  }
 
   // ── License / Subscription system — must be called before any early returns ──
   const license = useLicense(data);
@@ -405,9 +420,53 @@ export default function App() {
   }, []);
 
   // Early returns AFTER all hooks
-  if (!user) return <Login data={data} onLogin={u => { setUser(u); setPage('dashboard'); }} />;
+  if (!user) return (
+    <Login
+      data={data}
+      onLogin={async (email, password) => {
+        // Try principal login first
+        const school = await loginPrincipal(email, password);
+        if (school) {
+          setLocalSchoolId(school.id);
+          const schoolData = await loadSchoolData(school.id);
+          if (schoolData) setDataRaw(schoolData);
+          setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
+          setPage('dashboard');
+          return true;
+        }
+        // Try staff login
+        const teacher = await loginTeacher(email, password);
+        if (teacher) {
+          setLocalSchoolId(teacher.school_id);
+          const schoolData = await loadSchoolData(teacher.school_id);
+          if (schoolData) setDataRaw(schoolData);
+          setUser({ role: teacher.admin ? 'principal' : 'staff', name: teacher.name, email, staffId: teacher.staff_id });
+          setPage('dashboard');
+          return true;
+        }
+        return false;
+      }}
+    />
+  );
   if (user.role === 'principal' && !isConfigured && !setupDone) {
-    return <SetupWizard data={data} setData={setData} onDone={() => setSetupDone(true)} />;
+    return (
+      <SetupWizard
+        data={data}
+        setData={setData}
+        onDone={async (setupData) => {
+          try {
+            const schoolId = await createSchool(setupData);
+            setLocalSchoolId(schoolId);
+            const schoolData = await loadSchoolData(schoolId);
+            if (schoolData) setDataRaw(schoolData);
+            setSetupDone(true);
+          } catch (e) {
+            console.error('Setup error:', e);
+            alert('Failed to create school. Check your internet connection.');
+          }
+        }}
+      />
+    );
   }
 
 

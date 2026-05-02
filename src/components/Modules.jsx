@@ -1,4 +1,3 @@
-// LicenseSystem imports removed — TokenGenerator is now in App.jsx dev panel only
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
 import { GRADES_CBC } from '../data/initialData';
@@ -1100,8 +1099,6 @@ export function Settings({ data, setData }) {
           </Card>
         </div>
       </div>
-
-      {/* Developer token generator removed — dev-only access via secret panel */}
 
       {/* Add Bell Modal */}
       <Modal show={showBell} onClose={() => setShowBell(false)} title="Add Bell">
