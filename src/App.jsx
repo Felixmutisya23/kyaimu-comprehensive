@@ -372,18 +372,6 @@ export default function App() {
 
   const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
 
-  // ── Show loading screen while fetching from Supabase ────────
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
-        <div style={{ fontSize: 48 }}>🏫</div>
-        <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
-        <div style={{ color: '#64748b', fontSize: 13 }}>Loading school data...</div>
-        {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
-      </div>
-    );
-  }
-
   // ── License / Subscription system — must be called before any early returns ──
   const license = useLicense(data);
 
@@ -419,7 +407,15 @@ export default function App() {
     };
   }, []);
 
-  // Early returns AFTER all hooks
+  // Early returns AFTER all hooks — loading must be here too so hooks run every render
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 48 }}>🏫</div>
+      <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
+      <div style={{ color: '#64748b', fontSize: 13 }}>Loading school data...</div>
+      {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
+    </div>
+  );
   if (!user) return (
     <Login
       data={data}
