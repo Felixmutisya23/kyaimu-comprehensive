@@ -18,6 +18,7 @@ import {
   loadSchoolData, saveSchoolData, createSchool,
   loginPrincipal, loginTeacher,
   getLocalSchoolId, setLocalSchoolId,
+  checkAnySchoolExists,
 } from './supabase';
 
 /*
@@ -329,6 +330,7 @@ export default function App() {
   const [setupDone, setSetupDone] = React.useState(false);
   const [loading, setLoading]     = React.useState(true);
   const [dbError, setDbError]     = React.useState(null);
+  const [anySchoolExists, setAnySchoolExists] = React.useState(false);
 
   // ── Load school data from Supabase on mount ──────────────────
   React.useEffect(() => {
@@ -339,11 +341,14 @@ export default function App() {
           const schoolData = await loadSchoolData(schoolId);
           if (schoolData) {
             setDataRaw(schoolData);
+            setAnySchoolExists(true);
           } else {
-            // School ID in localStorage but not in DB — clear it
             localStorage.removeItem('edumanage_school_id');
           }
         }
+        // Check if ANY school exists in DB (so new devices show Login not Setup)
+        const exists = await checkAnySchoolExists();
+        setAnySchoolExists(exists);
       } catch (e) {
         console.error('Failed to load school data:', e);
         setDbError('Could not connect to database. Check your internet connection.');
@@ -417,8 +422,8 @@ export default function App() {
     </div>
   );
 
-  // No school in DB yet AND no school ID stored — show setup wizard
-  if (!isConfigured && !setupDone && !user && !getLocalSchoolId()) {
+  // Only show setup wizard if NO school exists in DB at all
+  if (!isConfigured && !setupDone && !user && !anySchoolExists) {
     return (
       <SetupWizard
         data={data}

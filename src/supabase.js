@@ -357,6 +357,18 @@ async function syncFeePayments(schoolId, feePayments) {
 }
 
 // ── Login: find teacher across all schools by email+password ─────
+export async function checkAnySchoolExists() {
+  try {
+    const { data, error } = await getSupabase()
+      .from('schools')
+      .select('id')
+      .limit(1);
+    return !error && data && data.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function loginTeacher(email, password) {
   const { data: teachers } = await getSupabase()
     .from('teachers')
