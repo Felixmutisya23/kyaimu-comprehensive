@@ -852,7 +852,6 @@ export function Settings({ data, setData }) {
   // ── Data Backup / Restore ──────────────────────────
   function downloadBackup() {
     const toSave = { ...data };
-    delete toSave.classes; // getter
     const blob = new Blob([JSON.stringify(toSave, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');

@@ -35,14 +35,7 @@ export const INITIAL_DATA = {
   // ── Classes & Streams — blank by default, principal adds in Settings ──
   classGroups: [],
 
-  get classes() {
-    const list = [];
-    this.classGroups.forEach(g => {
-      if (!g.streams || g.streams.length === 0) { list.push(g.name); }
-      else { g.streams.forEach(s => list.push(`${g.name} ${s}`)); }
-    });
-    return list;
-  },
+  // classes is computed via getAllClasses(data) helper — not stored in state
 
   subjects: [],
   departments: ['Academics', 'Management', 'Kitchen', 'Sports', 'Library', 'Finance', 'Counselling', 'Security'],

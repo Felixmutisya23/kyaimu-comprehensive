@@ -322,12 +322,7 @@ function SetupWizard({ data, setData, onDone }) {
 }
 
 export default function App() {
-  const [data, setDataRaw]        = React.useState(() => {
-    // Plain object — avoid spreading INITIAL_DATA getter functions into React state
-    const d = { ...INITIAL_DATA };
-    delete d.classes; // remove getter to keep state serializable
-    return d;
-  });
+  const [data, setDataRaw]        = React.useState({ ...INITIAL_DATA });
   const [user, setUser]           = React.useState(null);
   const [page, setPage]           = React.useState('dashboard');
   const [collapsed, setCollapsed] = React.useState(false);
