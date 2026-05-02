@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const _sb = createClient(
+  'https://dhijqdzgvfpbrfegikrp.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
+);
 
 /* ═══════════════════════════════════════════════════════
    LICENSE & SUBSCRIPTION SYSTEM
@@ -110,35 +116,10 @@ function loadTokenState() {
 async function saveLicenseToCloud(schoolId, licData, tokenData) {
   if (!schoolId) return;
   try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const sb = createClient(
-      'https://dhijqdzgvfpbrfegikrp.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
-    );
-    await sb.from('schools').update({
+    await _sb.from('schools').update({
       license_data: { lic: licData, token: tokenData }
     }).eq('id', schoolId);
   } catch(e) { console.warn('Cloud license save failed:', e); }
-}
-
-// Load license from Supabase on login — call from App after login
-export async function loadLicenseFromCloud(schoolId) {
-  if (!schoolId) return null;
-  try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const sb = createClient(
-      'https://dhijqdzgvfpbrfegikrp.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
-    );
-    const { data } = await sb.from('schools').select('license_data').eq('id', schoolId).single();
-    if (data?.license_data) {
-      const { lic, token } = data.license_data;
-      if (lic) { localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify(lic)); }
-      if (token) { localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(token)); }
-      return data.license_data;
-    }
-  } catch(e) { console.warn('Cloud license load failed:', e); }
-  return null;
 }
 
 function saveTokenState(state, schoolId, licState) {
@@ -149,7 +130,7 @@ function saveTokenState(state, schoolId, licState) {
 /* ═══════════════════════════════════════════════════════
    useLicense HOOK — used in App.jsx
 ═══════════════════════════════════════════════════════ */
-export function useLicense(data) {
+export function useLicense(data, refreshKey = 0) {
   const studentCount = (data.students || []).filter(
     s => !s.status || s.status === 'active'
   ).length;
@@ -159,8 +140,16 @@ export function useLicense(data) {
   const totalDue    = isFirstTerm ? FIRST_TERM_FLAT_FEE : studentCount * PER_STUDENT_FEE;
 
   // Track partial payments so we can show remaining balance
-  const [lic, setLicRaw]        = useState(() => loadLicense());
-  const [tokenState, setTok]    = useState(() => loadTokenState());
+  // refreshKey changes after login to force re-read from localStorage (which was just updated from cloud)
+  const [lic, setLicRaw]     = useState(() => loadLicense());
+  const [tokenState, setTok] = useState(() => loadTokenState());
+
+  React.useEffect(() => {
+    if (refreshKey > 0) {
+      setLicRaw(loadLicense());
+      setTok(loadTokenState());
+    }
+  }, [refreshKey]);
 
   const _currentTerm = data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
   const _currentYear = data.currentYear || new Date().getFullYear();

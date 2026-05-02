@@ -368,7 +368,9 @@ export async function loadLicenseFromCloud(schoolId) {
     if (data?.license_data) {
       const { lic, token } = data.license_data;
       if (lic) localStorage.setItem('edumanage_license_v1', JSON.stringify(lic));
-      if (token) localStorage.setItem('edumanage_token_v1', JSON.stringify(token));
+      if (token && token.expiry && new Date(token.expiry) > new Date()) {
+        localStorage.setItem('edumanage_token_v1', JSON.stringify(token));
+      }
       return data.license_data;
     }
   } catch(e) { console.warn('Cloud license load failed:', e); }

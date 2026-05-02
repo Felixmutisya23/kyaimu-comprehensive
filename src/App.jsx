@@ -332,6 +332,7 @@ export default function App() {
   const [loading, setLoading]     = React.useState(true);
   const [dbError, setDbError]     = React.useState(null);
   const [anySchoolExists, setAnySchoolExists] = React.useState(false);
+  const [licenseRefreshKey, setLicenseRefreshKey] = React.useState(0);
 
   // ── Load school data from Supabase on mount ──────────────────
   React.useEffect(() => {
@@ -379,7 +380,7 @@ export default function App() {
   const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
 
   // ── License / Subscription system — must be called before any early returns ──
-  const license = useLicense(data);
+  const license = useLicense(data, licenseRefreshKey);
 
   // ── Dev panel hook — must be before early returns ──
   const [showDevPanel, setShowDevPanel] = React.useState(false);
@@ -470,6 +471,7 @@ export default function App() {
           if (schoolData) setDataRaw(schoolData);
           // Sync license/token from cloud so payment persists across devices
           await loadLicenseFromCloud(school.id);
+          setLicenseRefreshKey(k => k + 1); // force useLicense to re-read localStorage
           setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
           setPage('dashboard');
           return true;
@@ -481,6 +483,7 @@ export default function App() {
           const schoolData = await loadSchoolData(teacher.school_id);
           if (schoolData) setDataRaw(schoolData);
           await loadLicenseFromCloud(teacher.school_id);
+          setLicenseRefreshKey(k => k + 1);
           setUser({ role: teacher.admin ? 'principal' : 'staff', name: teacher.name, email, staffId: teacher.staff_id });
           setPage('dashboard');
           return true;
