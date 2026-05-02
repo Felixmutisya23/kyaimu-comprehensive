@@ -22,7 +22,8 @@ export default function Login({ data, onLogin }) {
         setError('Incorrect email or password. Please try again.');
       }
     } catch (err) {
-      setError('Connection error. Please check your internet and try again.');
+      console.error('Login error:', err);
+      setError('Connection error: ' + (err?.message || JSON.stringify(err)));
     } finally {
       setLoading(false);
     }
