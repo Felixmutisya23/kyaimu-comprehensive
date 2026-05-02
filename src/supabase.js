@@ -28,7 +28,7 @@ export function clearLocalSchoolId() {
 // ── Convert Supabase school row → app data format ───────────────
 function schoolRowToData(row, related = {}) {
   return {
-    ...INITIAL_DATA,
+    // Plain object — no getter functions from INITIAL_DATA
     _schoolId:         row.id,
     schoolName:        row.school_name        || '',
     schoolMotto:       row.school_motto       || '',
