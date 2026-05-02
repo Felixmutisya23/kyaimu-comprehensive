@@ -10,7 +10,12 @@ import { INITIAL_DATA } from './data/initialData';
 const SUPABASE_URL  = 'https://dhijqdzgvfpbrfegikrp.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+// Lazy singleton — avoids module-level side effects that conflict with React
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+  return _supabase;
+}
 
 // School ID is stored in localStorage — ties this browser to a specific school
 const SCHOOL_ID_KEY = 'edumanage_school_id';
@@ -87,22 +92,22 @@ export async function loadSchoolData(schoolId) {
     { data: inventory },
     { data: editRequests },
   ] = await Promise.all([
-    supabase.from('schools').select('*').eq('id', schoolId).single(),
-    supabase.from('teachers').select('*').eq('school_id', schoolId),
-    supabase.from('students').select('*').eq('school_id', schoolId),
-    supabase.from('exams').select('*').eq('school_id', schoolId),
-    supabase.from('fee_types').select('*').eq('school_id', schoolId),
-    supabase.from('fee_schedule').select('*').eq('school_id', schoolId),
-    supabase.from('fee_payments').select('*').eq('school_id', schoolId),
-    supabase.from('terms').select('*').eq('school_id', schoolId),
-    supabase.from('roll_calls').select('*').eq('school_id', schoolId),
-    supabase.from('permissions').select('*').eq('school_id', schoolId),
-    supabase.from('status_alerts').select('*').eq('school_id', schoolId),
-    supabase.from('notifications').select('*').eq('school_id', schoolId),
-    supabase.from('messages').select('*').eq('school_id', schoolId),
-    supabase.from('parent_messages').select('*').eq('school_id', schoolId),
-    supabase.from('inventory').select('*').eq('school_id', schoolId),
-    supabase.from('edit_requests').select('*').eq('school_id', schoolId),
+    getSupabase().from('schools').select('*').eq('id', schoolId).single(),
+    getSupabase().from('teachers').select('*').eq('school_id', schoolId),
+    getSupabase().from('students').select('*').eq('school_id', schoolId),
+    getSupabase().from('exams').select('*').eq('school_id', schoolId),
+    getSupabase().from('fee_types').select('*').eq('school_id', schoolId),
+    getSupabase().from('fee_schedule').select('*').eq('school_id', schoolId),
+    getSupabase().from('fee_payments').select('*').eq('school_id', schoolId),
+    getSupabase().from('terms').select('*').eq('school_id', schoolId),
+    getSupabase().from('roll_calls').select('*').eq('school_id', schoolId),
+    getSupabase().from('permissions').select('*').eq('school_id', schoolId),
+    getSupabase().from('status_alerts').select('*').eq('school_id', schoolId),
+    getSupabase().from('notifications').select('*').eq('school_id', schoolId),
+    getSupabase().from('messages').select('*').eq('school_id', schoolId),
+    getSupabase().from('parent_messages').select('*').eq('school_id', schoolId),
+    getSupabase().from('inventory').select('*').eq('school_id', schoolId),
+    getSupabase().from('edit_requests').select('*').eq('school_id', schoolId),
   ]);
 
   if (schoolErr || !school) return null;
@@ -165,7 +170,7 @@ export async function loadSchoolData(schoolId) {
 
 // ── Create a new school ──────────────────────────────────────────
 export async function createSchool(setupData) {
-  const { data, error } = await supabase.from('schools').insert({
+  const { data, error } = await getSupabase().from('schools').insert({
     school_name:        setupData.schoolName,
     school_motto:       setupData.schoolMotto       || '',
     school_po_box:      setupData.schoolPOBox        || '',
@@ -182,7 +187,7 @@ export async function createSchool(setupData) {
   if (error || !data) throw new Error(error?.message || 'Failed to create school');
 
   // Insert default admin teacher
-  await supabase.from('teachers').insert({
+  await getSupabase().from('teachers').insert({
     school_id:      data.id,
     local_id:       1,
     name:           'Administrator',
@@ -207,7 +212,7 @@ export async function saveSchoolData(data) {
   if (!schoolId) return;
 
   // 1. Update main school row
-  await supabase.from('schools').update({
+  await getSupabase().from('schools').update({
     school_name:        data.schoolName,
     school_motto:       data.schoolMotto,
     school_po_box:      data.schoolPOBox,
@@ -256,9 +261,9 @@ export async function saveSchoolData(data) {
 
 async function syncTeachers(schoolId, teachers) {
   // Delete all and re-insert (simple approach for small datasets)
-  await supabase.from('teachers').delete().eq('school_id', schoolId);
+  await getSupabase().from('teachers').delete().eq('school_id', schoolId);
   if (!teachers.length) return;
-  await supabase.from('teachers').insert(teachers.map(t => ({
+  await getSupabase().from('teachers').insert(teachers.map(t => ({
     school_id:        schoolId,
     local_id:         t.id,
     name:             t.name,
@@ -278,9 +283,9 @@ async function syncTeachers(schoolId, teachers) {
 }
 
 async function syncStudents(schoolId, students) {
-  await supabase.from('students').delete().eq('school_id', schoolId);
+  await getSupabase().from('students').delete().eq('school_id', schoolId);
   if (!students.length) return;
-  await supabase.from('students').insert(students.map(s => ({
+  await getSupabase().from('students').insert(students.map(s => ({
     school_id:   schoolId,
     local_id:    s.id,
     name:        s.name,
@@ -297,9 +302,9 @@ async function syncStudents(schoolId, students) {
 }
 
 async function syncJsonTable(table, schoolId, items) {
-  await supabase.from(table).delete().eq('school_id', schoolId);
+  await getSupabase().from(table).delete().eq('school_id', schoolId);
   if (!items.length) return;
-  await supabase.from(table).insert(items.map((item, i) => ({
+  await getSupabase().from(table).insert(items.map((item, i) => ({
     school_id: schoolId,
     local_id:  String(item.id || i),
     data:      item,
@@ -307,9 +312,9 @@ async function syncJsonTable(table, schoolId, items) {
 }
 
 async function syncFeeTypes(schoolId, feeTypes) {
-  await supabase.from('fee_types').delete().eq('school_id', schoolId);
+  await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
   if (!feeTypes.length) return;
-  await supabase.from('fee_types').insert(feeTypes.map(f => ({
+  await getSupabase().from('fee_types').insert(feeTypes.map(f => ({
     school_id:          schoolId,
     local_id:           String(f.id),
     name:               f.name,
@@ -320,9 +325,9 @@ async function syncFeeTypes(schoolId, feeTypes) {
 }
 
 async function syncFeeSchedule(schoolId, feeSchedule) {
-  await supabase.from('fee_schedule').delete().eq('school_id', schoolId);
+  await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
   if (!feeSchedule.length) return;
-  await supabase.from('fee_schedule').insert(feeSchedule.map(f => ({
+  await getSupabase().from('fee_schedule').insert(feeSchedule.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
     fee_type_id: String(f.feeTypeId),
@@ -334,9 +339,9 @@ async function syncFeeSchedule(schoolId, feeSchedule) {
 }
 
 async function syncFeePayments(schoolId, feePayments) {
-  await supabase.from('fee_payments').delete().eq('school_id', schoolId);
+  await getSupabase().from('fee_payments').delete().eq('school_id', schoolId);
   if (!feePayments.length) return;
-  await supabase.from('fee_payments').insert(feePayments.map(f => ({
+  await getSupabase().from('fee_payments').insert(feePayments.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
     student_id:  String(f.studentId),
