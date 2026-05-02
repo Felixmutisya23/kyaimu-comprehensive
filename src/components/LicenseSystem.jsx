@@ -35,8 +35,15 @@ const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
    • NNNN = max students (padded to 4 digits)
    • CCCC = checksum (prevents tampering)
 ═══════════════════════════════════════════════════════ */
+function schoolHash(schoolName) {
+  // Generate a 4-char hash from full school name — harder to guess than first 4 letters
+  const name = schoolName.trim().toUpperCase();
+  const hash = [...name].reduce((a, c, i) => (a + c.charCodeAt(0) * (i + 7)) % 46655, 0);
+  return hash.toString(36).toUpperCase().padStart(4, '0');
+}
+
 function makeToken(schoolName, expiryDate, maxStudents = 9999) {
-  const schoolCode = schoolName.trim().toUpperCase().slice(0, 4).padEnd(4, 'X');
+  const schoolCode = schoolHash(schoolName);
   const dateStr    = expiryDate.replace(/-/g, '');
   const seats      = String(maxStudents).padStart(4, '0');
   const raw        = `${schoolCode}${dateStr}${seats}`;
@@ -72,7 +79,8 @@ function parseToken(token) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   LICENSE STATE — persisted in localStorage
+   LICENSE STATE — persisted in Supabase (syncs across devices)
+   Falls back to localStorage for speed on same device
 ═══════════════════════════════════════════════════════ */
 function loadLicense() {
   try {
@@ -82,8 +90,9 @@ function loadLicense() {
   return { paid: false, paidUntil: null, term: null, year: null, txRef: null, studentCount: 0 };
 }
 
-function saveLicense(lic) {
+function saveLicense(lic, schoolId, tokenState) {
   try { localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify(lic)); } catch {}
+  saveLicenseToCloud(schoolId, lic, tokenState);
 }
 
 function loadTokenState() {
@@ -97,8 +106,44 @@ function loadTokenState() {
   return null;
 }
 
-function saveTokenState(state) {
+// Save license data to Supabase so it syncs across all devices
+async function saveLicenseToCloud(schoolId, licData, tokenData) {
+  if (!schoolId) return;
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(
+      'https://dhijqdzgvfpbrfegikrp.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
+    );
+    await sb.from('schools').update({
+      license_data: { lic: licData, token: tokenData }
+    }).eq('id', schoolId);
+  } catch(e) { console.warn('Cloud license save failed:', e); }
+}
+
+// Load license from Supabase on login — call from App after login
+export async function loadLicenseFromCloud(schoolId) {
+  if (!schoolId) return null;
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(
+      'https://dhijqdzgvfpbrfegikrp.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
+    );
+    const { data } = await sb.from('schools').select('license_data').eq('id', schoolId).single();
+    if (data?.license_data) {
+      const { lic, token } = data.license_data;
+      if (lic) { localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify(lic)); }
+      if (token) { localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(token)); }
+      return data.license_data;
+    }
+  } catch(e) { console.warn('Cloud license load failed:', e); }
+  return null;
+}
+
+function saveTokenState(state, schoolId, licState) {
   try { localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(state)); } catch {}
+  saveLicenseToCloud(schoolId, licState, state);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -124,7 +169,7 @@ export function useLicense(data) {
   const amountDue    = Math.max(0, totalDue - alreadyPaid);
   const [checking, setChecking] = useState(false);
 
-  function setLic(val) { setLicRaw(val); saveLicense(val); }
+  function setLic(val) { setLicRaw(val); saveLicense(val, data._schoolId, tokenState); }
 
   const currentTerm = _currentTerm;
   const currentYear = _currentYear;
@@ -143,12 +188,17 @@ export function useLicense(data) {
     const parsed = parseToken(tokenStr);
     if (!parsed) return { ok: false, msg: '❌ Invalid token. Please check and try again.' };
     if (parsed.expiry < new Date()) return { ok: false, msg: '❌ This token has already expired.' };
+    // Verify token belongs to THIS school — prevents sharing between schools
+    const expectedCode = schoolHash(data.schoolName || '');
+    if (parsed.schoolCode !== expectedCode) {
+      return { ok: false, msg: '❌ This token was generated for a different school and cannot be used here.' };
+    }
     const state = {
       expiry: parsed.expiry.toISOString(),
       maxStudents: parsed.maxStudents,
       schoolCode: parsed.schoolCode,
     };
-    setTok(state); saveTokenState(state);
+    setTok(state); saveTokenState(state, data._schoolId, lic);
     return { ok: true, msg: `✅ Token accepted! Access granted until ${parsed.expiry.toLocaleDateString('en-KE')}.` };
   }
 
@@ -276,6 +326,15 @@ export function LicenseGate({ license, data }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0a0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+      {/* Hidden dev trigger — tiny dot in bottom-right corner, invisible unless you know it's there */}
+      <div
+        title=""
+        onClick={() => {
+          // Dispatch a custom event that App.jsx listens for
+          window.dispatchEvent(new CustomEvent('felix-dev-open'));
+        }}
+        style={{ position: 'fixed', bottom: 8, right: 8, width: 12, height: 12, borderRadius: '50%', background: '#7c3aed22', cursor: 'pointer', zIndex: 10000 }}
+      />
       <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 20, padding: 40, maxWidth: 500, width: '92%', textAlign: 'center', boxShadow: '0 24px 80px #0008' }}>
 
         <div style={{ fontSize: 48, marginBottom: 10 }}>🏫</div>
@@ -394,6 +453,7 @@ export function TokenGenerator({ data }) {
   const [devPass, setDevPass]     = useState('');
   const [authed, setAuthed]       = useState(false);
   const [passErr, setPassErr]     = useState('');
+  const [targetSchool, setTargetSchool] = useState(data.schoolName || '');
 
   function checkPassword() {
     if (devPass === DEV_PASSWORD) { setAuthed(true); setPassErr(''); }
@@ -401,7 +461,8 @@ export function TokenGenerator({ data }) {
   }
 
   function generate() {
-    const tok = makeToken(data.schoolName || 'SCHOOL', expiry, seats);
+    if (!targetSchool.trim()) { alert('Enter the school name first.'); return; }
+    const tok = makeToken(targetSchool.trim(), expiry, seats);
     setGenerated(tok);
   }
 
@@ -413,7 +474,7 @@ export function TokenGenerator({ data }) {
   function copyWhatsApp() {
     const msg =
       `*EduManage Pro Access Token*\n\n` +
-      `🏫 School: ${data.schoolName || ''}\n` +
+      `🏫 School: ${targetSchool}\n` +
       `🔑 Token: ${generated}\n` +
       `📅 Valid until: ${new Date(expiry).toLocaleDateString('en-KE')}\n` +
       `👥 Max students: ${seats}\n\n` +
@@ -449,6 +510,20 @@ export function TokenGenerator({ data }) {
         </div>
       ) : (
         <div>
+          {/* School name field */}
+          <div style={{ marginBottom: 12, padding: '10px 12px', background: '#171b26', border: '1px solid #7c3aed40', borderRadius: 8 }}>
+            <label style={{ fontSize: 11, color: '#7c3aed', display: 'block', marginBottom: 6, fontWeight: 700 }}>
+              🏫 Generating token for school:
+            </label>
+            <input
+              value={targetSchool}
+              onChange={e => { setTargetSchool(e.target.value); setGenerated(''); }}
+              placeholder="Enter exact school name as registered"
+              style={{ width: '100%', padding: '8px 10px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 6, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}
+            />
+            {targetSchool && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Token ID: {schoolHash(targetSchool.trim())} — unique to this school name</div>}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Expiry Date ({daysCount} days)</label>
@@ -476,7 +551,7 @@ export function TokenGenerator({ data }) {
           </div>
 
           <button onClick={generate} style={{ width: '100%', padding: '10px 0', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginBottom: 12 }}>
-            Generate Token for {data.schoolName || 'School'}
+            Generate Token for {targetSchool || 'School'}
           </button>
 
           {generated && (

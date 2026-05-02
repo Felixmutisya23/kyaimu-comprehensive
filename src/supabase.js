@@ -357,6 +357,24 @@ async function syncFeePayments(schoolId, feePayments) {
 }
 
 // ── Login: find teacher across all schools by email+password ─────
+export async function loadLicenseFromCloud(schoolId) {
+  if (!schoolId) return null;
+  try {
+    const { data } = await getSupabase()
+      .from('schools')
+      .select('license_data')
+      .eq('id', schoolId)
+      .single();
+    if (data?.license_data) {
+      const { lic, token } = data.license_data;
+      if (lic) localStorage.setItem('edumanage_license_v1', JSON.stringify(lic));
+      if (token) localStorage.setItem('edumanage_token_v1', JSON.stringify(token));
+      return data.license_data;
+    }
+  } catch(e) { console.warn('Cloud license load failed:', e); }
+  return null;
+}
+
 export async function checkAnySchoolExists() {
   try {
     const { data, error } = await getSupabase()

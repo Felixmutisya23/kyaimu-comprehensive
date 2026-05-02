@@ -19,6 +19,7 @@ import {
   loginPrincipal, loginTeacher,
   getLocalSchoolId, setLocalSchoolId,
   checkAnySchoolExists,
+  loadLicenseFromCloud,
 } from './supabase';
 
 /*
@@ -467,6 +468,8 @@ export default function App() {
           setLocalSchoolId(school.id);
           const schoolData = await loadSchoolData(school.id);
           if (schoolData) setDataRaw(schoolData);
+          // Sync license/token from cloud so payment persists across devices
+          await loadLicenseFromCloud(school.id);
           setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
           setPage('dashboard');
           return true;
@@ -477,6 +480,7 @@ export default function App() {
           setLocalSchoolId(teacher.school_id);
           const schoolData = await loadSchoolData(teacher.school_id);
           if (schoolData) setDataRaw(schoolData);
+          await loadLicenseFromCloud(teacher.school_id);
           setUser({ role: teacher.admin ? 'principal' : 'staff', name: teacher.name, email, staffId: teacher.staff_id });
           setPage('dashboard');
           return true;

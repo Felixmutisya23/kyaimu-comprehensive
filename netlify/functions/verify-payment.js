@@ -1,6 +1,15 @@
 exports.handler = async (event) => {
   const method = event.httpMethod;
 
+  // Check env var
+  if (!process.env.INSTASEND_SECRET_KEY) {
+    return {
+      statusCode: 503,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Payment system not configured. Contact administrator.' }),
+    };
+  }
+
   // ── INITIATE STK PUSH (POST with body.action = 'initiate') ──────────
   if (method === 'POST') {
     const body = JSON.parse(event.body || '{}');
