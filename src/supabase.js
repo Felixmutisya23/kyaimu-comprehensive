@@ -17,6 +17,9 @@ function getSupabase() {
   return _supabase;
 }
 
+// Export single shared client for use across the app
+export const supabaseClient = { from: (...a) => getSupabase().from(...a) };
+
 // School ID is stored in localStorage — ties this browser to a specific school
 const SCHOOL_ID_KEY = 'edumanage_school_id';
 
