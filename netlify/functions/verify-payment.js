@@ -1,5 +1,3 @@
-const IntaSend = require('intasend-node');
-
 function normalizePhone(phone) {
   let p = String(phone).replace(/\D/g, '');
   if (p.startsWith('0')) p = '254' + p.slice(1);
@@ -36,52 +34,73 @@ exports.handler = async (event) => {
   }
 
   try {
-    const intasend = new IntaSend(pubKey, secretKey, false); // false = live mode
-    const collection = intasend.collection();
-
     // ── INITIATE STK PUSH ──────────────────────────────────────────
     if (body.action === 'initiate') {
-      const { phone, amount, apiRef, name, email } = body;
+      const { phone, amount, apiRef } = body;
       const normalizedPhone = normalizePhone(phone);
 
       console.log('Initiating STK Push:', { phone: normalizedPhone, amount, apiRef });
 
-      const response = await collection.mpesaStkPush({
-        first_name: (name || 'School').split(' ')[0],
-        last_name: (name || 'Admin').split(' ').slice(1).join(' ') || 'Admin',
-        email: email || 'school@edumanage.ac.ke',
-        host: 'https://elimupro-ke.netlify.app',
-        amount: Math.round(parseFloat(amount)),
-        phone_number: normalizedPhone,
-        api_ref: apiRef || 'edumanage-payment',
+      const response = await fetch('https://payment.intasend.com/api/v1/payment/mpesa-stk-push/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-IntaSend-Public-Key': pubKey,
+          'Authorization': 'Bearer ' + secretKey,
+        },
+        body: JSON.stringify({
+          amount: Math.round(parseFloat(amount)),
+          phone_number: normalizedPhone,
+          currency: 'KES',
+          narrative: 'EduManage Pro subscription',
+          api_ref: apiRef || 'edumanage_' + Date.now(),
+        }),
       });
 
-      console.log('STK Push response:', JSON.stringify(response));
+      const text = await response.text();
+      console.log('IntaSend status:', response.status, 'body:', text);
 
-      const invoiceId = response.invoice?.invoice_id || response.id;
+      let data;
+      try { data = JSON.parse(text); } catch { data = { error: text }; }
+
+      const invoiceId = data.invoice_id || data.id;
       return {
         statusCode: 200, headers,
-        body: JSON.stringify({ success: true, invoice_id: invoiceId, ...response }),
+        body: JSON.stringify({ ...data, invoice_id: invoiceId }),
       };
     }
 
     // ── CHECK PAYMENT STATUS ───────────────────────────────────────
     if (body.invoiceId) {
       console.log('Checking status for invoice:', body.invoiceId);
-      const status = await collection.checkPayment({ invoice_id: body.invoiceId });
-      console.log('Payment status:', JSON.stringify(status));
-      const state = status.invoice?.state || status.state;
-      return { statusCode: 200, headers, body: JSON.stringify({ state }) };
+
+      const response = await fetch(`https://payment.intasend.com/api/v1/payment/status/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-IntaSend-Public-Key': pubKey,
+          'Authorization': 'Bearer ' + secretKey,
+        },
+        body: JSON.stringify({ invoice_id: body.invoiceId }),
+      });
+
+      const text = await response.text();
+      console.log('Status response:', text);
+
+      let data;
+      try { data = JSON.parse(text); } catch { data = {}; }
+
+      const state = data.invoice?.state || data.state;
+      return { statusCode: 200, headers, body: JSON.stringify({ state, ...data }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing action or invoiceId' }) };
 
   } catch (err) {
-    console.error('verify-payment error:', err?.response?.data || err.message);
-    const msg = err?.response?.data?.details || err?.response?.data?.detail || err.message;
+    console.error('verify-payment error:', err.message);
     return {
       statusCode: 200, headers,
-      body: JSON.stringify({ error: true, message: msg || 'Payment failed. Try again.' }),
+      body: JSON.stringify({ error: true, message: err.message || 'Payment failed. Try again.' }),
     };
   }
 };
