@@ -30,7 +30,7 @@ exports.handler = async (event) => {
       const { phone, amount, apiRef, name, email } = body;
       console.log('Initiating payment:', { phone, amount, apiRef });
 
-      const res = await fetch('https://api.intasend.com/api/v1/payment/mpesa-stk-push/', {
+      const res = await fetch('https://payment.intasend.com/api/v1/payment/mpesa-stk-push/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ exports.handler = async (event) => {
 
     if (body.invoiceId) {
       const res = await fetch(
-        `https://api.intasend.com/api/v1/payment/status/`,
+        `https://payment.intasend.com/api/v1/payment/status/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
