@@ -1,3 +1,12 @@
+const IntaSend = require('intasend-node');
+
+function normalizePhone(phone) {
+  let p = String(phone).replace(/\D/g, '');
+  if (p.startsWith('0')) p = '254' + p.slice(1);
+  if (!p.startsWith('254')) p = '254' + p;
+  return p;
+}
+
 exports.handler = async (event) => {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
@@ -9,9 +18,10 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const key = process.env.INSTASEND_SECRET_KEY;
-  const pubKey = process.env.INSTASEND_PUBLISHABLE_KEY || '';
-  if (!key) {
+  const secretKey = process.env.INSTASEND_SECRET_KEY;
+  const pubKey = process.env.INSTASEND_PUBLISHABLE_KEY;
+
+  if (!secretKey || !pubKey) {
     return {
       statusCode: 503, headers,
       body: JSON.stringify({ error: 'Payment system not configured. Contact administrator.' }),
@@ -26,58 +36,52 @@ exports.handler = async (event) => {
   }
 
   try {
+    const intasend = new IntaSend(pubKey, secretKey, false); // false = live mode
+    const collection = intasend.collection();
+
+    // ── INITIATE STK PUSH ──────────────────────────────────────────
     if (body.action === 'initiate') {
       const { phone, amount, apiRef, name, email } = body;
-      console.log('Initiating payment:', { phone, amount, apiRef });
+      const normalizedPhone = normalizePhone(phone);
 
-      const res = await fetch('https://payment.intasend.com/api/v1/payment/mpesa-stk-push/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`,
-          'X-intasend-public-key-token': pubKey,
-        },
-        body: JSON.stringify({
-          amount: String(amount),
-          phone_number: phone,
-          api_ref: apiRef || 'edumanage-payment',
-        }),
+      console.log('Initiating STK Push:', { phone: normalizedPhone, amount, apiRef });
+
+      const response = await collection.mpesaStkPush({
+        first_name: (name || 'School').split(' ')[0],
+        last_name: (name || 'Admin').split(' ').slice(1).join(' ') || 'Admin',
+        email: email || 'school@edumanage.ac.ke',
+        host: 'https://elimupro-ke.netlify.app',
+        amount: Math.round(parseFloat(amount)),
+        phone_number: normalizedPhone,
+        api_ref: apiRef || 'edumanage-payment',
       });
 
-      const text = await res.text();
-      console.log('InstaSend status:', res.status, 'body:', text);
+      console.log('STK Push response:', JSON.stringify(response));
 
-      let data;
-      try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-      if (!res.ok) {
-        return {
-          statusCode: 200, headers,
-          body: JSON.stringify({ error: true, message: data?.detail || data?.message || `InstaSend error ${res.status}` }),
-        };
-      }
-      return { statusCode: 200, headers, body: JSON.stringify(data) };
+      const invoiceId = response.invoice?.invoice_id || response.id;
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ success: true, invoice_id: invoiceId, ...response }),
+      };
     }
 
+    // ── CHECK PAYMENT STATUS ───────────────────────────────────────
     if (body.invoiceId) {
-      const res = await fetch(
-        `https://payment.intasend.com/api/v1/payment/status/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({ invoice_id: body.invoiceId }),
-        }
-      );
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = {}; }
-      return { statusCode: 200, headers, body: JSON.stringify({ state: data.invoice?.state || data.state }) };
+      console.log('Checking status for invoice:', body.invoiceId);
+      const status = await collection.checkPayment({ invoice_id: body.invoiceId });
+      console.log('Payment status:', JSON.stringify(status));
+      const state = status.invoice?.state || status.state;
+      return { statusCode: 200, headers, body: JSON.stringify({ state }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing action or invoiceId' }) };
 
   } catch (err) {
-    console.error('verify-payment error:', err);
-    return { statusCode: 200, headers, body: JSON.stringify({ error: true, message: err.message }) };
+    console.error('verify-payment error:', err?.response?.data || err.message);
+    const msg = err?.response?.data?.details || err?.response?.data?.detail || err.message;
+    return {
+      statusCode: 200, headers,
+      body: JSON.stringify({ error: true, message: msg || 'Payment failed. Try again.' }),
+    };
   }
 };
