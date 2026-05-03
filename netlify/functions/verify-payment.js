@@ -10,6 +10,7 @@ exports.handler = async (event) => {
   }
 
   const key = process.env.INSTASEND_SECRET_KEY;
+  const pubKey = process.env.INSTASEND_PUBLISHABLE_KEY || '';
   if (!key) {
     return {
       statusCode: 503, headers,
@@ -29,12 +30,17 @@ exports.handler = async (event) => {
       const { phone, amount, apiRef, name, email } = body;
       console.log('Initiating payment:', { phone, amount, apiRef });
 
-      const res = await fetch('https://app.instasend.io/api/v1/payment-links/one-time/', {
+      const res = await fetch('https://api.intasend.com/api/v1/payment/mpesa-stk-push/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-insta-token': key },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`,
+          'X-intasend-public-key-token': pubKey,
+        },
         body: JSON.stringify({
-          amount, currency: 'KES', phone_number: phone,
-          api_ref: apiRef, name: name || 'School', email: email || 'school@school.ac.ke',
+          amount: String(amount),
+          phone_number: phone,
+          api_ref: apiRef || 'edumanage-payment',
         }),
       });
 
@@ -55,8 +61,12 @@ exports.handler = async (event) => {
 
     if (body.invoiceId) {
       const res = await fetch(
-        `https://app.instasend.io/api/v1/payment-links/${body.invoiceId}/`,
-        { headers: { 'X-insta-token': key } }
+        `https://api.intasend.com/api/v1/payment/status/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+          body: JSON.stringify({ invoice_id: body.invoiceId }),
+        }
       );
       const text = await res.text();
       let data;
