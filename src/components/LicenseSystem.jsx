@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const _sb = createClient(
-  'https://dhijqdzgvfpbrfegikrp.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg'
-);
+import { supabaseClient } from '../supabase';
 
 /* ═══════════════════════════════════════════════════════
    LICENSE & SUBSCRIPTION SYSTEM
@@ -26,7 +21,7 @@ const _sb = createClient(
 const VERIFY_PAYMENT_URL = '/.netlify/functions/verify-payment';
 
 // ── PRICING CONSTANTS ────────────────────────────────
-const FIRST_TERM_FLAT_FEE = 5000;  // KES 5,000 flat for first-ever term (no students yet)
+const FIRST_TERM_FLAT_FEE = 1000;  // KES 1,000 flat for first-ever term (testing)
 const PER_STUDENT_FEE     = 100;   // KES 100 per student per term from next term onward
 
 // ── STORAGE KEYS ─────────────────────────────────────
@@ -116,7 +111,7 @@ function loadTokenState() {
 async function saveLicenseToCloud(schoolId, licData, tokenData) {
   if (!schoolId) return;
   try {
-    await _sb.from('schools').update({
+    await supabaseClient.from('schools').update({
       license_data: { lic: licData, token: tokenData }
     }).eq('id', schoolId);
   } catch(e) { console.warn('Cloud license save failed:', e); }
