@@ -305,13 +305,40 @@ async function syncStudents(schoolId, students) {
 }
 
 async function syncJsonTable(table, schoolId, items) {
-  await getSupabase().from(table).delete().eq('school_id', schoolId);
-  if (!items.length) return;
-  await getSupabase().from(table).insert(items.map((item, i) => ({
+  if (!items.length) {
+    // Only delete if we have confirmed empty array
+    await getSupabase().from(table).delete().eq('school_id', schoolId);
+    return;
+  }
+  // Upsert: insert or update based on school_id + local_id combination
+  // This prevents data loss if save fails halfway
+  const rows = items.map((item, i) => ({
     school_id: schoolId,
     local_id:  String(item.id || i),
     data:      item,
-  })));
+  }));
+  
+  // Get existing local_ids to know what to delete (removed items)
+  const { data: existing } = await getSupabase()
+    .from(table)
+    .select('local_id')
+    .eq('school_id', schoolId);
+  
+  const newIds = new Set(rows.map(r => r.local_id));
+  const toDelete = (existing || []).filter(e => !newIds.has(e.local_id)).map(e => e.local_id);
+  
+  // Delete removed items
+  if (toDelete.length) {
+    await getSupabase().from(table).delete()
+      .eq('school_id', schoolId)
+      .in('local_id', toDelete);
+  }
+  
+  // Upsert all current items
+  await getSupabase().from(table).upsert(rows, { 
+    onConflict: 'school_id,local_id',
+    ignoreDuplicates: false 
+  });
 }
 
 async function syncFeeTypes(schoolId, feeTypes) {

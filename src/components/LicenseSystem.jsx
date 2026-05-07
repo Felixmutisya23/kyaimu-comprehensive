@@ -21,7 +21,7 @@ import { supabaseClient } from '../supabase';
 const VERIFY_PAYMENT_URL = '/.netlify/functions/verify-payment';
 
 // ── PRICING CONSTANTS ────────────────────────────────
-const FIRST_TERM_FLAT_FEE = 1000;  // KES 1,000 flat for first-ever term (testing)
+const FIRST_TERM_FLAT_FEE = 5000;  // KES 5,000 flat for first-ever term
 const PER_STUDENT_FEE     = 100;   // KES 100 per student per term from next term onward
 
 // ── STORAGE KEYS ─────────────────────────────────────

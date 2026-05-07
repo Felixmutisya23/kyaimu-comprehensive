@@ -18,6 +18,9 @@ export default function Timetable({ data, setData, user }) {
   const [editMode, setEditMode] = useState(false);
   const [showGen, setShowGen]   = useState(false);
   const [genClass, setGenClass] = useState(getAllClasses(data)[0] || '');
+  const [genStep, setGenStep]   = useState(1); // 1=class, 2=subject config, 3=options
+  const [subjectConfig, setSubjectConfig] = useState({}); // {subjectName: {lessonsPerWeek, isDouble, doublesSeparated}}
+  const [genOptions, setGenOptions] = useState({ allowDoubleConsecutive: true });
 
   const tt = data.timetable[selClass] || {};
 
@@ -111,21 +114,114 @@ export default function Timetable({ data, setData, user }) {
   }
 
   /* ── Auto-generate ───────────────────────────────── */
+  function initSubjectConfig() {
+    const subjects = data.subjects || [];
+    const cfg = {};
+    subjects.forEach(s => {
+      cfg[s] = { lessonsPerWeek: 4, isDouble: false, doublesSeparated: false };
+    });
+    setSubjectConfig(cfg);
+    setGenStep(2);
+  }
+
   function generateTimetable() {
-    const subjects = data.subjects;
-    const generated = {};
-    DAYS.forEach((day, di) => {
-      generated[day] = data.bells.map((b, bi) => {
-        if (b.type === 'assembly') return 'Assembly';
-        if (b.type === 'break')    return 'Break';
-        if (b.type === 'lunch')    return 'Lunch';
-        if (b.type === 'end')      return 'End';
-        const lessonIdx = data.bells.slice(0, bi).filter(x => x.type === 'lesson').length;
-        return subjects[(di * 8 + lessonIdx) % subjects.length];
+    const lessonSlots = []; // [{day, slotIndex}]
+    DAYS.forEach(day => {
+      data.bells.forEach((b, i) => {
+        if (b.type === 'lesson') lessonSlots.push({ day, slotIndex: i });
       });
     });
+
+    // Build list of lessons to place
+    const toPlace = [];
+    Object.entries(subjectConfig).forEach(([subj, cfg]) => {
+      const count = cfg.lessonsPerWeek || 0;
+      for (let i = 0; i < count; i++) {
+        toPlace.push({ subj, isDouble: cfg.isDouble, doublesSeparated: cfg.doublesSeparated });
+      }
+    });
+
+    // Shuffle lessons for randomness
+    for (let i = toPlace.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [toPlace[i], toPlace[j]] = [toPlace[j], toPlace[i]];
+    }
+
+    // Initialize empty timetable
+    const generated = {};
+    DAYS.forEach(day => {
+      generated[day] = data.bells.map(b => {
+        if (b.type === 'assembly') return 'Assembly';
+        if (b.type === 'break') return 'Break';
+        if (b.type === 'lunch') return 'Lunch';
+        if (b.type === 'end') return 'End';
+        return '';
+      });
+    });
+
+    // Place double lessons first (consecutive or separated)
+    const doubles = toPlace.filter(l => l.isDouble);
+    const singles = toPlace.filter(l => !l.isDouble);
+
+    // Place doubles
+    doubles.forEach(({ subj, doublesSeparated }) => {
+      const daySlots = {};
+      DAYS.forEach(d => {
+        daySlots[d] = data.bells.map((b, i) => ({ b, i })).filter(({ b }) => b.type === 'lesson');
+      });
+
+      if (!doublesSeparated) {
+        // Find consecutive free slots
+        let placed = false;
+        const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
+        for (const day of shuffledDays) {
+          const slots = daySlots[day];
+          for (let i = 0; i < slots.length - 1; i++) {
+            const s1 = slots[i].i;
+            const s2 = slots[i + 1].i;
+            if (!generated[day][s1] && !generated[day][s2] && s2 === s1 + 1) {
+              generated[day][s1] = subj;
+              generated[day][s2] = subj;
+              placed = true;
+              break;
+            }
+          }
+          if (placed) break;
+        }
+        if (!placed) singles.push({ subj, isDouble: false });
+      } else {
+        // Place as two singles on different days
+        singles.push({ subj, isDouble: false });
+        singles.push({ subj, isDouble: false });
+      }
+    });
+
+    // Place singles - distribute evenly across days
+    const freeSlots = [];
+    DAYS.forEach(day => {
+      data.bells.forEach((b, i) => {
+        if (b.type === 'lesson' && !generated[day][i]) {
+          freeSlots.push({ day, i });
+        }
+      });
+    });
+
+    // Shuffle free slots
+    for (let i = freeSlots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [freeSlots[i], freeSlots[j]] = [freeSlots[j], freeSlots[i]];
+    }
+
+    singles.forEach((lesson, idx) => {
+      if (idx < freeSlots.length) {
+        const { day, i } = freeSlots[idx];
+        generated[day][i] = lesson.subj;
+      }
+    });
+
     setData(d => ({ ...d, timetable: { ...d.timetable, [genClass]: generated } }));
     setShowGen(false);
+    setGenStep(1);
   }
 
   function updateCell(day, idx, value) {
@@ -321,19 +417,105 @@ export default function Timetable({ data, setData, user }) {
         </div>
       )}
 
-      {/* Auto Generate Modal */}
-      <Modal show={showGen} onClose={() => setShowGen(false)} title="Auto-Generate Timetable">
-        <Alert type="warning"><Icon name="alert" size={14} />This will replace the existing timetable for the selected class.</Alert>
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Class</label>
-          <select value={genClass} onChange={e => setGenClass(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
-            {getAllClasses(data).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setShowGen(false)}>Cancel</Btn>
-          <Btn variant="success" onClick={generateTimetable}>Generate</Btn>
-        </div>
+      {/* Smart Auto-Generate Modal */}
+      <Modal show={showGen} onClose={() => { setShowGen(false); setGenStep(1); }} title={`Auto-Generate Timetable — Step ${genStep} of 3`}>
+        
+        {/* Step 1: Select Class */}
+        {genStep === 1 && (
+          <div>
+            <Alert type="warning"><Icon name="alert" size={14} /> This will replace the existing timetable for the selected class.</Alert>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Select Class</label>
+              <select value={genClass} onChange={e => setGenClass(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+                {getAllClasses(data).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setShowGen(false)}>Cancel</Btn>
+              <Btn onClick={initSubjectConfig}>Next: Configure Subjects →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Lessons per week + double periods */}
+        {genStep === 2 && (
+          <div>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12 }}>
+              Set how many lessons per week for each subject, and whether any should have double periods.
+            </div>
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#1e2435' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', color: '#64748b' }}>Subject</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>Lessons/Week</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>Double Period?</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>Doubles Separated?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(subjectConfig).map(([subj, cfg]) => (
+                    <tr key={subj} style={{ borderBottom: '1px solid #2a3350' }}>
+                      <td style={{ padding: '8px 10px', color: '#e2e8f0', fontWeight: 600 }}>{subj}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <input type="number" min={0} max={10} value={cfg.lessonsPerWeek}
+                          onChange={e => setSubjectConfig(p => ({ ...p, [subj]: { ...p[subj], lessonsPerWeek: Number(e.target.value) } }))}
+                          style={{ width: 60, padding: '4px 8px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 6, color: '#e2e8f0', textAlign: 'center' }} />
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <input type="checkbox" checked={cfg.isDouble}
+                          onChange={e => setSubjectConfig(p => ({ ...p, [subj]: { ...p[subj], isDouble: e.target.checked } }))}
+                          style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        {cfg.isDouble && (
+                          <div style={{ fontSize: 11, color: '#64748b' }}>
+                            <label><input type="radio" name={`sep-${subj}`} checked={!cfg.doublesSeparated}
+                              onChange={() => setSubjectConfig(p => ({ ...p, [subj]: { ...p[subj], doublesSeparated: false } }))} /> Consecutive</label>
+                            {' '}
+                            <label><input type="radio" name={`sep-${subj}`} checked={cfg.doublesSeparated}
+                              onChange={() => setSubjectConfig(p => ({ ...p, [subj]: { ...p[subj], doublesSeparated: true } }))} /> Separated</label>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Btn variant="ghost" onClick={() => setGenStep(1)}>← Back</Btn>
+              <Btn onClick={() => setGenStep(3)}>Next: Review & Generate →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Review & Generate */}
+        {genStep === 3 && (
+          <div>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12 }}>Review your timetable configuration:</div>
+            <div style={{ background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 12 }}>
+              <div style={{ fontWeight: 700, color: '#4f8ef7', marginBottom: 8 }}>Class: {genClass}</div>
+              {Object.entries(subjectConfig).filter(([, c]) => c.lessonsPerWeek > 0).map(([subj, cfg]) => (
+                <div key={subj} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #2a3350', color: '#e2e8f0' }}>
+                  <span>{subj}</span>
+                  <span style={{ color: '#64748b' }}>
+                    {cfg.lessonsPerWeek} lessons/week
+                    {cfg.isDouble ? (cfg.doublesSeparated ? ' · 2 singles' : ' · double period') : ''}
+                  </span>
+                </div>
+              ))}
+              <div style={{ marginTop: 8, color: '#64748b' }}>
+                Total: {Object.values(subjectConfig).reduce((a, c) => a + (c.lessonsPerWeek || 0), 0)} lessons/week
+                · Available: {data.bells.filter(b => b.type === 'lesson').length * DAYS.length} slots
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setGenStep(2)}>← Back</Btn>
+              <Btn variant="success" onClick={generateTimetable}><Icon name="check" size={13} /> Generate Timetable</Btn>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
