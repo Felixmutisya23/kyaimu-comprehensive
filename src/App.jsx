@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { loginPrincipal, loginTeacher, loadSchoolData, loadLicenseFromCloud, setLocalSchoolId, getSubscription } from './supabase';
 import { INITIAL_DATA, canSeeKitchenAlerts, canSeeFees, isTeachingStaff } from './data/initialData';
 import { Icon } from './components/UI';
 import Login from './components/Login';
@@ -372,7 +373,53 @@ export default function App() {
   // ── License / Subscription system ──────────────────────
   const license = useLicense(data);
 
-  if (!user) return <Login data={data} onLogin={u => { setUser(u); setPage('dashboard'); }} />;
+  if (!user) return <Login data={data} onLogin={async (email, password) => {
+    try {
+      // Try principal login first
+      const school = await loginPrincipal(email, password);
+      if (school) {
+        setLocalSchoolId(school.id);
+        const sd = await loadSchoolData(school.id);
+        if (sd) setDataRaw(sd);
+        await loadLicenseFromCloud(school.id);
+        setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
+        setPage('dashboard');
+        const now = new Date();
+        const t = sd?.currentTerm || (now.getMonth() < 4 ? 1 : now.getMonth() < 8 ? 2 : 3);
+        const y = sd?.currentYear || now.getFullYear();
+        const sub = await getSubscription(school.id, t, y);
+        setSubscription && setSubscription(sub);
+        return true;
+      }
+      // Try teacher login
+      const teacher = await loginTeacher(email, password);
+      if (teacher) {
+        setLocalSchoolId(teacher.school_id);
+        const sd = await loadSchoolData(teacher.school_id);
+        if (sd) setDataRaw(sd);
+        const teacherRecord = (sd?.teachers || []).find(t => (t.email || '').toLowerCase() === (email || '').toLowerCase());
+        if (teacherRecord && teacherRecord.status === 'pending') return false;
+        await loadLicenseFromCloud(teacher.school_id);
+        setUser({
+          role: teacher.admin ? 'principal' : 'staff',
+          staffType: teacherRecord?.staffType || teacher.staff_type || 'teaching',
+          name: teacher.name || teacherRecord?.name || email,
+          email,
+          staffId: teacher.staff_id || teacherRecord?.staffId,
+          isClassTeacher: teacherRecord?.isClassTeacher || teacher.is_class_teacher || false,
+          classTeacherOf: teacherRecord?.classTeacherOf || teacher.class_teacher_of || null,
+          teacherSubjects: teacherRecord?.subjects || [],
+          admin: teacher.admin || false,
+        });
+        setPage('dashboard');
+        return true;
+      }
+      return false;
+    } catch(err) {
+      console.error('Login error:', err);
+      return false;
+    }
+  }} />;
   if (user.role === 'principal' && !isConfigured && !setupDone) {
     return <SetupWizard data={data} setData={setData} onDone={() => setSetupDone(true)} />;
   }
@@ -413,7 +460,7 @@ export default function App() {
   };
 
   const roleColor = ROLE_COLORS[user.role] || '#4f8ef7';
-  const initials  = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const initials  = (user.name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   // Show license gate — but NEVER on Settings so Felix can always reach it
   const showLicenseGate = !license.isUnlocked && user?.role === 'principal' && page !== 'settings';
