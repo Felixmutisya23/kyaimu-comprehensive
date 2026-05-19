@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Avatar, Alert, Icon } from './UI';
 import { getAllClasses } from '../data/initialData';
+import { PendingTeacherApprovals, InviteLinkGenerator } from './TeacherRegistration';
 
 const STAFF_TYPES = [
   { value: 'teaching',     label: 'Teaching Staff' },
@@ -163,6 +164,8 @@ export default function Teachers({ data, setData }) {
 
   return (
     <div>
+      <InviteLinkGenerator data={data} />
+      <PendingTeacherApprovals data={data} setData={setData} />
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input placeholder="Search by name or staff ID..." value={search}

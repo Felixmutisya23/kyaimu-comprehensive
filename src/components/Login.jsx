@@ -5,7 +5,7 @@ const INPUT_STYLE = {
   borderRadius: 8, color: '#e2e8f0', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 };
 
-export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, onParentLogin, onTeacherRegister }) {
+export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, onParentLogin, onTeacherRegister, externalError }) {
   const [tab,      setTab]      = useState('staff');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -130,9 +130,9 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
               </div>
             )}
 
-            {error && (
+            {(error || externalError) && (
               <div style={{ background: '#ef444415', border: '1px solid #ef444440', color: '#ef4444', borderRadius: 8, padding: '10px 13px', fontSize: 13, marginBottom: 14, display: 'flex', gap: 8 }}>
-                <span>⚠</span><span>{error}</span>
+                <span>⚠</span><span>{externalError || error}</span>
               </div>
             )}
             <button type="submit" disabled={loading || !email || (tab === 'staff' && !password)} style={{

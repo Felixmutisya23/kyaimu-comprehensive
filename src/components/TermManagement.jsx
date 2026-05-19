@@ -224,3 +224,100 @@ export default function TermManagement({ data, setData }) {
     </div>
   );
 }
+
+export function PromotionPanel({ data, setData }) {
+  const [preview, setPreview]   = useState(null);
+  const [running, setRunning]   = useState(false);
+  const [done, setDone]         = useState(false);
+
+  function buildNextClassMap() {
+    const groups   = data.classGroups || [];
+    const allNames = [];
+    groups.forEach(g => {
+      if (!g.streams || g.streams.length == 0) {
+        allNames.push(g.name);
+      } else {
+        g.streams.forEach(s => allNames.push(`${g.name} ${s}`));
+      }
+    });
+    const map = {};
+    allNames.forEach((cls, i) => {
+      map[cls] = i < allNames.length - 1 ? allNames[i + 1] : null;
+    });
+    return map;
+  }
+
+  function generatePreview() {
+    const nextMap   = buildNextClassMap();
+    const students  = data.students || [];
+    const promotions = [];
+    const unchanged  = [];
+    students.forEach(s => {
+      if (!s.status || s.status == 'active') {
+        const next = nextMap[s.class];
+        if (next) promotions.push({ student: s, from: s.class, to: next });
+        else if (s.class) unchanged.push({ student: s, reason: 'Completed school (final class)' });
+      }
+    });
+    setPreview({ promotions, unchanged });
+    setDone(false);
+  }
+
+  function applyPromotion() {
+    if (!preview) return;
+    setRunning(true);
+    const year = data.currentYear || new Date().getFullYear();
+    const newHistory = [
+      ...(data.promotionHistory || []),
+      ...preview.promotions.map(p => ({
+        studentId: p.student.id, studentName: p.student.name,
+        fromClass: p.from, toClass: p.to, year, promotedAt: new Date().toISOString(),
+      })),
+    ];
+    const updatedStudents = (data.students || []).map(s => {
+      const promo = preview.promotions.find(p => p.student.id == s.id);
+      return promo ? { ...s, class: promo.to } : s;
+    });
+    setData(d => ({ ...d, students: updatedStudents, promotionHistory: newHistory }));
+    setRunning(false);
+    setDone(true);
+    setPreview(null);
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ background: '#171b26', border: '1px solid #7c3aed30', borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#7c3aed', marginBottom: 12 }}>🎓 Student Promotion</div>
+        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16, lineHeight: 1.6 }}>
+          At the end of Term 3, promote all active students to their next class.
+        </div>
+        {done && <div style={{ background: '#10b98115', border: '1px solid #10b98130', borderRadius: 8, padding: 12, marginBottom: 16, color: '#10b981', fontSize: 13 }}>✅ Promotion complete! All students moved to their next class.</div>}
+        {!preview && (
+          <button onClick={generatePreview} style={{ padding: '10px 20px', background: '#7c3aed', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+            Preview Promotion
+          </button>
+        )}
+        {preview && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>✅ {preview.promotions.length} students will be promoted:</div>
+            <div style={{ maxHeight: 200, overflowY: 'auto', background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              {preview.promotions.map((p, i) => (
+                <div key={i} style={{ fontSize: 12, color: '#e2e8f0', padding: '4px 0', borderBottom: '1px solid #2a3350', display: 'flex', gap: 10 }}>
+                  <span style={{ flex: 1 }}>{p.student.name}</span>
+                  <span style={{ color: '#64748b' }}>{p.from} → </span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>{p.to}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPreview(null)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #2a3350', borderRadius: 8, color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+              <button onClick={applyPromotion} disabled={running} style={{ padding: '8px 20px', background: '#10b981', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                {running ? 'Promoting...' : `✅ Confirm & Promote ${preview.promotions.length} Students`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

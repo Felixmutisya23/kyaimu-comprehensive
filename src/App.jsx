@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { loginPrincipal, loginTeacher, loadSchoolData, loadLicenseFromCloud, setLocalSchoolId, getSubscription } from './supabase';
 import { INITIAL_DATA, canSeeKitchenAlerts, canSeeFees, isTeachingStaff } from './data/initialData';
 import { Icon } from './components/UI';
 import Login from './components/Login';
@@ -12,45 +11,20 @@ import Messages from './components/Messages';
 import { Kitchen, Departments, Settings } from './components/Modules';
 import FeesModule from './components/FeesModule';
 import StudentStatus from './components/StudentStatus';
-import TermManagement, { getCurrentTermInfo, TermBadge } from './components/TermManagement';
+import TermManagement, { getCurrentTermInfo, TermBadge, PromotionPanel } from './components/TermManagement';
 import ParentMessaging from './components/ParentMessaging';
 import { useLicense, LicenseGate, TokenGenerator } from './components/LicenseSystem';
-
-// ── Secret developer key sequence ────────────────────
-// Typing "felix" anywhere (when not in an input) toggles the dev panel
-const DEV_SEQUENCE = 'felix';
-
-/* ── localStorage persistence ─────────────────────────
-   Data is saved automatically on every change.
-   This means data survives page refresh / closing browser.
-   Each school's deployment has its own isolated data.
-────────────────────────────────────────────────────── */
-const STORAGE_KEY = 'edumanage_data_v1';
-
-function loadData() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge with INITIAL_DATA to pick up any new fields added in updates
-      return { ...INITIAL_DATA, ...parsed };
-    }
-  } catch (e) {
-    console.warn('Could not load saved data:', e);
-  }
-  return { ...INITIAL_DATA };
-}
-
-function saveData(data) {
-  try {
-    // Don't save the getter function — just the plain properties
-    const toSave = { ...data };
-    delete toSave.classes; // derived from classGroups getter
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch (e) {
-    console.warn('Could not save data:', e);
-  }
-}
+import TeacherPortal from './components/TeacherPortal';
+import { TeacherRegisterPage } from './components/TeacherRegistration';
+import { StudentPortal, ParentPortal } from './components/StudentHistory';
+import {
+  loadSchoolData, saveSchoolData, createSchool,
+  loginPrincipal, loginTeacher,
+  getLocalSchoolId, setLocalSchoolId,
+  checkAnySchoolExists,
+  loadLicenseFromCloud,
+  getSubscription, upsertSubscription,
+} from './supabase';
 
 /*
   NAV VISIBILITY RULES
@@ -69,11 +43,11 @@ function saveData(data) {
 function buildNav(user, data) {
   if (!user) return [];
   const teaching    = isTeachingStaff(user, data);
-  const isPrincipal = user.role === 'principal';
-  const staff       = data.teachers.find(t => t.staffId === user.staffId);
+  const isPrincipal = user.role == 'principal';
+  const staff       = (data.teachers||[]).find(t => t.staffId == user.staffId);
   const dept        = staff?.dept || user.dept || '';
-  const seeKitchen  = isPrincipal || dept === 'Kitchen';
-  const seeFees     = isPrincipal || dept === 'Finance';
+  const seeKitchen  = isPrincipal || dept == 'Kitchen';
+  const seeFees     = isPrincipal || dept == 'Finance';
 
   return [
     { id: 'dashboard',     label: 'Dashboard',        icon: 'dashboard', section: 'Main'          },
@@ -97,7 +71,7 @@ function buildNav(user, data) {
       ? { id: 'kitchen',   label: 'Kitchen',           icon: 'kitchen',   section: 'Admin'         } : null,
     isPrincipal
       ? { id: 'terms',     label: 'Term Calendar',     icon: 'timetable', section: 'System'        } : null,
-    isPrincipal
+    (isPrincipal || (teaching && !!(data.teachers||[]).find(t => t.staffId == user.staffId)?.classTeacherOf))
       ? { id: 'parentmsg', label: 'Parent Messages',   icon: 'messages',  section: 'Communication' } : null,
     isPrincipal
       ? { id: 'settings',  label: 'Settings',          icon: 'settings',  section: 'System'        } : null,
@@ -117,34 +91,34 @@ const ROLE_COLORS = { principal:'#7c3aed', class_teacher:'#4f8ef7', subject_teac
 function getUserRole(staffRecord) {
   if (!staffRecord) return 'non_teaching';
   if (staffRecord.admin) return 'principal';
-  if (staffRecord.staffType === 'teaching') {
+  if (staffRecord.staffType == 'teaching') {
     return staffRecord.isClassTeacher ? 'class_teacher' : 'subject_teacher';
   }
   return 'non_teaching';
 }
 
 function Notifications({ data, setData, user }) {
-  const myNotifs = (data.notifications || []).filter(n => n.to === user.staffId || n.to === 'ALL');
+  const myNotifs = (data.notifications || []).filter(n => n.to == user.staffId || n.to == 'ALL');
   // Also show pending edit requests that need this user's approval
   const pendingApprovals = (data.editRequests || []).filter(r => {
     if (r.status !== 'pending') return false;
-    if (user.role === 'principal' && r.approvals.principal === null) return true;
+    if (user.role == 'principal' && r.approvals?.principal == null) return true;
     // class teacher of that exam class
-    const staff = data.teachers.find(t => t.staffId === user.staffId);
+    const staff = (data.teachers||[]).find(t => t.staffId == user.staffId);
     if (staff?.classTeacherOf) {
-      const exam = data.exams.find(e => e.id === r.examId);
-      if (exam?.class === staff.classTeacherOf && r.approvals.classTeacher === null) return true;
+      const exam = (data.exams||[]).find(e => e.id == r.examId);
+      if (exam?.class == staff.classTeacherOf && r.approvals?.classTeacher == null) return true;
     }
     return false;
   });
 
   function markRead(id) {
-    setData(d => ({ ...d, notifications: d.notifications.map(n => n.id === id ? { ...n, read: true } : n) }));
+    setData(d => ({ ...d, notifications: d.notifications.map(n => n.id == id ? { ...n, read: true } : n) }));
   }
 
   function handleApproval(reqId, decision) {
-    const isPrincipal = user.role === 'principal';
-    const staff = data.teachers.find(t => t.staffId === user.staffId);
+    const isPrincipal = user.role == 'principal';
+    const staff = (data.teachers||[]).find(t => t.staffId == user.staffId);
     setData(d => {
       const reqs = d.editRequests.map(r => {
         if (r.id !== reqId) return r;
@@ -154,7 +128,7 @@ function Notifications({ data, setData, user }) {
 
         // Check if fully approved or rejected
         const { classTeacher, principal } = updated.approvals;
-        if (classTeacher === 'approved' && principal === 'approved') {
+        if (classTeacher == 'approved' && principal == 'approved') {
           updated.status = 'approved';
           // Apply the score change
           d = applyEditRequest(d, updated);
@@ -163,7 +137,7 @@ function Notifications({ data, setData, user }) {
             { id: Date.now()+1, to: r.requestedBy, from: 'System', message: `✅ Your edit request for ${r.studentName} — ${r.subject} (${r.oldScore}→${r.newScore}) has been APPROVED.`, date: new Date().toISOString().split('T')[0], read: false },
             { id: Date.now()+2, to: 'ALL_TEACHING', from: 'System', message: `Score updated: ${r.studentName} — ${r.subject} changed from ${r.oldScore} to ${r.newScore} by ${r.requestedByName}.`, date: new Date().toISOString().split('T')[0], read: false },
           ];
-        } else if (classTeacher === 'rejected' || principal === 'rejected') {
+        } else if (classTeacher == 'rejected' || principal == 'rejected') {
           updated.status = 'rejected';
           d.notifications = [...(d.notifications||[]),
             { id: Date.now()+1, to: r.requestedBy, from: 'System', message: `❌ Your edit request for ${r.studentName} — ${r.subject} (${r.oldScore}→${r.newScore}) was REJECTED.`, date: new Date().toISOString().split('T')[0], read: false },
@@ -210,12 +184,12 @@ function Notifications({ data, setData, user }) {
               </div>
               <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 10 }}>Requested by: {r.requestedByName} · {r.date}</div>
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-                Class Teacher: <span style={{ color: r.approvals.classTeacher ? (r.approvals.classTeacher === 'approved' ? '#10b981' : '#ef4444') : '#f59e0b' }}>
-                  {r.approvals.classTeacher || 'Pending'}
+                Class Teacher: <span style={{ color: r.approvals?.classTeacher ? (r.approvals?.classTeacher == 'approved' ? '#10b981' : '#ef4444') : '#f59e0b' }}>
+                  {r.approvals?.classTeacher || 'Pending'}
                 </span>
                 &nbsp;&nbsp;·&nbsp;&nbsp;
-                Principal: <span style={{ color: r.approvals.principal ? (r.approvals.principal === 'approved' ? '#10b981' : '#ef4444') : '#f59e0b' }}>
-                  {r.approvals.principal || 'Pending'}
+                Principal: <span style={{ color: r.approvals?.principal ? (r.approvals?.principal == 'approved' ? '#10b981' : '#ef4444') : '#f59e0b' }}>
+                  {r.approvals?.principal || 'Pending'}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -234,7 +208,7 @@ function Notifications({ data, setData, user }) {
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
         Notifications {unread > 0 && <span style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '2px 7px', borderRadius: 10, marginLeft: 8 }}>{unread}</span>}
       </div>
-      {myNotifs.length === 0 ? (
+      {myNotifs.length == 0 ? (
         <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 32, textAlign: 'center', color: '#64748b' }}>
           No notifications yet.
         </div>
@@ -260,9 +234,8 @@ function SetupWizard({ data, setData, onDone }) {
     schoolCounty: '', schoolType: 'Primary', principalName: '', newPass: '',
   });
 
-  function save() {
-    setData(d => ({
-      ...d,
+  async function save() {
+    const setupData = {
       schoolName:        form.schoolName.trim(),
       schoolMotto:       form.schoolMotto.trim(),
       schoolPOBox:       form.schoolPOBox.trim(),
@@ -270,9 +243,10 @@ function SetupWizard({ data, setData, onDone }) {
       schoolCounty:      form.schoolCounty.trim(),
       schoolType:        form.schoolType,
       principalName:     form.principalName.trim(),
-      principalPassword: form.newPass.trim() || d.principalPassword,
-    }));
-    onDone();
+      principalEmail:    'principal@school.ac.ke',
+      principalPassword: form.newPass.trim() || 'admin123',
+    };
+    await onDone(setupData);
   }
 
   const inp = (val, onChange, ph) => ({
@@ -354,102 +328,310 @@ function SetupWizard({ data, setData, onDone }) {
 }
 
 export default function App() {
-  const [data, setDataRaw]    = React.useState(() => loadData());
-  const [user, setUser]       = React.useState(null);
-  const [page, setPage]       = React.useState('dashboard');
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [data, setDataRaw]        = React.useState({ ...INITIAL_DATA });
+  const [user, setUser]           = React.useState(null);
+  const [page, setPage]           = React.useState('dashboard');
+  const [showTeacherRegister]     = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'register');
+  const [studentUser, setStudentUser] = React.useState(null);
+  const [parentUser,  setParentUser]  = React.useState(null);
+  const [collapsed, setCollapsed] = React.useState(() => window.innerWidth < 768);
   const [setupDone, setSetupDone] = React.useState(false);
+  const [loading, setLoading]     = React.useState(true);
+  const [dbError, setDbError]     = React.useState(null);
+  const [anySchoolExists, setAnySchoolExists] = React.useState(false);
+  const [licenseRefreshKey, setLicenseRefreshKey] = React.useState(0);
+  const [subscription, setSubscription] = React.useState(null);
+  const [saveError, setSaveError] = React.useState(null);
+  const [loginError, setLoginError] = React.useState('');
 
+  // ── Load school data from Supabase on mount ──────────────────
+  React.useEffect(() => {
+    async function init() {
+      try {
+        const schoolId = getLocalSchoolId();
+        if (schoolId) {
+          const schoolData = await loadSchoolData(schoolId);
+          if (schoolData) {
+            setDataRaw(schoolData);
+            setAnySchoolExists(true);
+          } else {
+            localStorage.removeItem('edumanage_school_id');
+          }
+          // ── Always sync license/token from cloud on boot ──────────
+          // This ensures payment status & tokens work on ANY device
+          // (phone, tablet, another browser) even before the school
+          // has ever logged in on that specific device.
+          try {
+            await loadLicenseFromCloud(schoolId);
+            setLicenseRefreshKey(k => k + 1); // tell useLicense to re-read localStorage
+          } catch (licErr) {
+            console.warn('Boot license sync failed (non-fatal):', licErr);
+          }
+        }
+        // Check if ANY school exists in DB (so new devices show Login not Setup)
+        const exists = await checkAnySchoolExists();
+        setAnySchoolExists(exists);
+      } catch (e) {
+        console.error('Failed to load school data:', e);
+        setDbError('Could not connect to database. Check your internet connection.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
+
+  // ── Save to Supabase on every data change ────────────────────
+  const saveTimer = React.useRef(null);
   function setData(updater) {
     setDataRaw(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      saveData(next);
+      const next = typeof updater == 'function' ? updater(prev) : updater;
+      // Only save if data was loaded from DB (_loadedFromDB flag set by loadSchoolData)
+      // This prevents wiping DB when state is still at INITIAL_DATA
+      if (next._schoolId && next._loadedFromDB) {
+        clearTimeout(saveTimer.current);
+        // FIX: 2000ms debounce (was 800ms) — reduces Supabase query load at scale
+        saveTimer.current = setTimeout(() => {
+          setSaveError(null);
+          saveSchoolData(next).catch(e => {
+            console.error('Save error:', e);
+            setSaveError('⚠ Changes could not be saved — check your connection.');
+          });
+        }, 2000);
+      }
       return next;
     });
   }
 
-  const isConfigured = !!(data.schoolName && data.schoolName.trim());
+  const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
 
-  // ── License / Subscription system ──────────────────────
-  const license = useLicense(data);
+  // ── License / Subscription system — must be called before any early returns ──
+  const license = useLicense(data, licenseRefreshKey, setData);
 
-  if (!user) return <Login data={data} onLogin={async (email, password) => {
-    try {
-      // Try principal login first
-      const school = await loginPrincipal(email, password);
-      if (school) {
-        setLocalSchoolId(school.id);
-        const sd = await loadSchoolData(school.id);
-        if (sd) setDataRaw(sd);
-        await loadLicenseFromCloud(school.id);
-        setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
-        setPage('dashboard');
-        const now = new Date();
-        const t = sd?.currentTerm || (now.getMonth() < 4 ? 1 : now.getMonth() < 8 ? 2 : 3);
-        const y = sd?.currentYear || now.getFullYear();
-        const sub = await getSubscription(school.id, t, y);
-        setSubscription && setSubscription(sub);
-        return true;
+  // ── Dev panel hook — must be before early returns ──
+  const [showDevPanel, setShowDevPanel] = React.useState(false);
+
+  // ── Secret dev panel: type "felix" anywhere (outside inputs) to toggle ──
+  const keyBuffer = React.useRef('');
+  React.useEffect(() => {
+    function handleKey(e) {
+      // Only block if user is actively typing (has a value in the input)
+      // But still allow the secret sequence via Ctrl+Shift+F shortcut
+      if (e.ctrlKey && e.shiftKey && e.key == 'F') {
+        e.preventDefault();
+        setShowDevPanel(v => !v);
+        keyBuffer.current = '';
+        return;
       }
-      // Try teacher login
-      const teacher = await loginTeacher(email, password);
-      if (teacher) {
-        setLocalSchoolId(teacher.school_id);
-        const sd = await loadSchoolData(teacher.school_id);
-        if (sd) setDataRaw(sd);
-        const teacherRecord = (sd?.teachers || []).find(t => (t.email || '').toLowerCase() === (email || '').toLowerCase());
-        if (teacherRecord && teacherRecord.status === 'pending') return false;
-        await loadLicenseFromCloud(teacher.school_id);
-        setUser({
-          role: teacher.admin ? 'principal' : 'staff',
-          staffType: teacherRecord?.staffType || teacher.staff_type || 'teaching',
-          name: teacher.name || teacherRecord?.name || email,
-          email,
-          staffId: teacher.staff_id || teacherRecord?.staffId,
-          isClassTeacher: teacherRecord?.isClassTeacher || teacher.is_class_teacher || false,
-          classTeacherOf: teacherRecord?.classTeacherOf || teacher.class_teacher_of || null,
-          teacherSubjects: teacherRecord?.subjects || [],
-          admin: teacher.admin || false,
-        });
-        setPage('dashboard');
-        return true;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag == 'input' || tag == 'textarea' || tag == 'select') return;
+      keyBuffer.current = (keyBuffer.current + e.key).slice(-5);
+      if (keyBuffer.current == 'felix') {
+        setShowDevPanel(v => !v);
+        keyBuffer.current = '';
       }
-      return false;
-    } catch(err) {
-      console.error('Login error:', err);
-      return false;
     }
-  }} />;
-  if (user.role === 'principal' && !isConfigured && !setupDone) {
-    return <SetupWizard data={data} setData={setData} onDone={() => setSetupDone(true)} />;
+    function handleDevOpen() { setShowDevPanel(v => !v); }
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('felix-dev-open', handleDevOpen);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('felix-dev-open', handleDevOpen);
+    };
+  }, []);
+
+  // Early returns AFTER all hooks — loading must be here too so hooks run every render
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 48 }}>🏫</div>
+      <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
+      <div style={{ color: '#64748b', fontSize: 13 }}>Loading school data...</div>
+      {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
+    </div>
+  );
+
+  // Only show setup wizard if NO school exists in DB at all
+  if (!isConfigured && !setupDone && !user && !anySchoolExists) {
+    return (
+      <SetupWizard
+        data={data}
+        setData={setData}
+        onDone={async (setupData) => {
+          try {
+            const schoolId = await createSchool(setupData);
+            setLocalSchoolId(schoolId);
+            const schoolData = await loadSchoolData(schoolId);
+            if (schoolData) setDataRaw(schoolData);
+            setSetupDone(true);
+          } catch (e) {
+            console.error('Setup error:', e);
+            alert('Failed to create school: ' + e.message);
+          }
+        }}
+      />
+    );
+  }
+
+  if (!user) {
+    if (showTeacherRegister) {
+      return <TeacherRegisterPage data={data} setData={setData} onBack={() => window.history.back()} />;
+    }
+    if (studentUser) return <StudentPortal student={studentUser} data={data} onLogout={() => setStudentUser(null)} />;
+    if (parentUser)  return <ParentPortal  parent={parentUser}  data={data} onLogout={() => setParentUser(null)} />;
+    return (
+    <Login
+      data={data}
+      externalError={loginError}
+      onStudentLogin={(admNo) => {
+        const student = (data.students || []).find(s =>
+          String(s.admNo || '').trim().toLowerCase() === String(admNo || '').trim().toLowerCase()
+        );
+        if (student) { setStudentUser(student); return true; }
+        return false;
+      }}
+      onParentLogin={(phone) => {
+        // Parent: phone number only — no password required
+        const clean = s => String(s||'').replace(/\s/g,'').replace(/^0/,'254');
+        const cleanPhone = clean(phone);
+        const student = (data.students || []).find(s => {
+          const ph = clean(s.parentPhone);
+          return ph && ph === cleanPhone;
+        });
+        if (student) { setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone }); return true; }
+        return false;
+      }}
+      onTeacherRegister={() => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('action', 'register');
+        window.location.href = url.toString();
+      }}
+      onCreateSchool={async (setupData) => {
+        try {
+          const schoolId = await createSchool(setupData);
+          setLocalSchoolId(schoolId);
+          const schoolData = await loadSchoolData(schoolId);
+          if (schoolData) setDataRaw(schoolData);
+          // Auto-login as principal
+          setUser({ role: 'principal', name: setupData.principalName || 'Principal', email: setupData.principalEmail });
+          setPage('dashboard');
+        } catch (e) {
+          throw new Error(e.message || 'Failed to create school');
+        }
+      }}
+      onLogin={async (email, password) => {
+        // Try principal login first
+        const school = await loginPrincipal(email, password);
+        if (school) {
+          setLocalSchoolId(school.id);
+          const schoolData = await loadSchoolData(school.id);
+          if (schoolData) setDataRaw(schoolData);
+          // Sync license/token from cloud so payment persists across devices
+          await loadLicenseFromCloud(school.id);
+          setLicenseRefreshKey(k => k + 1); // force useLicense to re-read localStorage
+          setUser({ role: 'principal', name: school.principal_name || 'Principal', email });
+          setPage('dashboard');
+          // Load subscription for current term
+          const now = new Date();
+          const t = schoolData?.currentTerm || (now.getMonth() < 4 ? 1 : now.getMonth() < 8 ? 2 : 3);
+          const y = schoolData?.currentYear || now.getFullYear();
+          const sub = await getSubscription(school.id, t, y);
+          setSubscription(sub);
+          return true;
+        }
+        // Try staff login
+        const teacher = await loginTeacher(email, password);
+        if (teacher) {
+          setLocalSchoolId(teacher.school_id);
+          const teacherSchoolData = await loadSchoolData(teacher.school_id);
+          if (teacherSchoolData) setDataRaw(teacherSchoolData);
+          // Block pending (unapproved) teachers
+          const pendingCheck = (teacherSchoolData?.teachers || []).find(t => t.email == email);
+          if (pendingCheck && pendingCheck.status == 'pending') {
+            setLoginError('Your account is pending approval. Please wait for the administrator to approve you.');
+            return false;
+          }
+          setLoginError('');
+          await loadLicenseFromCloud(teacher.school_id);
+          setLicenseRefreshKey(k => k + 1);
+          // Build full teacher user object — needed by TeacherPortal
+          const teacherRecord = (teacherSchoolData?.teachers || []).find(t => t.email == email || t.staffId == teacher.staff_id);
+          setUser({
+            role:            teacher.admin ? 'principal' : 'staff',
+            staffType:       teacherRecord?.staffType || teacher.staff_type || 'teaching',
+            name:            teacher.name,
+            email,
+            staffId:         teacher.staff_id || teacherRecord?.staffId,
+            isClassTeacher:  teacherRecord?.isClassTeacher || teacher.is_class_teacher || false,
+            classTeacherOf:  teacherRecord?.classTeacherOf || teacher.class_teacher_of || null,
+            teacherSubjects: teacherRecord?.subjects || [],
+            admin:           teacher.admin || false,
+          });
+          setPage('dashboard');
+          // Load subscription for current term
+          const now2 = new Date();
+          const t2 = teacherSchoolData?.currentTerm || (now2.getMonth() < 4 ? 1 : now2.getMonth() < 8 ? 2 : 3);
+          const y2 = teacherSchoolData?.currentYear || now2.getFullYear();
+          const sub = await getSubscription(teacher.school_id, t2, y2);
+          setSubscription(sub);
+          return true;
+        }
+        return false;
+      }}
+    />
+  );
+  }
+  // Redirect teachers to their dedicated portal
+  if (user && user.role !== 'principal') {
+    return <TeacherPortal data={data} setData={setData} user={user} onLogout={() => { setUser(null); setDataRaw({...INITIAL_DATA}); clearLocalSchoolId(); }} />;
+  }
+
+  if (user.role == 'principal' && !isConfigured && !setupDone) {
+    return (
+      <SetupWizard
+        data={data}
+        setData={setData}
+        onDone={async (setupData) => {
+          try {
+            const schoolId = await createSchool(setupData);
+            setLocalSchoolId(schoolId);
+            const schoolData = await loadSchoolData(schoolId);
+            if (schoolData) setDataRaw(schoolData);
+            setSetupDone(true);
+          } catch (e) {
+            console.error('Setup error:', e);
+            alert('Failed to create school. Check your internet connection.');
+          }
+        }}
+      />
+    );
   }
 
 
   const nav      = buildNav(user, data);
   const sections = [...new Set(nav.map(n => n.section))];
 
-  const myMsgUnread = data.messages.filter(m => !m.read && (user.role === 'principal' || m.dept === user.dept)).length;
-  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to === user.staffId || n.to === 'ALL')).length;
+  const myMsgUnread = (data.messages||[]).filter(m => !m.read && (user.role == 'principal' || m.dept == user.dept)).length;
+  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL')).length;
   const pendingApprovalCount = (data.editRequests || []).filter(r => {
     if (r.status !== 'pending') return false;
-    if (user.role === 'principal' && r.approvals.principal === null) return true;
-    const staff = data.teachers.find(t => t.staffId === user.staffId);
+    if (user.role == 'principal' && r.approvals?.principal == null) return true;
+    const staff = (data.teachers||[]).find(t => t.staffId == user.staffId);
     if (staff?.classTeacherOf) {
-      const exam = data.exams.find(e => e.id === r.examId);
-      if (exam?.class === staff.classTeacherOf && r.approvals.classTeacher === null) return true;
+      const exam = (data.exams||[]).find(e => e.id == r.examId);
+      if (exam?.class == staff.classTeacherOf && r.approvals?.classTeacher == null) return true;
     }
     return false;
   }).length;
 
-  const lowInv         = data.inventory.filter(i => i.current <= i.min).length;
+  const lowInv         = (data.inventory||[]).filter(i => i.current <= i.min).length;
   const showKitchenAlert = canSeeKitchenAlerts(user, data) && lowInv > 0;
-  const statusAlertCount = user.role === 'principal'
+  const statusAlertCount = user.role == 'principal'
     ? (data.statusAlerts || []).filter(a => !a.resolved).length
     : 0;
   // Overdue permissions — relevant to class teachers too
   const overduePermCount = (data.permissions || []).filter(p =>
     !p.returned && p.dateReturn < new Date().toISOString().split('T')[0] &&
-    (user.role === 'principal' || (user.isClassTeacher && (data.students||[]).find(s=>s.id===p.studentId)?.class === user.classTeacherOf))
+    (user.role == 'principal' || (user.isClassTeacher && (data.students||[]).find(s=>s.id == p.studentId)?.class == user.classTeacherOf))
   ).length;
 
   const badges = {
@@ -460,30 +642,15 @@ export default function App() {
   };
 
   const roleColor = ROLE_COLORS[user.role] || '#4f8ef7';
-  const initials  = (user.name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const initials  = (user.name||"").split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   // Show license gate — but NEVER on Settings so Felix can always reach it
-  const showLicenseGate = !license.isUnlocked && user?.role === 'principal' && page !== 'settings';
+  const showLicenseGate = !license.isUnlocked && user?.role == 'principal' && page !== 'settings';
 
-  // ── Secret dev panel: type "felix" anywhere (outside inputs) to toggle ──
-  const [showDevPanel, setShowDevPanel] = React.useState(false);
-  const keyBuffer = React.useRef('');
-  React.useEffect(() => {
-    function handleKey(e) {
-      const tag = document.activeElement?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      keyBuffer.current = (keyBuffer.current + e.key).slice(-5);
-      if (keyBuffer.current === 'felix') {
-        setShowDevPanel(v => !v);
-        keyBuffer.current = '';
-      }
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+
 
   function renderPage() {
-    if (!nav.find(n => n.id === page)) return <Dashboard data={data} setData={setData} user={user} />;
+    if (!nav.find(n => n.id == page)) return <Dashboard data={data} setData={setData} user={user} />;
     const props = { data, setData, user, isUnlocked: license.isUnlocked };
     switch (page) {
       case 'dashboard':     return <Dashboard     {...props} />;
@@ -498,8 +665,8 @@ export default function App() {
       case 'departments':   return <Departments   {...props} />;
       case 'kitchen':       return <Kitchen       {...props} />;
       case 'settings':      return <Settings      {...props} />;
-      case 'terms':         return <TermManagement {...props} />;
-      case 'parentmsg':     return <ParentMessaging {...props} />;
+      case 'terms':         return <><TermManagement {...props} /><PromotionPanel data={data} setData={setData} /></>;
+      case 'parentmsg':     return <ParentMessaging {...props} subscription={subscription} onSubscriptionChange={setSubscription} />;
       default:              return <Dashboard     {...props} />;
     }
   }
@@ -512,7 +679,7 @@ export default function App() {
       {/* ── SECRET DEV PANEL (triggered by typing "felix") ── */}
       {showDevPanel && (
         <div style={{ position: 'fixed', inset: 0, background: '#0008', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowDevPanel(false); }}>
+          onClick={e => { if (e.target == e.currentTarget) setShowDevPanel(false); }}>
           <div style={{ background: '#0f1117', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
@@ -529,16 +696,36 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* SAVE ERROR BANNER */}
+      {saveError && (
+        <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, background: '#ef4444', color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, boxShadow: '0 4px 20px #0006', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {saveError}
+          <span style={{ cursor: 'pointer', fontWeight: 900 }} onClick={() => setSaveError(null)}>✕</span>
+        </div>
+      )}
       {/* READ-ONLY BANNER */}
-      {!license.isUnlocked && user?.role === 'principal' && (
+      {!license.isUnlocked && user?.role == 'principal' && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 998, background: '#ef4444', color: '#fff', textAlign: 'center', padding: '6px 0', fontSize: 12, fontWeight: 700 }}>
           🔒 READ-ONLY MODE — Subscribe to unlock full access &nbsp;·&nbsp;
           <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setPage('settings')}>Pay Now</span>
         </div>
       )}
 
+      {/* MOBILE HAMBURGER */}
+      <style>{`
+        @media (max-width: 768px) {
+          .edu-sidebar { position: fixed !important; left: 0; top: 0; height: 100vh; z-index: 1000; transform: translateX(-100%); transition: transform 0.25s !important; width: 240px !important; }
+          .edu-sidebar.open { transform: translateX(0) !important; }
+          .edu-overlay { display: block !important; }
+          .edu-hamburger { display: flex !important; }
+          .edu-main { margin-left: 0 !important; }
+        }
+        .edu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; cursor: pointer; }
+        .edu-hamburger { display: none; }
+      `}</style>
+      <div className="edu-overlay" style={{ pointerEvents: collapsed ? 'none' : 'auto' }} onClick={() => setCollapsed(true)} />
       {/* SIDEBAR */}
-      <aside style={{ width: collapsed ? 64 : 240, background: '#171b26', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
+      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: '#171b26', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
         <div style={{ padding: '14px 12px', borderBottom: '1px solid #2a3350', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#fff', flexShrink: 0 }}>E</div>
           {!collapsed && (
@@ -557,7 +744,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: roleColor }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: roleColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {user.role === 'principal' ? 'Principal' : user.role === 'class_teacher' ? 'Class Teacher' : user.role === 'subject_teacher' ? 'Subject Teacher' : 'Non-Teaching Staff'}
+                {user.role == 'principal' ? 'Principal' : user.role == 'class_teacher' ? 'Class Teacher' : user.role == 'subject_teacher' ? 'Subject Teacher' : 'Non-Teaching Staff'}
               </span>
             </div>
             {user.classTeacherOf && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, paddingLeft: 16 }}>Class Teacher: {user.classTeacherOf}</div>}
@@ -569,10 +756,10 @@ export default function App() {
           {sections.map(sec => (
             <div key={sec}>
               {!collapsed && <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', padding: '8px 14px 4px', textTransform: 'uppercase', letterSpacing: 1 }}>{sec}</div>}
-              {nav.filter(n => n.section === sec).map(n => {
-                const active = page === n.id;
+              {nav.filter(n => n.section == sec).map(n => {
+                const active = page == n.id;
                 return (
-                  <div key={n.id} onClick={() => setPage(n.id)} title={collapsed ? n.label : undefined}
+                  <div key={n.id} onClick={() => { setPage(n.id); if (window.innerWidth < 768) setCollapsed(true); }} title={collapsed ? n.label : undefined}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '11px 0' : '9px 14px', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', fontSize: 13, color: active ? '#4f8ef7' : '#94a3b8', background: active ? '#1e2435' : 'transparent', borderLeft: active ? '3px solid #4f8ef7' : '3px solid transparent', fontWeight: active ? 600 : 400, transition: 'all 0.12s' }}
                     onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#1e243570'; }}
                     onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
@@ -595,32 +782,36 @@ export default function App() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
                 <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
               </div>
-              <button onClick={() => setUser(null)} title="Sign out"
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, fontSize: 18, flexShrink: 0 }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#ef444415'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = 'none'; }}>⏻</button>
+              <button onClick={() => { setUser(null); setDataRaw({...INITIAL_DATA}); clearLocalSchoolId(); }} title="Sign out"
+                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, fontSize: 13, fontWeight: 700, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#ef444420'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>⏻ {!collapsed && 'Logout'}</button>
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-              <button onClick={() => setUser(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>⏻</button>
+              <button onClick={() => { setUser(null); setDataRaw({...INITIAL_DATA}); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>⏻</button>
             </div>
           )}
         </div>
       </aside>
 
       {/* MAIN */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role === 'principal') ? 30 : 0 }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
         <header style={{ background: '#171b26', borderBottom: '1px solid #2a3350', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="edu-hamburger" onClick={() => setCollapsed(c => !c)}
+              style={{ background: 'none', border: 'none', color: '#e2e8f0', cursor: 'pointer', fontSize: 22, padding: 4, borderRadius: 6 }}>☰</button>
+            <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#e2e8f0' }}>{PAGE_TITLES[page] || page}</div>
             <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>
               {data.schoolName} · {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
               <TermBadge data={data} />
             </div>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* License status badge */}
-            {user?.role === 'principal' && (
+            {user?.role == 'principal' && (
               license.isUnlocked
                 ? (license.tokenActive
                     ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#7c3aed20', color: '#7c3aed', border: '1px solid #7c3aed30' }}>🔑 TOKEN · {license.daysLeft}d</span>

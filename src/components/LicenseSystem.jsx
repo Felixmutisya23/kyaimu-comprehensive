@@ -35,8 +35,10 @@ const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
    • NNNN = max students (padded to 4 digits)
    • CCCC = checksum (prevents tampering)
 ═══════════════════════════════════════════════════════ */
-function makeToken(schoolName, expiryDate, maxStudents = 9999) {
-  const schoolCode = schoolName.trim().toUpperCase().slice(0, 4).padEnd(4, 'X');
+// FIX: schoolCode is now 8 chars of UUID (not 4 chars of name)
+// Old 4-char name tokens are no longer valid — regenerate for existing schools
+function makeToken(schoolId, expiryDate, maxStudents = 9999) {
+  const schoolCode = (schoolId || '').replace(/-/g, '').toUpperCase().slice(0, 8).padEnd(8, 'X');
   const dateStr    = expiryDate.replace(/-/g, '');
   const seats      = String(maxStudents).padStart(4, '0');
   const raw        = `${schoolCode}${dateStr}${seats}`;
@@ -50,6 +52,7 @@ function makeToken(schoolName, expiryDate, maxStudents = 9999) {
 
 function parseToken(token) {
   try {
+    // Token format: EDU-XXXXXXXX-YYYYMMDD-NNNN-CCCC (8-char UUID code)
     const parts = token.trim().toUpperCase().split('-');
     if (parts.length !== 5 || parts[0] !== 'EDU') return null;
     const [, schoolCode, dateStr, seats, check] = parts;
@@ -103,19 +106,29 @@ function saveTokenState(state) {
 
 /* ═══════════════════════════════════════════════════════
    useLicense HOOK — used in App.jsx
+   
+   CROSS-DEVICE SYNC:
+   • Token and payment status are saved into data.licenseData
+   • data.licenseData is saved to Supabase by saveSchoolData (App.jsx)
+   • On login, loadLicenseFromCloud reads it back from Supabase
+   • This means token/payment works on ANY computer/device
+   
+   SCHOOL ISOLATION:
+   • Token contains first-4-letters of school name (schoolCode)
+   • applyToken verifies the schoolCode matches THIS school
+   • Different schools have different schoolCodes → token won't work cross-school
+   • Payments are tied to school_id in Supabase → completely isolated
 ═══════════════════════════════════════════════════════ */
-export function useLicense(data) {
+export function useLicense(data, refreshKey = 0, setData = null) {
   const studentCount = (data.students || []).filter(
     s => !s.status || s.status === 'active'
   ).length;
 
-  // First term ever (no students yet) → flat KES 5,000; thereafter KES 100/student
   const isFirstTerm = studentCount === 0;
   const totalDue    = isFirstTerm ? FIRST_TERM_FLAT_FEE : studentCount * PER_STUDENT_FEE;
 
-  // Track partial payments so we can show remaining balance
-  const [lic, setLicRaw]        = useState(() => loadLicense());
-  const [tokenState, setTok]    = useState(() => loadTokenState());
+  const [lic, setLicRaw]     = useState(() => loadLicense());
+  const [tokenState, setTok] = useState(() => loadTokenState());
 
   const _currentTerm = data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
   const _currentYear = data.currentYear || new Date().getFullYear();
@@ -124,10 +137,33 @@ export function useLicense(data) {
   const amountDue    = Math.max(0, totalDue - alreadyPaid);
   const [checking, setChecking] = useState(false);
 
-  function setLic(val) { setLicRaw(val); saveLicense(val); }
-
   const currentTerm = _currentTerm;
   const currentYear = _currentYear;
+
+  // ── Save license to localStorage AND to Supabase via data.licenseData ──
+  function setLic(val) {
+    setLicRaw(val);
+    saveLicense(val);
+    // Push into Supabase by updating data.licenseData
+    if (setData) {
+      setData(d => ({
+        ...d,
+        licenseData: { ...((d.licenseData) || {}), lic: val, token: tokenState },
+      }));
+    }
+  }
+
+  // ── Save token to localStorage AND to Supabase via data.licenseData ──
+  function setToken(state) {
+    setTok(state);
+    saveTokenState(state);
+    if (setData) {
+      setData(d => ({
+        ...d,
+        licenseData: { ...((d.licenseData) || {}), token: state, lic: lic },
+      }));
+    }
+  }
 
   const tokenActive  = tokenState && new Date(tokenState.expiry) > new Date();
   const licenseValid = amountDue === 0 && lic.paid &&
@@ -139,16 +175,32 @@ export function useLicense(data) {
     ? Math.ceil((new Date(tokenState.expiry) - new Date()) / 86400000)
     : null;
 
+  // FIX: school code uses first 8 chars of UUID — globally unique, no name collisions
+  function getThisSchoolCode() {
+    const uuid = (data._schoolId || '').replace(/-/g, '').toUpperCase().slice(0, 8).padEnd(8, 'X');
+    return uuid;
+  }
+
   function applyToken(tokenStr) {
     const parsed = parseToken(tokenStr);
     if (!parsed) return { ok: false, msg: '❌ Invalid token. Please check and try again.' };
     if (parsed.expiry < new Date()) return { ok: false, msg: '❌ This token has already expired.' };
+
+    // FIX: compare UUID-based code (not school name) — eliminates 4-letter collision
+    const thisCode = getThisSchoolCode();
+    if (parsed.schoolCode !== thisCode) {
+      return {
+        ok: false,
+        msg: `❌ This token is for a different school. Each school has its own unique token.`,
+      };
+    }
+
     const state = {
-      expiry: parsed.expiry.toISOString(),
+      expiry:      parsed.expiry.toISOString(),
       maxStudents: parsed.maxStudents,
-      schoolCode: parsed.schoolCode,
+      schoolCode:  parsed.schoolCode,
     };
-    setTok(state); saveTokenState(state);
+    setToken(state); // saves to localStorage + Supabase
     return { ok: true, msg: `✅ Token accepted! Access granted until ${parsed.expiry.toLocaleDateString('en-KE')}.` };
   }
 
@@ -157,22 +209,21 @@ export function useLicense(data) {
     if (amountDue <= 0) { alert('No outstanding balance. You are fully paid up!'); return; }
     setChecking(true);
 
-    // Format: 254XXXXXXXXX
     let fp = phone.replace(/\s/g, '').replace(/^0/, '254');
     if (!fp.startsWith('254')) fp = '254' + fp;
 
     try {
-      // ✅ Route through Netlify function — avoids CORS and keeps secret key server-side
       const res = await fetch(VERIFY_PAYMENT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'initiate',
-          phone: fp,
-          amount: amountDue,
-          apiRef: `EDU-${(data.schoolName || 'SCH').slice(0, 8).replace(/\s/g, '')}-T${currentTerm}-${currentYear}-${Date.now()}`,
-          name: data.schoolName || 'School',
-          email: data.principalEmail || 'school@school.ac.ke',
+          action:  'initiate',
+          phone:   fp,
+          amount:  amountDue,
+          // apiRef includes school_id so payments are school-isolated in InstaSend records
+          apiRef:  `EDU-${(data._schoolId || 'SCH').slice(0, 8)}-T${currentTerm}-${currentYear}-${Date.now()}`,
+          name:    data.schoolName || 'School',
+          email:   data.principalEmail || 'school@school.ac.ke',
         }),
       });
       const json = await res.json();
@@ -190,7 +241,7 @@ export function useLicense(data) {
 
   async function pollPayment(invoiceId, paidAmount, onSuccess) {
     let attempts = 0;
-    const maxAttempts = 36; // 3 minutes
+    const maxAttempts = 36;
 
     const interval = setInterval(async () => {
       attempts++;
@@ -209,17 +260,18 @@ export function useLicense(data) {
           const newAmountPaid = alreadyPaid + paidAmount;
           const nowFullyPaid  = newAmountPaid >= totalDue;
           const newLic = {
-            paid: nowFullyPaid,
-            paidUntil: null,
-            term: currentTerm,
-            year: currentYear,
-            txRef: invoiceId,
+            paid:         nowFullyPaid,
+            paidUntil:    null,
+            term:         currentTerm,
+            year:         currentYear,
+            txRef:        invoiceId,
             studentCount,
-            amountPaid: newAmountPaid,
+            amountPaid:   newAmountPaid,
             totalDue,
-            paidAt: new Date().toISOString(),
+            paidAt:       new Date().toISOString(),
+            schoolId:     data._schoolId || null, // ties payment to this school in our records
           };
-          setLic(newLic);
+          setLic(newLic); // saves to localStorage + Supabase
           if (onSuccess) onSuccess();
           if (nowFullyPaid) {
             alert(
@@ -245,10 +297,7 @@ export function useLicense(data) {
       if (attempts >= maxAttempts) {
         clearInterval(interval);
         setChecking(false);
-        alert(
-          'Payment check timed out.\n\n' +
-          'If you completed the M-Pesa payment, contact the developer with your M-Pesa confirmation SMS.'
-        );
+        alert('Payment check timed out.\n\nIf you completed the M-Pesa payment, contact the developer with your M-Pesa confirmation SMS.');
       }
     }, 5000);
   }
@@ -380,9 +429,8 @@ export function LicenseGate({ license, data }) {
    Password-protected so only you (Felix) can use it
 ═══════════════════════════════════════════════════════ */
 export function TokenGenerator({ data }) {
-  // ── SET YOUR DEVELOPER PASSWORD HERE ─────────────
-  const DEV_PASSWORD = 'Felix@EduManage2025!';
-  // ─────────────────────────────────────────────────
+  // FIX: developer password is now verified server-side via Netlify function
+  // /.netlify/functions/generate-token — never stored in frontend source
 
   const [expiry, setExpiry] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 90);
@@ -395,14 +443,36 @@ export function TokenGenerator({ data }) {
   const [authed, setAuthed]       = useState(false);
   const [passErr, setPassErr]     = useState('');
 
-  function checkPassword() {
-    if (devPass === DEV_PASSWORD) { setAuthed(true); setPassErr(''); }
-    else setPassErr('Wrong password. Try again.');
+  async function checkPassword() {
+    // FIX: verify password server-side — no secret ever in the browser
+    try {
+      const res = await fetch('/.netlify/functions/generate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', password: devPass }),
+      });
+      const json = await res.json();
+      if (json.ok) { setAuthed(true); setPassErr(''); }
+      else setPassErr('Wrong password. Try again.');
+    } catch {
+      setPassErr('Connection error. Try again.');
+    }
   }
 
-  function generate() {
-    const tok = makeToken(data.schoolName || 'SCHOOL', expiry, seats);
-    setGenerated(tok);
+  async function generate() {
+    // FIX: generate token server-side — uses school UUID not school name
+    try {
+      const res = await fetch('/.netlify/functions/generate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate', password: devPass, schoolId: data._schoolId, schoolName: data.schoolName || 'SCHOOL', expiry, seats }),
+      });
+      const json = await res.json();
+      if (json.token) setGenerated(json.token);
+      else alert('Token generation failed: ' + (json.error || 'Unknown error'));
+    } catch {
+      alert('Connection error generating token.');
+    }
   }
 
   function copy() {

@@ -63,30 +63,54 @@ export default function Exams({ data, setData, user }) {
   /* ── Ranking ──────────────────────────────────────── */
   function rankStudents(exam) {
     if (!exam) return [];
+
     // All streams of same base class for overall position
     const siblingClasses = getSiblingStreams(exam.class, data);
-    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class));
-    // This stream's students only
-    const streamStudents = data.students.filter(s => s.class === exam.class);
 
-    function calcStats(s) {
-      const res   = exam.results[s.name] || {};
+    // Find the matching exam for each sibling stream
+    // (same name + term + year, different stream class)
+    function findSiblingExam(cls) {
+      if (cls === exam.class) return exam;
+      return (data.exams || []).find(e =>
+        e.class === cls &&
+        e.term  === exam.term &&
+        e.year  === exam.year &&
+        e.name  === exam.name
+      ) || null;
+    }
+
+    // Get results for a student using the correct exam for their stream
+    function calcStats(student) {
+      const sibExam   = findSiblingExam(student.class);
+      const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
+      const res   = resultsObj[student.name] || {};
       const subs  = Object.keys(res);
       const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
       const mean  = subs.length ? Math.round(total / subs.length) : 0;
       return { total, mean, grade: getGrade(mean), results: res, subs };
     }
 
+    // This stream's students only
+    const streamStudents = data.students.filter(s => s.class === exam.class);
+    // All sibling streams students
+    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class));
+
     const overallRanked = allSiblings
       .map(s => ({ ...s, ...calcStats(s) }))
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
     return streamStudents
       .map(s => ({ ...s, ...calcStats(s) }))
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
       .map((s, i) => {
         const ov = overallRanked.findIndex(x => x.name === s.name);
-        return { ...s, streamPos: i + 1, overallPos: ov + 1 };
+        return {
+          ...s,
+          streamPos:  i + 1,
+          streamOf:   streamStudents.length,
+          overallPos: ov + 1,
+          overallOf:  overallRanked.length,
+        };
       });
   }
 
@@ -356,8 +380,12 @@ export default function Exams({ data, setData, user }) {
                         <td style={{ ...TS.td, fontWeight: 700 }}>{s.total}</td>
                         <td style={TS.td}>{s.mean}</td>
                         <td style={TS.td}><GradeBadge score={s.mean} /></td>
-                        <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>{s.overallPos}</td>
-                        <td style={{ ...TS.td, fontWeight: 700, color: '#4f8ef7' }}>{s.streamPos}</td>
+                        <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>
+                          {s.overallPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.overallOf}</span>
+                        </td>
+                        <td style={{ ...TS.td, fontWeight: 700, color: '#4f8ef7' }}>
+                          {s.streamPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.streamOf}</span>
+                        </td>
                       </>
                     )}
                     <td style={TS.td}>

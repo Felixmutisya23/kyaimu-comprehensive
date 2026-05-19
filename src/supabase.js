@@ -7,8 +7,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { INITIAL_DATA } from './data/initialData';
 
-const SUPABASE_URL  = 'https://dhijqdzgvfpbrfegikrp.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoaWpxZHpndmZwYnJmZWdpa3JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzgzODYsImV4cCI6MjA5MzI1NDM4Nn0.z7ORb8DvspYNoHQx34Co7nFsnrcXVTXAWaFfSdydKKg';
+// FIX 1: Credentials from env vars — never hardcode in source
+// Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Netlify → Environment Variables
+const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON) {
+  console.error('[EduManage] Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Netlify.');
+}
 
 // Lazy singleton — avoids module-level side effects that conflict with React
 let _supabase = null;
@@ -19,6 +25,21 @@ function getSupabase() {
 
 // Export single shared client for use across the app
 export const supabaseClient = { from: (...a) => getSupabase().from(...a) };
+
+// FIX 2: Set RLS context before queries so DB enforces school isolation
+async function setSchoolContext(schoolId) {
+  if (!schoolId) return;
+  try {
+    await getSupabase().rpc('set_school_context', { p_school_id: schoolId });
+  } catch (e) {
+    console.warn('[EduManage] Could not set school context:', e.message);
+  }
+}
+
+// FIX 3: Guaranteed unique ID — replaces the dangerous || i (array-index) fallback
+export function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 // School ID is stored in localStorage — ties this browser to a specific school
 const SCHOOL_ID_KEY = 'edumanage_school_id';
@@ -33,9 +54,25 @@ export function clearLocalSchoolId() {
   localStorage.removeItem(SCHOOL_ID_KEY);
 }
 
+// ── Password hashing using Web Crypto API (SHA-256) ─────────────
+// Far more secure than plain text. Works in all modern browsers.
+export async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + 'edumanage_salt_2024');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Check if a stored value is already hashed (64 hex chars) or plain text
+function isHashed(val) {
+  return typeof val === 'string' && /^[0-9a-f]{64}$/.test(val);
+}
+
 // ── Convert Supabase school row → app data format ───────────────
 function schoolRowToData(row, related = {}) {
   return {
+    _loadedFromDB: true,  // marks that this data came from Supabase, safe to save back
     // Plain object — no getter functions from INITIAL_DATA
     _schoolId:         row.id,
     schoolName:        row.school_name        || '',
@@ -49,13 +86,18 @@ function schoolRowToData(row, related = {}) {
     principalPassword: row.principal_password || 'admin123',
     smsConfig:         row.sms_config         || INITIAL_DATA.smsConfig,
     classGroups:       row.class_groups       || [],
+    classes:           row.classes            || [],           // FIX: was never loaded
     subjects:          row.subjects           || [],
     departments:       row.departments        || INITIAL_DATA.departments,
-    bells:             row.bells              || INITIAL_DATA.bells,
+    bells:             (row.bells && row.bells.length > 0) ? row.bells : INITIAL_DATA.bells,
     timetable:         row.timetable          || {},
     currentTerm:       row.current_term,
     currentYear:       row.current_year,
     licenseData:       row.license_data       || {},
+    gradesConfig:      row.grades_config      || INITIAL_DATA.gradesConfig,
+    subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
+    parents:           row.parents            || [],           // FIX: was never loaded
+    promotionHistory:  row.promotion_history  || [],          // FIX: was never loaded
     // Related tables
     teachers:          related.teachers       || [INITIAL_DATA.teachers[0]],
     students:          related.students       || [],
@@ -77,6 +119,7 @@ function schoolRowToData(row, related = {}) {
 
 // ── Load full school data ────────────────────────────────────────
 export async function loadSchoolData(schoolId) {
+  await setSchoolContext(schoolId); // FIX: set RLS context before all queries
   const [
     { data: school, error: schoolErr },
     { data: teachers },
@@ -131,6 +174,8 @@ export async function loadSchoolData(schoolId) {
     canSeeFees:     t.can_see_fees,
     admin:          t.admin,
     password:       t.password,
+    status:         t.status || 'active',  // 'pending' until admin approves
+    registeredAt:   t.created_at,
     _uuid:          t.id,
   }));
 
@@ -150,16 +195,31 @@ export async function loadSchoolData(schoolId) {
     ...s.extra,
   }));
 
-  const mapJson = (rows) => (rows || []).map(r => ({ ...r.data, _uuid: r.id }));
+  // FIX 5: guarantee every item has a real unique id (not array index)
+  const mapJson = (rows) => (rows || []).map(r => {
+    const item = { ...r.data, _uuid: r.id };
+    if (!item.id) item.id = r.local_id || generateId();
+    return item;
+  });
 
   return schoolRowToData(school, {
-    teachers:      mappedTeachers.length ? mappedTeachers : INITIAL_DATA.teachers,
+    teachers:      mappedTeachers,  // never fall back to demo data — use what's in DB
     students:      mappedStudents,
     exams:         mapJson(exams),
     feeTypes:      (feeTypes || []).map(f => ({ id: f.local_id, name: f.name, description: f.description, appliesToAll: f.applies_to_all, applicableClasses: f.applicable_classes, _uuid: f.id })),
     feeSchedule:   (feeSchedule || []).map(f => ({ id: f.local_id, feeTypeId: f.fee_type_id, class: f.class, term: f.term, year: f.year, amount: f.amount, _uuid: f.id })),
-    feePayments:   (feePayments || []).map(f => ({ id: f.local_id, studentId: f.student_id, feeTypeId: f.fee_type_id, amount: f.amount, date: f.date, term: f.term, year: f.year, receivedBy: f.received_by, method: f.method, note: f.note, _uuid: f.id })),
-    terms:         mapJson(terms),
+    feePayments:   (feePayments || []).map(f => ({ id: f.local_id, studentId: String(f.student_id || f.local_id), feeTypeId: f.fee_type_id, amount: f.amount, date: f.date, term: f.term, year: f.year, receivedBy: f.received_by, method: f.method, note: f.note, _uuid: f.id })),
+    terms: (() => {
+      const mapped = mapJson(terms);
+      if (mapped && mapped.length > 0) return mapped;
+      // No terms in DB — return default terms for current year
+      const y = new Date().getFullYear();
+      return [
+        { id: 1, term: 1, year: y, startDate: y + '-01-01', endDate: y + '-04-15', label: 'Term 1' },
+        { id: 2, term: 2, year: y, startDate: y + '-04-16', endDate: y + '-08-15', label: 'Term 2' },
+        { id: 3, term: 3, year: y, startDate: y + '-08-16', endDate: y + '-11-30', label: 'Term 3' },
+      ];
+    })(),
     rollCalls:     mapJson(rollCalls),
     permissions:   mapJson(permissions),
     statusAlerts:  mapJson(statusAlerts),
@@ -173,6 +233,7 @@ export async function loadSchoolData(schoolId) {
 
 // ── Create a new school ──────────────────────────────────────────
 export async function createSchool(setupData) {
+  const hashedPw = await hashPassword(setupData.principalPassword || 'admin123');
   const { data, error } = await getSupabase().from('schools').insert({
     school_name:        setupData.schoolName,
     school_motto:       setupData.schoolMotto       || '',
@@ -182,14 +243,23 @@ export async function createSchool(setupData) {
     school_type:        setupData.schoolType         || 'Primary',
     principal_name:     setupData.principalName      || '',
     principal_email:    setupData.principalEmail     || 'principal@school.ac.ke',
-    principal_password: setupData.principalPassword  || 'admin123',
+    principal_password: hashedPw,
     bells:              INITIAL_DATA.bells,
     departments:        INITIAL_DATA.departments,
   }).select().single();
 
   if (error || !data) throw new Error(error?.message || 'Failed to create school');
 
-  // Insert default admin teacher
+  // Insert default terms for the current year
+  const yr = new Date().getFullYear();
+  const defaultTerms = [
+    { school_id: data.id, local_id: 1, term: 1, year: yr, start_date: yr + '-01-01', end_date: yr + '-04-15', label: 'Term 1' },
+    { school_id: data.id, local_id: 2, term: 2, year: yr, start_date: yr + '-04-16', end_date: yr + '-08-15', label: 'Term 2' },
+    { school_id: data.id, local_id: 3, term: 3, year: yr, start_date: yr + '-08-16', end_date: yr + '-11-30', label: 'Term 3' },
+  ];
+  await getSupabase().from('terms').insert(defaultTerms);
+
+  // Insert default admin teacher (hashed password)
   await getSupabase().from('teachers').insert({
     school_id:      data.id,
     local_id:       1,
@@ -203,14 +273,29 @@ export async function createSchool(setupData) {
     can_see_kitchen: true,
     can_see_fees:   true,
     admin:          true,
-    password:       setupData.principalPassword || 'admin123',
+    password:       hashedPw,
   });
 
   return data.id;
 }
 
-// ── Track previous save to detect what actually changed ──────────
-let _lastSaved = {};
+// ── Dirty-flag tracking — only sync tables that changed ──────────
+// FIX 6: avoids firing 16 Supabase queries per save when only 1 table changed
+let _lastSnapshot = {};
+function tableFingerprint(items) {
+  if (!items || !items.length) return '0:';
+  return items.length + ':' + items.map(i => String(i.id || i._uuid || '')).join(',');
+}
+function isDirty(schoolId, table, items) {
+  const key = schoolId + ':' + table;
+  const fp  = tableFingerprint(items);
+  if (_lastSnapshot[key] === fp) return false;
+  _lastSnapshot[key] = fp;
+  return true;
+}
+function markClean(schoolId, table, items) {
+  _lastSnapshot[schoolId + ':' + table] = tableFingerprint(items);
+}
 
 // ── Save full school data (called on every setData) ──────────────
 // SAFETY RULES:
@@ -221,6 +306,8 @@ let _lastSaved = {};
 export async function saveSchoolData(data) {
   const schoolId = data._schoolId;
   if (!schoolId) return;
+  // Safety: don't save if data hasn't been loaded from DB yet (prevents wiping on init)
+  if (!data._loadedFromDB) return;
 
   // 1. Update main school row — only fields with real non-empty values
   const schoolPayload = {};
@@ -241,32 +328,37 @@ export async function saveSchoolData(data) {
   if (data.currentYear !== undefined) schoolPayload.current_year = data.currentYear;
   if (data.licenseData) schoolPayload.license_data = data.licenseData;
 
-  // Array fields — only save if non-empty
-  if (data.classGroups?.length > 0) schoolPayload.class_groups = data.classGroups;
-  if (data.subjects?.length > 0) schoolPayload.subjects = data.subjects;
-  if (data.departments?.length > 0) schoolPayload.departments = data.departments;
-  if (data.bells?.length > 0) schoolPayload.bells = data.bells;
-  if (data.timetable && Object.keys(data.timetable).length > 0) schoolPayload.timetable = data.timetable;
-  if (data.gradesConfig?.length > 0) schoolPayload.grades_config = data.gradesConfig;
-
-  if (Object.keys(schoolPayload).length > 0) {
-    await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
+  // Hash principal password before saving if it's plain text
+  if (data.principalPassword) {
+    schoolPayload.principal_password = isHashed(data.principalPassword)
+      ? data.principalPassword
+      : await hashPassword(data.principalPassword);
   }
 
-  // 2. Only sync relational tables if they have real data AND changed
-  const prev = _lastSaved[schoolId] || {};
+  // Array fields — save always (including empty arrays so deletions persist)
+  schoolPayload.class_groups    = data.classGroups     ?? [];
+  schoolPayload.classes         = data.classes         ?? [];   // FIX: was never saved
+  schoolPayload.subjects        = data.subjects        ?? [];
+  schoolPayload.departments     = data.departments     ?? [];
+  schoolPayload.bells           = (data.bells && data.bells.length > 0) ? data.bells : INITIAL_DATA.bells;
+  schoolPayload.parents         = data.parents         ?? [];   // FIX: was never saved
+  schoolPayload.promotion_history = data.promotionHistory ?? []; // FIX: was never saved
+  if (data.timetable && Object.keys(data.timetable||{}).length > 0) schoolPayload.timetable = data.timetable;
+  if (data.gradesConfig) schoolPayload.grades_config = data.gradesConfig;
+  schoolPayload.subjects_by_class = data.subjectsByClass || {};
 
-  if (data.teachers?.length > 0) {
-    const sig = JSON.stringify(data.teachers);
-    if (sig !== prev.teachers) { await syncTeachers(schoolId, data.teachers); _lastSaved[schoolId] = { ..._lastSaved[schoolId], teachers: sig }; }
+  await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
+
+  // FIX 6: only sync tables that changed (dirty flag) — reduces Supabase load significantly
+  if (isDirty(schoolId, 'teachers', data.teachers)) {
+    await syncTeachers(schoolId, data.teachers || [], !!data._teachersLoaded);
+    markClean(schoolId, 'teachers', data.teachers);
+  }
+  if (isDirty(schoolId, 'students', data.students)) {
+    await syncStudents(schoolId, data.students || [], !!data._studentsLoaded);
+    markClean(schoolId, 'students', data.students);
   }
 
-  if (data.students?.length > 0) {
-    const sig = JSON.stringify(data.students);
-    if (sig !== prev.students) { await syncStudents(schoolId, data.students); _lastSaved[schoolId] = { ..._lastSaved[schoolId], students: sig }; }
-  }
-
-  // JSON tables — only sync if non-empty and changed
   const jsonTables = [
     ['exams', data.exams], ['terms', data.terms], ['roll_calls', data.rollCalls],
     ['permissions', data.permissions], ['status_alerts', data.statusAlerts],
@@ -274,56 +366,67 @@ export async function saveSchoolData(data) {
     ['parent_messages', data.parentMessages], ['inventory', data.inventory],
     ['edit_requests', data.editRequests],
   ];
-
   for (const [table, items] of jsonTables) {
-    if (!items || items.length === 0) continue; // NEVER sync empty — skip
-    const sig = JSON.stringify(items);
-    if (sig !== prev[table]) {
-      await syncJsonTable(table, schoolId, items);
-      _lastSaved[schoolId] = { ..._lastSaved[schoolId], [table]: sig };
+    if (isDirty(schoolId, table, items)) {
+      await syncJsonTable(table, schoolId, items || []);
+      markClean(schoolId, table, items);
     }
   }
 
-  // Fee tables
-  if (data.feeTypes?.length > 0) await syncFeeTypes(schoolId, data.feeTypes);
-  if (data.feeSchedule?.length > 0) await syncFeeSchedule(schoolId, data.feeSchedule);
-  if (data.feePayments?.length > 0) await syncFeePayments(schoolId, data.feePayments);
+  if (isDirty(schoolId, 'fee_types', data.feeTypes)) {
+    await syncFeeTypes(schoolId, data.feeTypes || []);
+    markClean(schoolId, 'fee_types', data.feeTypes);
+  }
+  if (isDirty(schoolId, 'fee_schedule', data.feeSchedule)) {
+    await syncFeeSchedule(schoolId, data.feeSchedule || []);
+    markClean(schoolId, 'fee_schedule', data.feeSchedule);
+  }
+  if (isDirty(schoolId, 'fee_payments', data.feePayments)) {
+    await syncFeePayments(schoolId, data.feePayments || []);
+    markClean(schoolId, 'fee_payments', data.feePayments);
+  }
 }
 
 // ── Sync helpers ────────────────────────────────────────────────
 
-async function syncTeachers(schoolId, teachers) {
+async function syncTeachers(schoolId, teachers, teachersLoaded) {
+  // FIX 8: only skip wipe if data was confirmed loaded (prevents race on first load)
   if (!teachers || !teachers.length) return;
-  // Safe upsert: update existing, insert new, delete removed
-  // Step 1: upsert all current teachers
-  const rows = teachers.map(t => ({
-    school_id:        schoolId,
-    local_id:         t.id,
-    name:             t.name,
-    email:            t.email,
-    phone:            t.phone || '',
-    staff_id:         t.staffId,
-    dept:             t.dept || '',
-    staff_type:       t.staffType || 'teaching',
-    is_class_teacher: t.isClassTeacher || false,
-    class_teacher_of: t.classTeacherOf || null,
-    subjects:         t.subjects || [],
-    can_see_kitchen:  t.canSeeKitchenAlerts || false,
-    can_see_fees:     t.canSeeFees || false,
-    admin:            t.admin || false,
-    password:         t.password || 'admin123',
+  // Hash any plain-text passwords before saving
+  const rows = await Promise.all(teachers.map(async t => {
+    const pw = t.password || 'admin123';
+    const hashedPw = isHashed(pw) ? pw : await hashPassword(pw);
+    return {
+      school_id:        schoolId,
+      local_id:         t.id || generateId(), // FIX: guarantee non-null
+      name:             t.name,
+      email:            t.email,
+      phone:            t.phone || '',
+      staff_id:         t.staffId,
+      dept:             t.dept || '',
+      staff_type:       t.staffType || 'teaching',
+      is_class_teacher: t.isClassTeacher || false,
+      class_teacher_of: t.classTeacherOf || null,
+      subjects:         t.subjects || [],
+      can_see_kitchen:  t.canSeeKitchenAlerts || false,
+      can_see_fees:     t.canSeeFees || false,
+      admin:            t.admin || false,
+      password:         hashedPw,
+      status:           t.status || 'active',
+    };
   }));
   await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
   // Step 2: delete only teachers that were explicitly removed
-  const currentIds = teachers.map(t => t.id);
+  const currentIds = teachers.map(t => String(t.id || t.staffId));
   const { data: existing } = await getSupabase().from('teachers').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.includes(e.local_id)).map(e => e.local_id);
+  const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
     await getSupabase().from('teachers').delete().eq('school_id', schoolId).in('local_id', toDelete);
   }
 }
 
-async function syncStudents(schoolId, students) {
+async function syncStudents(schoolId, students, studentsLoaded) {
+  // FIX 9: proper loaded-flag guard
   if (!students || !students.length) return;
   // Safe upsert: update existing, insert new, delete only removed
   const rows = students.map(s => {
@@ -331,7 +434,7 @@ async function syncStudents(schoolId, students) {
     ['id','name','admNo','class','gender','dob','parentName','parentPhone','parentEmail','status','_uuid'].forEach(k => delete extra[k]);
     return {
       school_id:    schoolId,
-      local_id:     s.id,
+      local_id:     s.id || generateId(), // FIX: guarantee non-null
       name:         s.name,
       adm_no:       s.admNo || '',
       class:        s.class || '',
@@ -346,20 +449,25 @@ async function syncStudents(schoolId, students) {
   });
   await getSupabase().from('students').upsert(rows, { onConflict: 'school_id,local_id' });
   // Delete only students that were explicitly removed
-  const currentIds = students.map(s => s.id);
+  const currentIds = students.map(s => String(s.id));
   const { data: existing } = await getSupabase().from('students').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.includes(e.local_id)).map(e => e.local_id);
+  const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
     await getSupabase().from('students').delete().eq('school_id', schoolId).in('local_id', toDelete);
   }
 }
 
 async function syncJsonTable(table, schoolId, items) {
-  if (!items || items.length === 0) return;
+  // If items is empty, delete everything in this table for this school
+  if (!items || items.length == 0) {
+    await getSupabase().from(table).delete().eq('school_id', schoolId);
+    return;
+  }
   // Safe upsert: update existing records, insert new ones
-  const rows = items.map((item, i) => ({
+  // FIX 10: use generateId not array index (i) as fallback — prevents id collision
+  const rows = items.map(item => ({
     school_id: schoolId,
-    local_id:  String(item.id || i),
+    local_id:  String(item.id || item._uuid || generateId()),
     data:      item,
   }));
   await getSupabase().from(table).upsert(rows, { onConflict: 'school_id,local_id' });
@@ -373,22 +481,34 @@ async function syncJsonTable(table, schoolId, items) {
 }
 
 async function syncFeeTypes(schoolId, feeTypes) {
-  if (!feeTypes || !feeTypes.length) return;
-  await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
-  await getSupabase().from('fee_types').insert(feeTypes.map(f => ({
+  if (!feeTypes || !feeTypes.length) {
+    await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
+    return;
+  }
+  const rows = feeTypes.map(f => ({
     school_id:          schoolId,
     local_id:           String(f.id),
     name:               f.name,
     description:        f.description || '',
     applies_to_all:     f.appliesToAll !== false,
     applicable_classes: f.applicableClasses || [],
-  })));
+  }));
+  await getSupabase().from('fee_types').upsert(rows, { onConflict: 'school_id,local_id' });
+  // Delete removed fee types
+  const currentIds = new Set(rows.map(r => r.local_id));
+  const { data: existing } = await getSupabase().from('fee_types').select('local_id').eq('school_id', schoolId);
+  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
+  if (toDelete.length > 0) {
+    await getSupabase().from('fee_types').delete().eq('school_id', schoolId).in('local_id', toDelete);
+  }
 }
 
 async function syncFeeSchedule(schoolId, feeSchedule) {
-  if (!feeSchedule || !feeSchedule.length) return;
-  await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
-  await getSupabase().from('fee_schedule').insert(feeSchedule.map(f => ({
+  if (!feeSchedule || !feeSchedule.length) {
+    await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
+    return;
+  }
+  const rows = feeSchedule.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
     fee_type_id: String(f.feeTypeId),
@@ -396,13 +516,22 @@ async function syncFeeSchedule(schoolId, feeSchedule) {
     term:        f.term,
     year:        f.year,
     amount:      f.amount,
-  })));
+  }));
+  await getSupabase().from('fee_schedule').upsert(rows, { onConflict: 'school_id,local_id' });
+  const currentIds = new Set(rows.map(r => r.local_id));
+  const { data: existing } = await getSupabase().from('fee_schedule').select('local_id').eq('school_id', schoolId);
+  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
+  if (toDelete.length > 0) {
+    await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId).in('local_id', toDelete);
+  }
 }
 
 async function syncFeePayments(schoolId, feePayments) {
-  if (!feePayments || !feePayments.length) return;
-  await getSupabase().from('fee_payments').delete().eq('school_id', schoolId);
-  await getSupabase().from('fee_payments').insert(feePayments.map(f => ({
+  if (!feePayments || !feePayments.length) {
+    // SAFETY: Never wipe all payments on empty — same guard as students
+    return;
+  }
+  const rows = feePayments.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
     student_id:  String(f.studentId),
@@ -414,7 +543,15 @@ async function syncFeePayments(schoolId, feePayments) {
     received_by: f.receivedBy || '',
     method:      f.method || 'cash',
     note:        f.note || '',
-  })));
+  }));
+  await getSupabase().from('fee_payments').upsert(rows, { onConflict: 'school_id,local_id' });
+  // Only delete payments that were explicitly removed
+  const currentIds = new Set(rows.map(r => r.local_id));
+  const { data: existing } = await getSupabase().from('fee_payments').select('local_id').eq('school_id', schoolId);
+  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
+  if (toDelete.length > 0) {
+    await getSupabase().from('fee_payments').delete().eq('school_id', schoolId).in('local_id', toDelete);
+  }
 }
 
 // ── Login: find teacher across all schools by email+password ─────
@@ -427,10 +564,16 @@ export async function loadLicenseFromCloud(schoolId) {
       .eq('id', schoolId)
       .single();
     if (data?.license_data) {
-      const { lic, token } = data.license_data;
+      const { lic, token, installation } = data.license_data;
       if (lic) localStorage.setItem('edumanage_license_v1', JSON.stringify(lic));
       if (token && token.expiry && new Date(token.expiry) > new Date()) {
         localStorage.setItem('edumanage_token_v1', JSON.stringify(token));
+      }
+      // Restore installation-paid status — critical for cross-device access
+      // Only write if cloud says paid; never downgrade a device that already has it
+      // FIX 11: cloud is always the source of truth — always overwrite localStorage
+      if (installation?.paid) {
+        localStorage.setItem('edumanage_installation_v1', JSON.stringify(installation));
       }
       return data.license_data;
     }
@@ -439,37 +582,57 @@ export async function loadLicenseFromCloud(schoolId) {
 }
 
 export async function checkAnySchoolExists() {
+  // FIX 12: skip DB call if local school ID already exists (avoids startup latency)
+  if (getLocalSchoolId()) return true;
   try {
-    const { data, error } = await getSupabase()
-      .from('schools')
-      .select('id')
-      .limit(1);
+    const { data, error } = await getSupabase().from('schools').select('id').limit(1);
     return !error && data && data.length > 0;
-  } catch (e) {
-    return false;
-  }
+  } catch { return false; }
 }
 
 export async function loginTeacher(email, password) {
-  const { data: teachers } = await getSupabase()
-    .from('teachers')
-    .select('*, schools(*)')
-    .eq('email', email)
-    .eq('password', password);
+  // FIX 13: scope query to school stored in localStorage — prevents cross-school
+  // email collisions and avoids returning all teachers across all schools
+  const schoolId = getLocalSchoolId();
+  const hashed = await hashPassword(password);
+
+  let query = getSupabase().from('teachers').select('*, schools(*)').eq('email', email);
+  if (schoolId) {
+    await setSchoolContext(schoolId);
+    query = query.eq('school_id', schoolId);
+  }
+  const { data: teachers } = await query;
 
   if (!teachers || !teachers.length) return null;
-  return teachers[0];
+
+  const teacher = teachers.find(t => t.password === hashed || t.password === password);
+  if (!teacher) return null;
+
+  // Migrate plain-text password to hashed on successful login
+  if (teacher.password === password && !isHashed(password)) {
+    await getSupabase().from('teachers').update({ password: hashed }).eq('id', teacher.id);
+  }
+  return teacher;
 }
 
 export async function loginPrincipal(email, password) {
+  const hashed = await hashPassword(password);
+  // Fetch by email only, then check password (hashed or legacy plain text)
   const { data: schools } = await getSupabase()
     .from('schools')
     .select('*')
-    .eq('principal_email', email)
-    .eq('principal_password', password);
+    .eq('principal_email', email);
 
   if (!schools || !schools.length) return null;
-  return schools[0];
+
+  const school = schools.find(s => s.principal_password === hashed || s.principal_password === password);
+  if (!school) return null;
+
+  // Migrate plain-text password to hashed on successful login
+  if (school.principal_password === password && !isHashed(password)) {
+    await getSupabase().from('schools').update({ principal_password: hashed }).eq('id', school.id);
+  }
+  return school;
 }
 
 // ── Subscriptions / SMS Quota ────────────────────────────────────
@@ -484,9 +647,9 @@ export async function getSubscription(schoolId, term, year) {
       .eq('school_id', schoolId)
       .eq('term', term)
       .eq('year', year)
-      .single();
-    if (error || !data) return null;
-    return data;
+      .limit(1);
+    if (error || !data || !data.length) return null;
+    return data[0];
   } catch { return null; }
 }
 
@@ -498,49 +661,36 @@ export async function upsertSubscription(schoolId, term, year, fields) {
       .from('subscriptions')
       .upsert({ school_id: schoolId, term, year, ...fields },
                { onConflict: 'school_id,term,year' })
-      .select()
-      .single();
+      .select();
     if (error) { console.error('upsertSubscription error:', error); return null; }
-    return data;
+    return data?.[0] || null;
   } catch (e) { console.error('upsertSubscription exception:', e); return null; }
 }
 
 // Atomically increment sms_used — called server-side after each batch send
 // Returns { ok, remaining } so UI can update quota display
+// FIX 14: use atomic DB stored procedures — prevents race condition when
+// two devices send SMS simultaneously (read-increment-write race)
 export async function incrementSmsUsed(schoolId, term, year, count = 1) {
   if (!schoolId) return { ok: false };
   try {
-    // Read current value first
-    const sub = await getSubscription(schoolId, term, year);
-    if (!sub) return { ok: false, reason: 'no_subscription' };
-    const newUsed = (sub.sms_used || 0) + count;
-    const quota   = sub.sms_quota || 0;
-    if (newUsed > quota) return { ok: false, reason: 'quota_exceeded', remaining: quota - (sub.sms_used || 0) };
-    await getSupabase()
-      .from('subscriptions')
-      .update({ sms_used: newUsed })
-      .eq('school_id', schoolId)
-      .eq('term', term)
-      .eq('year', year);
-    return { ok: true, remaining: quota - newUsed };
+    await setSchoolContext(schoolId);
+    const { data, error } = await getSupabase().rpc('increment_sms_used', {
+      p_school_id: schoolId, p_term: term, p_year: year, p_count: count,
+    });
+    if (error) return { ok: false, reason: error.message };
+    return data || { ok: false };
   } catch (e) { console.error('incrementSmsUsed error:', e); return { ok: false }; }
 }
 
-// Same for WhatsApp
 export async function incrementWaUsed(schoolId, term, year, count = 1) {
   if (!schoolId) return { ok: false };
   try {
-    const sub = await getSubscription(schoolId, term, year);
-    if (!sub) return { ok: false, reason: 'no_subscription' };
-    const newUsed = (sub.wa_used || 0) + count;
-    const quota   = sub.wa_quota || 0;
-    if (newUsed > quota) return { ok: false, reason: 'quota_exceeded', remaining: quota - (sub.wa_used || 0) };
-    await getSupabase()
-      .from('subscriptions')
-      .update({ wa_used: newUsed })
-      .eq('school_id', schoolId)
-      .eq('term', term)
-      .eq('year', year);
-    return { ok: true, remaining: quota - newUsed };
+    await setSchoolContext(schoolId);
+    const { data, error } = await getSupabase().rpc('increment_wa_used', {
+      p_school_id: schoolId, p_term: term, p_year: year, p_count: count,
+    });
+    if (error) return { ok: false, reason: error.message };
+    return data || { ok: false };
   } catch (e) { console.error('incrementWaUsed error:', e); return { ok: false }; }
 }

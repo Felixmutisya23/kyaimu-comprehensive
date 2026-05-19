@@ -1,5 +1,46 @@
 import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass } from '../data/initialData';
 
+/* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
+function getFeeExpected(student, term, year, data) {
+  const types = data.feeTypes || [];
+  return types.reduce((sum, ft) => {
+    const sch = (data.feeSchedule || []).find(s =>
+      String(s.feeTypeId) === String(ft.id) &&
+      (ft.appliesToAll !== false || (ft.applicableClasses || []).includes(student.class)) &&
+      String(s.term) === String(term) &&
+      String(s.year) === String(year)
+    );
+    return sum + (sch ? Number(sch.amount) || 0 : 0);
+  }, 0);
+}
+
+function getFeePaid(studentId, term, year, data) {
+  return (data.feePayments || [])
+    .filter(p =>
+      String(p.studentId) === String(studentId) &&
+      String(p.term) === String(term) &&
+      String(p.year) === String(year)
+    )
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+}
+
+function getFeeBalance(student, term, year, data) {
+  const expected = getFeeExpected(student, term, year, data);
+  const paid     = getFeePaid(student.id, term, year, data);
+  return expected - paid;
+}
+
+function getNextTermDate(exam, data) {
+  const terms = data.terms || [];
+  const nextTerm = exam.term < 3 ? exam.term + 1 : 1;
+  const nextYear = exam.term < 3 ? exam.year : (Number(exam.year) || 0) + 1;
+  const found = terms.find(t => Number(t.term) === nextTerm && Number(t.year) === nextYear);
+  if (found && found.startDate) {
+    return new Date(found.startDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  return '___________________________';
+}
+
 /* ═══════════════════════════════════════════════════════
    SHARED HEADER — used by all printed documents
 ═══════════════════════════════════════════════════════ */
@@ -30,33 +71,67 @@ export function computeRankings(exam, allStudents, data) {
   const siblingClasses = getSiblingStreams(exam.class, data);
   const hasStreams      = siblingClasses.length > 1;
 
-  function calcStats(studentName) {
-    const res   = exam.results[studentName] || {};
+  // ── Find the matching exam for each sibling stream ──────────────
+  // Sibling exams: same name + term + year, different stream of the same base class.
+  // This is the correct way to get overall position across all streams.
+  function findSiblingExam(cls) {
+    if (cls === exam.class) return exam;
+    return (data.exams || []).find(e =>
+      e.class === cls &&
+      e.term  === exam.term &&
+      e.year  === exam.year &&
+      e.name  === exam.name
+    ) || null;
+  }
+
+  // Build a merged results map: studentName → results (from their stream's exam)
+  const siblingExamMap = {};
+  siblingClasses.forEach(cls => {
+    const ex = findSiblingExam(cls);
+    if (ex) siblingExamMap[cls] = ex.results || {};
+  });
+
+  function calcStatsForStudent(student) {
+    // Use the correct exam for this student's class
+    const resultsObj = siblingExamMap[student.class] || exam.results || {};
+    const res   = resultsObj[student.name] || {};
     const subs  = Object.keys(res);
     const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
     const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
     return { total, mean, grade: getGrade(Math.round(mean)), results: res, subjects: subs };
   }
 
-  // Overall: across ALL sibling streams
+  function calcStatsFromResults(studentName, resultsObj) {
+    const res   = resultsObj[studentName] || {};
+    const subs  = Object.keys(res);
+    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
+    return { total, mean, grade: getGrade(Math.round(mean)), results: res, subjects: subs };
+  }
+
+  // Overall: across ALL sibling streams — each student ranked using their OWN stream's exam
   const allSiblingStudents = allStudents.filter(s => siblingClasses.includes(s.class));
   const overallSorted = [...allSiblingStudents]
-    .map(s => ({ name: s.name, ...calcStats(s.name) }))
+    .map(s => ({ name: s.name, class: s.class, ...calcStatsForStudent(s) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
-  // Stream: within this exam's class only
+  // Stream: within this exam's class only — uses this exam's results
   const streamStudents = allStudents.filter(s => s.class === exam.class);
   const streamSorted = [...streamStudents]
-    .map(s => ({ name: s.name, ...calcStats(s.name) }))
+    .map(s => ({ name: s.name, class: s.class, ...calcStatsFromResults(s.name, exam.results || {}) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
-  // Build map: studentName → { overallPos, streamPos }
+  // Build map: studentName → { overallPos, overallOf, streamPos, streamOf }
   const posMap = {};
-  overallSorted.forEach((s, i) => { posMap[s.name] = { overallPos: i + 1, overallOf: overallSorted.length }; });
+  overallSorted.forEach((s, i) => {
+    posMap[s.name] = { overallPos: i + 1, overallOf: overallSorted.length };
+  });
   streamSorted.forEach((s, i) => {
     if (posMap[s.name]) {
       posMap[s.name].streamPos = i + 1;
       posMap[s.name].streamOf  = streamSorted.length;
+    } else {
+      posMap[s.name] = { overallPos: i + 1, overallOf: overallSorted.length, streamPos: i + 1, streamOf: streamSorted.length };
     }
   });
 
@@ -188,6 +263,22 @@ export function printReportForm(student, exam, data) {
   // Compute positions
   const { posMap, overallSorted } = computeRankings(exam, data.students, data);
   const pos = posMap[student.name] || {};
+
+  // Fee balance for this exam's term/year
+  const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);
+  const feeExpected = getFeeExpected(student, exam.term, exam.year, data);
+  const feePaid     = getFeePaid(student.id, exam.term, exam.year, data);
+  const feeBalanceStr = feeExpected > 0
+    ? (feeBalance > 0
+        ? `KES ${feeBalance.toLocaleString()} (Balance)`
+        : feeBalance < 0
+          ? `KES ${Math.abs(feeBalance).toLocaleString()} (Overpaid)`
+          : 'CLEARED ✓')
+    : 'N/A';
+  const feeCellColor = feeBalance > 0 ? '#cc0000' : '#10b981';
+
+  // Next term start date
+  const nextTermDate = getNextTermDate(exam, data);
 
   // Student's scores
   const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
@@ -340,13 +431,14 @@ export function printReportForm(student, exam, data) {
     <table style="font-size:11px;margin-top:4px">
       <tr>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
-          <strong>Next Term Begins:</strong> ___________________________
+          <strong>Next Term Begins:</strong> ${nextTermDate}
         </td>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
           <strong>Closing Date:</strong> ___________________________
         </td>
-        <td style="padding:6px 10px;border:1px solid #ccc;background:#fff0f0">
-          <strong>Fees Balance:</strong> KES ___________________________
+        <td style="padding:6px 10px;border:1px solid #ccc;background:#fff0f0;color:${feeCellColor};font-weight:700">
+          <strong style="color:#333">Fees Balance:</strong> ${feeBalanceStr}
+          ${feeExpected > 0 ? `<div style="font-size:9px;color:#777;font-weight:400">Expected: KES ${feeExpected.toLocaleString()} · Paid: KES ${feePaid.toLocaleString()}</div>` : ''}
         </td>
         <td style="padding:6px 10px;border:1px solid #ccc;background:#f0fff4;color:#555;font-size:10px">
           Printed: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}
@@ -373,6 +465,7 @@ export function printAllReportForms(exam, data) {
   const { posMap } = computeRankings(exam, data.students, data);
   const stream    = getStreamFromClass(exam.class, data);
   const baseClass = getBaseClass(exam.class, data);
+  const nextTermDate = getNextTermDate(exam, data);
 
   const allPages = students.map(student => {
     const res  = exam.results[student.name] || {};
@@ -383,6 +476,19 @@ export function printAllReportForms(exam, data) {
     const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
     const grade = getGrade(Math.round(mean));
     const pos   = posMap[student.name] || {};
+
+    // Fee balance for this student
+    const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);
+    const feeExpected = getFeeExpected(student, exam.term, exam.year, data);
+    const feePaid     = getFeePaid(student.id, exam.term, exam.year, data);
+    const feeBalanceStr = feeExpected > 0
+      ? (feeBalance > 0
+          ? `KES ${feeBalance.toLocaleString()} (Balance)`
+          : feeBalance < 0
+            ? `KES ${Math.abs(feeBalance).toLocaleString()} (Overpaid)`
+            : 'CLEARED ✓')
+      : 'N/A';
+    const feeCellColor = feeBalance > 0 ? '#cc0000' : '#10b981';
 
     const rows = subs.map(sub => {
       const score = getScore(res[sub]);
@@ -455,8 +561,8 @@ export function printAllReportForms(exam, data) {
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:10px">
           <tr>
-            <td style="padding:5px 8px;border:1px solid #ccc;background:#f0f4ff"><strong>Next Term Begins:</strong> ________________________</td>
-            <td style="padding:5px 8px;border:1px solid #ccc;background:#fff0f0"><strong>Fees Balance:</strong> KES ___________________</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;background:#f0f4ff"><strong>Next Term Begins:</strong> ${nextTermDate}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;background:#fff0f0;color:${feeCellColor};font-weight:700"><strong style="color:#333">Fees Balance:</strong> ${feeBalanceStr}${feeExpected > 0 ? ` <span style="font-size:8px;color:#777;font-weight:400">(Exp: KES ${feeExpected.toLocaleString()} · Paid: KES ${feePaid.toLocaleString()})</span>` : ''}</td>
             <td style="padding:5px 8px;border:1px solid #ccc;font-size:9px;color:#888">Printed: ${new Date().toLocaleDateString('en-KE')}</td>
           </tr>
         </table>
