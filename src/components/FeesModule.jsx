@@ -19,14 +19,14 @@ function curTerm() {
 
 /* ── Compute what a student owes for one fee type in one term/year ── */
 function getExpected(student, feeTypeId, term, year, data) {
-  const ft = (data.feeTypes || []).find(f => f.id === feeTypeId);
+  const ft = (data.feeTypes || []).find(f => f.id == feeTypeId);
   if (!ft) return 0;
   const applies = ft.appliesToAll || (ft.applicableClasses || []).includes(student.class);
   if (!applies) return 0;
   const sch = (data.feeSchedule || []).find(s =>
-    s.feeTypeId === feeTypeId &&
-    (s.class === student.class || s.class === 'ALL') &&
-    s.term === Number(term) && s.year === Number(year)
+    s.feeTypeId == feeTypeId &&
+    (s.class == student.class || s.class == 'ALL') &&
+    s.term == Number(term) && s.year == Number(year)
   );
   return sch ? Number(sch.amount) : 0;
 }
@@ -34,7 +34,7 @@ function getExpected(student, feeTypeId, term, year, data) {
 /* ── Sum all expected fees for a student in a term/year ── */
 function getTotalExpected(student, term, year, data, feeTypeId = null) {
   const types = feeTypeId
-    ? [(data.feeTypes || []).find(f => f.id === feeTypeId)].filter(Boolean)
+    ? [(data.feeTypes || []).find(f => f.id == feeTypeId)].filter(Boolean)
     : (data.feeTypes || []);
   return types.reduce((s, ft) => s + getExpected(student, ft.id, term, year, data), 0);
 }
@@ -43,12 +43,12 @@ function getTotalExpected(student, term, year, data, feeTypeId = null) {
 function getPaid(studentId, term, year, data, feeTypeId = null) {
   return (data.feePayments || [])
     .filter(p =>
-      p.studentId === studentId &&
-      p.term === Number(term) &&
-      p.year === Number(year) &&
-      (feeTypeId ? p.feeTypeId === feeTypeId : true)
+      String(p.studentId) == String(studentId) &&
+      Number(p.term) == Number(term) &&
+      Number(p.year) == Number(year) &&
+      (feeTypeId ? String(p.feeTypeId) == String(feeTypeId) : true)
     )
-    .reduce((s, p) => s + p.amount, 0);
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
 }
 
 /* ── Print fee clearance / balance list ── */
@@ -59,14 +59,14 @@ function printFeeList(students, feeTypeId, term, year, data, feeTypeName) {
     const balance  = expected - paid;
     const overpaid = Math.max(0, -balance);
     const status   = balance <= 0 ? 'CLEARED' : 'PENDING';
-    return `<tr style="background:${i%2===0?'#fff':'#f8f9ff'}">
+    return `<tr style="background:${i%2 == 0?'#fff':'#f8f9ff'}">
       <td style="padding:5px 8px;border:1px solid #ddd;font-weight:600">${s.admNo}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;font-weight:600">${s.name.toUpperCase()}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${s.class}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;text-align:right">${expected>0?'KES '+expected.toLocaleString():'—'}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;color:#10b981;font-weight:700">${paid>0?'KES '+paid.toLocaleString():'—'}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;color:${balance>0?'#cc0000':'#10b981'};font-weight:700">${balance>0?'KES '+balance.toLocaleString():overpaid>0?'Credit KES '+overpaid.toLocaleString():'—'}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:700;color:${status==='CLEARED'?'#10b981':'#cc0000'}">${status}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:700;color:${status == 'CLEARED'?'#10b981':'#cc0000'}">${status}</td>
     </tr>`;
   }).join('');
 
@@ -117,7 +117,7 @@ function printFeeList(students, feeTypeId, term, year, data, feeTypeName) {
 
 /* ── Print full student fee statement ── */
 function printStudentStatement(student, data) {
-  const allPayments = (data.feePayments || []).filter(p => p.studentId === student.id);
+  const allPayments = (data.feePayments || []).filter(p => p.studentId == student.id);
   const years = [...new Set([student.joined, ...allPayments.map(p => String(p.year)), String(curYear())])].sort();
   const feeTypes = data.feeTypes || [];
 
@@ -126,10 +126,10 @@ function printStudentStatement(student, data) {
 
   years.forEach(yr => {
     TERMS.forEach(term => {
-      const termPayments = allPayments.filter(p => p.term === Number(term) && p.year === Number(yr));
+      const termPayments = allPayments.filter(p => p.term == Number(term) && p.year == Number(yr));
       const totalExp = getTotalExpected(student, term, yr, data);
       const totalPaid = getPaid(student.id, term, yr, data);
-      if (totalExp === 0 && totalPaid === 0) return;
+      if (totalExp == 0 && totalPaid == 0) return;
       grandExpected += totalExp; grandPaid += totalPaid;
       const bal = totalExp - totalPaid;
 
@@ -146,10 +146,10 @@ function printStudentStatement(student, data) {
       // Per fee-type breakdown with expected, paid, balance
       feeTypes.forEach(ft => {
         const expected = getExpected(student, ft.id, term, yr, data);
-        const ftPayments = termPayments.filter(p => p.feeTypeId === ft.id);
+        const ftPayments = termPayments.filter(p => p.feeTypeId == ft.id);
         const ftPaid = ftPayments.reduce((s, p) => s + p.amount, 0);
         const ftBal = expected - ftPaid;
-        if (expected === 0 && ftPaid === 0) return;
+        if (expected == 0 && ftPaid == 0) return;
         bodyRows += `<tr style="background:#f8faff">
           <td style="padding:4px 8px;border:1px solid #eee;font-weight:700;color:#003399" colspan="2">${ft.name}</td>
           <td style="padding:4px 8px;border:1px solid #eee;text-align:right;color:#555">Expected:<br><strong>KES ${expected.toLocaleString()}</strong></td>
@@ -168,13 +168,13 @@ function printStudentStatement(student, data) {
             <td style="padding:3px 8px;border:1px solid #eee;text-align:right;color:#10b981;font-weight:700;font-size:11px">KES ${p.amount.toLocaleString()}</td>
           </tr>`;
         });
-        if (ftPayments.length === 0) {
+        if (ftPayments.length == 0) {
           bodyRows += `<tr><td colspan="6" style="padding:3px 8px 3px 20px;border:1px solid #eee;color:#aaa;font-size:11px">↳ No payments yet for this fee type</td></tr>`;
         }
       });
-      if (feeTypes.length === 0 && termPayments.length > 0) {
+      if (feeTypes.length == 0 && termPayments.length > 0) {
         termPayments.forEach(p => {
-          const ft = feeTypes.find(f => f.id === p.feeTypeId);
+          const ft = feeTypes.find(f => f.id == p.feeTypeId);
           bodyRows += `<tr>
             <td style="padding:4px 8px;border:1px solid #eee">${p.date}</td>
             <td style="padding:4px 8px;border:1px solid #eee">${ft?.name||'General'}</td>
@@ -248,7 +248,7 @@ function printStudentStatement(student, data) {
 function printFeeStructure(classes, data, selClass) {
   const feeTypes = data.feeTypes || [];
   const schedule = data.feeSchedule || [];
-  const targetClasses = selClass === 'ALL' ? classes : [selClass];
+  const targetClasses = selClass == 'ALL' ? classes : [selClass];
   
   const tableRows = targetClasses.map(cls => {
     const classTypes = feeTypes.filter(ft => ft.appliesToAll || (ft.applicableClasses||[]).includes(cls));
@@ -258,7 +258,7 @@ function printFeeStructure(classes, data, selClass) {
     classTypes.forEach(ft => {
       [1,2,3].forEach(term => {
         const yr = new Date().getFullYear();
-        const sch = schedule.find(s => s.feeTypeId === ft.id && (s.class === cls || s.class === 'ALL') && s.term === term && s.year === yr);
+        const sch = schedule.find(s => s.feeTypeId == ft.id && (s.class == cls || s.class == 'ALL') && s.term == term && s.year == yr);
         const amt = sch ? Number(sch.amount) : 0;
         classTotal += amt;
         rows += `<tr>
@@ -318,10 +318,10 @@ function printFeeStructure(classes, data, selClass) {
    MAIN FEES COMPONENT
 ═══════════════════════════════════════════════════════ */
 export default function FeesModule({ data, setData, user, isUnlocked = true }) {
-  const isPrincipal = user.role === 'principal';
-  const isFinance   = user.role === 'non_teaching' && user.dept === 'Finance';
+  const isPrincipal = user.role == 'principal';
+  const isFinance   = user.role == 'non_teaching' && user.dept == 'Finance';
   const canManage   = isPrincipal || isFinance;
-  const isParent    = user.role === 'parent';
+  const isParent    = user.role == 'parent';
 
   const [tab, setTab] = useState(isParent ? 'parent' : 'overview');
 
@@ -343,14 +343,14 @@ export default function FeesModule({ data, setData, user, isUnlocked = true }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 18, width: 'fit-content', flexWrap: 'wrap' }}>
-        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={TAB_S(tab === t.id)}>{t.label}</button>)}
+        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={TAB_S(tab == t.id)}>{t.label}</button>)}
       </div>
 
-      {tab === 'overview'   && <FeeOverview   data={data} setData={setData} user={user} canManage={canManage} />}
-      {tab === 'payments'   && <PaymentHistory data={data} setData={setData} user={user} canManage={canManage} />}
-      {tab === 'bytype'     && <ByFeeType      data={data} setData={setData} user={user} canManage={canManage} />}
-      {tab === 'structure'  && <FeeStructure   data={data} setData={setData} />}
-      {tab === 'parent'     && <ParentView     data={data} user={user} />}
+      {tab == 'overview'   && <FeeOverview   data={data} setData={setData} user={user} canManage={canManage} />}
+      {tab == 'payments'   && <PaymentHistory data={data} setData={setData} user={user} canManage={canManage} />}
+      {tab == 'bytype'     && <ByFeeType      data={data} setData={setData} user={user} canManage={canManage} />}
+      {tab == 'structure'  && <FeeStructure   data={data} setData={setData} />}
+      {tab == 'parent'     && <ParentView     data={data} user={user} />}
     </div>
   );
 }
@@ -365,10 +365,10 @@ function FeeOverview({ data, setData, user, canManage }) {
   const [payStudent,  setPayStudent]  = useState(null);
 
   const allClasses   = getAllClasses(data);
-  const activeStudents = (data.students || []).filter(s => !s.status || s.status === 'active');
+  const activeStudents = (data.students || []).filter(s => !s.status || s.status == 'active');
 
   const filtered = activeStudents.filter(s =>
-    (!filterClass || s.class === filterClass) &&
+    (!filterClass || s.class == filterClass) &&
     (s.name.toLowerCase().includes(search.toLowerCase()) || s.admNo.includes(search))
   );
 
@@ -416,7 +416,7 @@ function FeeOverview({ data, setData, user, canManage }) {
                 <th key={h} style={TS.th}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {filtered.length === 0
+              {filtered.length == 0
                 ? <tr><td colSpan={8} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 28 }}>No students found.</td></tr>
                 : filtered.map(s => {
                   const exp  = getTotalExpected(s, filterTerm, filterYear, data);
@@ -473,16 +473,16 @@ function ByFeeType({ data, setData, user, canManage }) {
   const feeTypes   = data.feeTypes || [];
   const allClasses = getAllClasses(data);
 
-  const ft = feeTypes.find(f => f.id === selFeeType);
+  const ft = feeTypes.find(f => f.id == selFeeType);
 
   // Get students this fee applies to
   const eligibleStudents = useMemo(() => {
-    const active = (data.students || []).filter(s => !s.status || s.status === 'active');
+    const active = (data.students || []).filter(s => !s.status || s.status == 'active');
     if (!ft) return active;
     const students = ft.appliesToAll
       ? active
       : active.filter(s => (ft.applicableClasses || []).includes(s.class));
-    return selClass ? students.filter(s => s.class === selClass) : students;
+    return selClass ? students.filter(s => s.class == selClass) : students;
   }, [ft, selClass, data.students]);
 
   const cleared   = eligibleStudents.filter(s => {
@@ -523,7 +523,7 @@ function ByFeeType({ data, setData, user, canManage }) {
       {!selFeeType ? (
         <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
           Select a fee type above to view the payment status list.
-          {feeTypes.length === 0 && <div style={{ marginTop: 12 }}>No fee types added yet. Go to <strong>Fee Structure</strong> tab first.</div>}
+          {feeTypes.length == 0 && <div style={{ marginTop: 12 }}>No fee types added yet. Go to <strong>Fee Structure</strong> tab first.</div>}
         </Card>
       ) : (
         <>
@@ -532,7 +532,7 @@ function ByFeeType({ data, setData, user, canManage }) {
             {[
               { l: 'Eligible Students', v: eligibleStudents.length, c: '#4f8ef7' },
               { l: 'Cleared',           v: cleared.length,          c: '#10b981' },
-              { l: 'Pending',           v: pending.length,           c: '#ef4444' },
+              { l: 'Pending',           v: (pending||[]).length,           c: '#ef4444' },
             ].map(({ l, v, c }) => (
               <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
                 <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{v}</div>
@@ -593,8 +593,8 @@ function PaymentHistory({ data, setData, user, canManage }) {
   const payments = (data.feePayments || [])
     .filter(p =>
       (!search || p.studentName?.toLowerCase().includes(search.toLowerCase())) &&
-      (!filterFT || p.feeTypeId === filterFT) &&
-      (!filterTerm || p.term === Number(filterTerm))
+      (!filterFT || p.feeTypeId == filterFT) &&
+      (!filterTerm || p.term == Number(filterTerm))
     );
 
   return (
@@ -612,7 +612,7 @@ function PaymentHistory({ data, setData, user, canManage }) {
         {canManage && <Btn onClick={() => setShowPay(true)}><Icon name="add" size={14} /> Record Payment</Btn>}
       </div>
 
-      {payments.length === 0
+      {payments.length == 0
         ? <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No payments found.</Card>
         : (
           <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -624,8 +624,8 @@ function PaymentHistory({ data, setData, user, canManage }) {
                 </tr></thead>
                 <tbody>
                   {[...payments].reverse().map(p => {
-                    const student = (data.students || []).find(s => s.id === p.studentId);
-                    const ft      = (data.feeTypes || []).find(f => f.id === p.feeTypeId);
+                    const student = (data.students || []).find(s => s.id == p.studentId);
+                    const ft      = (data.feeTypes || []).find(f => f.id == p.feeTypeId);
                     return (
                       <tr key={p.id}>
                         <td style={TS.td}>{p.date}</td>
@@ -634,7 +634,7 @@ function PaymentHistory({ data, setData, user, canManage }) {
                         <td style={TS.td}>Term {p.term}</td>
                         <td style={TS.td}>{p.year}</td>
                         <td style={TS.td}>{ft?.name || 'General'}</td>
-                        <td style={TS.td}><Tag color={p.method==='Mpesa'?'green':p.method==='Bank'?'blue':'gray'}>{p.method}</Tag></td>
+                        <td style={TS.td}><Tag color={p.method == 'Mpesa'?'green':p.method == 'Bank'?'blue':'gray'}>{p.method}</Tag></td>
                         <td style={{ ...TS.td, fontFamily: 'monospace', fontSize: 11 }}>{p.reference}</td>
                         <td style={{ ...TS.td, color: '#10b981', fontWeight: 700 }}>KES {p.amount.toLocaleString()}</td>
                         <td style={TS.td}>
@@ -674,9 +674,9 @@ function RecordPaymentModal({ show, onClose, data, setData, defaultStudent }) {
   React.useEffect(() => { if (show) setForm(init()); }, [show, defaultStudent]);
 
   function save() {
-    const student = (data.students || []).find(s => s.id === Number(form.studentId));
+    const student = (data.students || []).find(s => s.id == Number(form.studentId));
     if (!student || !form.amount) return;
-    const ft = (data.feeTypes || []).find(f => f.id === form.feeTypeId);
+    const ft = (data.feeTypes || []).find(f => f.id == form.feeTypeId);
     const payment = {
       id:           Date.now(),
       studentId:    student.id,
@@ -703,7 +703,7 @@ function RecordPaymentModal({ show, onClose, data, setData, defaultStudent }) {
       <FormGroup label="Student *">
         <select value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })}>
           <option value="">Choose student...</option>
-          {(data.students || []).filter(s => !s.status || s.status === 'active').map(s => (
+          {(data.students || []).filter(s => !s.status || s.status == 'active').map(s => (
             <option key={s.id} value={s.id}>{s.name} ({s.admNo}) — {s.class}</option>
           ))}
         </select>
@@ -803,7 +803,7 @@ function FeeStructure({ data, setData }) {
             <SectionTitle style={{ margin: 0 }}>Fee Types</SectionTitle>
             <Btn size="sm" onClick={() => setShowAddType(true)}><Icon name="add" size={12} /> Add Type</Btn>
           </div>
-          {feeTypes.length === 0
+          {feeTypes.length == 0
             ? <p style={{ color: '#64748b', fontSize: 13 }}>No fee types yet. Add Tuition, Remedials, Sports Fee, etc.</p>
             : feeTypes.map(ft => (
               <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
@@ -826,9 +826,9 @@ function FeeStructure({ data, setData }) {
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <SectionTitle style={{ margin: 0 }}>Amounts Per Class / Term</SectionTitle>
-            <Btn size="sm" onClick={() => setShowAddSched(true)} disabled={feeTypes.length === 0}><Icon name="add" size={12} /> Set Amount</Btn>
+            <Btn size="sm" onClick={() => setShowAddSched(true)} disabled={feeTypes.length == 0}><Icon name="add" size={12} /> Set Amount</Btn>
           </div>
-          {feeSchedule.length === 0
+          {feeSchedule.length == 0
             ? <p style={{ color: '#64748b', fontSize: 13 }}>No amounts set. First add fee types, then set amounts per class and term.</p>
             : (
               <div style={{ overflowX: 'auto' }}>
@@ -836,11 +836,11 @@ function FeeStructure({ data, setData }) {
                   <thead><tr>{['Fee Type','Class','Tm','Year','Amount',''].map(h => <th key={h} style={TS.th}>{h}</th>)}</tr></thead>
                   <tbody>
                     {feeSchedule.map(sch => {
-                      const ft = feeTypes.find(f => f.id === sch.feeTypeId);
+                      const ft = feeTypes.find(f => f.id == sch.feeTypeId);
                       return (
                         <tr key={sch.id}>
                           <td style={TS.td}>{ft?.name || '—'}</td>
-                          <td style={TS.td}>{sch.class === 'ALL' ? 'All' : sch.class}</td>
+                          <td style={TS.td}>{sch.class == 'ALL' ? 'All' : sch.class}</td>
                           <td style={TS.td}>T{sch.term}</td>
                           <td style={TS.td}>{sch.year}</td>
                           <td style={{ ...TS.td, fontWeight: 700, color: '#10b981' }}>KES {Number(sch.amount).toLocaleString()}</td>
@@ -872,7 +872,7 @@ function FeeStructure({ data, setData }) {
             <div>
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Select specific classes this fee applies to:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {getAllClasses(data).map(c => (
+                {(getAllClasses(data)||[]).map(c => (
                   <div key={c} onClick={() => toggleClass(c)} style={{
                     padding: '3px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 500,
                     background: typeForm.applicableClasses.includes(c) ? '#4f8ef7' : '#252d42',
@@ -902,7 +902,7 @@ function FeeStructure({ data, setData }) {
           <FormGroup label="Class (ALL = applies to all)">
             <select value={schedForm.class} onChange={e => setSchedForm({ ...schedForm, class: e.target.value })}>
               <option value="ALL">All Classes</option>
-              {getAllClasses(data).map(c => <option key={c} value={c}>{c}</option>)}
+              {(getAllClasses(data)||[]).map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </FormGroup>
           <FormGroup label="Amount (KES) *"><input type="number" value={schedForm.amount} onChange={e => setSchedForm({ ...schedForm, amount: e.target.value })} placeholder="e.g. 15000" /></FormGroup>
@@ -922,28 +922,28 @@ function FeeStructure({ data, setData }) {
 
 /* ── PARENT VIEW ──────────────────────────────────────── */
 function ParentView({ data, user }) {
-  const myChildren = (data.students || []).filter(s => s.parentId === user.parentId || s.parentPhone === user.phone);
+  const myChildren = (data.students || []).filter(s => s.parentId == user.parentId || s.parentPhone == user.phone);
   const [selChild, setSelChild] = useState(myChildren[0]?.id || null);
   const [selFT, setSelFT] = useState('');
   const [selTerm, setSelTerm] = useState('');
   const [selClass, setSelClass] = useState('');
 
-  const child = myChildren.find(s => s.id === selChild);
+  const child = myChildren.find(s => s.id == selChild);
 
-  if (myChildren.length === 0) {
+  if (myChildren.length == 0) {
     return <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No students linked to your account. Contact the school office.</Card>;
   }
 
   const feeTypes = data.feeTypes || [];
   const payments = (data.feePayments || []).filter(p =>
-    p.studentId === selChild &&
-    (!selFT || p.feeTypeId === selFT) &&
-    (!selTerm || p.term === Number(selTerm)) &&
-    (!selClass || p.studentClass === selClass)
+    p.studentId == selChild &&
+    (!selFT || p.feeTypeId == selFT) &&
+    (!selTerm || p.term == Number(selTerm)) &&
+    (!selClass || p.studentClass == selClass)
   );
 
   // All classes this child has been in (based on payments)
-  const childClasses = [...new Set((data.feePayments || []).filter(p => p.studentId === selChild).map(p => p.studentClass).filter(Boolean))];
+  const childClasses = [...new Set((data.feePayments || []).filter(p => p.studentId == selChild).map(p => p.studentClass).filter(Boolean))];
 
   return (
     <div>
@@ -952,9 +952,9 @@ function ParentView({ data, user }) {
           {myChildren.map(c => (
             <div key={c.id} onClick={() => { setSelChild(c.id); setSelClass(''); setSelFT(''); setSelTerm(''); }}
               style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 500, fontSize: 13,
-                background: selChild === c.id ? '#4f8ef7' : '#1e2435',
-                color: selChild === c.id ? '#fff' : '#94a3b8',
-                border: `1px solid ${selChild === c.id ? '#4f8ef7' : '#2a3350'}` }}>
+                background: selChild == c.id ? '#4f8ef7' : '#1e2435',
+                color: selChild == c.id ? '#fff' : '#94a3b8',
+                border: `1px solid ${selChild == c.id ? '#4f8ef7' : '#2a3350'}` }}>
               {c.name} — {c.class}
             </div>
           ))}
@@ -966,7 +966,7 @@ function ParentView({ data, user }) {
           <Card style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#4f8ef730', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, color: '#4f8ef7' }}>
-                {child.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                {(child.name||'').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{child.name}</div>
@@ -1000,10 +1000,10 @@ function ParentView({ data, user }) {
               <table style={TS.table}>
                 <thead><tr>{['Date','Fee Type','Class','Term','Year','Method','Reference','Amount'].map(h => <th key={h} style={TS.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {payments.length === 0
+                  {payments.length == 0
                     ? <tr><td colSpan={8} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 24 }}>No payment records found for selected filters.</td></tr>
                     : [...payments].reverse().map(p => {
-                      const ft = feeTypes.find(f => f.id === p.feeTypeId);
+                      const ft = feeTypes.find(f => f.id == p.feeTypeId);
                       return (
                         <tr key={p.id}>
                           <td style={TS.td}>{p.date}</td>

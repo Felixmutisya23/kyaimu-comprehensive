@@ -3,27 +3,27 @@ import { Card, SectionTitle, Alert, ProgressBar, Tag, Icon } from './UI';
 import { canSeeKitchenAlerts, canSeeFees } from '../data/initialData';
 
 export default function Dashboard({ data, user }) {
-  const isPrincipal    = user.role === 'principal';
+  const isPrincipal    = user.role == 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
   const showKitchen    = canSeeKitchenAlerts(user, data);
   const showFees       = canSeeFees(user, data);
-  const isTeaching     = user.role === 'class_teacher' || user.role === 'subject_teacher';
+  const isTeaching     = user.role == 'class_teacher' || user.role == 'subject_teacher';
 
-  const lowInv      = data.inventory.filter(i => i.current <= i.min);
-  const totalFees   = data.students.reduce((s, st) => s + st.fees.total, 0);
-  const paidFees    = data.students.reduce((s, st) => s + st.fees.paid, 0);
-  const unreadMsgs  = data.messages.filter(m => !m.read && (isPrincipal || m.dept === user.dept)).length;
-  const myStudents  = isClassTeacher ? data.students.filter(s => s.class === myClass) : data.students;
-  const pendingReqs = (data.editRequests || []).filter(r => r.status === 'pending');
+  const lowInv      = (data.inventory||[]).filter(i => i.current <= i.min);
+  const totalFees   = (data.students||[]).reduce((s, st) => s + (st.fees?.total || 0), 0);
+  const paidFees    = (data.students||[]).reduce((s, st) => s + (st.fees?.paid || 0), 0);
+  const unreadMsgs  = (data.messages||[]).filter(m => !m.read && (isPrincipal || m.dept == user.dept)).length;
+  const myStudents  = isClassTeacher ? (data.students||[]).filter(s => s.class == myClass) : data.students;
+  const pendingReqs = (data.editRequests || []).filter(r => r.status == 'pending');
 
-  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to === user.staffId || n.to === 'ALL')).length;
+  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL')).length;
   const myApprovalsPending = pendingReqs.filter(r => {
-    if (isPrincipal && r.approvals.principal === null) return true;
-    const staff = data.teachers.find(t => t.staffId === user.staffId);
+    if (isPrincipal && r.approvals?.principal == null) return true;
+    const staff = (data.teachers||[]).find(t => t.staffId == user.staffId);
     if (staff?.classTeacherOf) {
-      const exam = data.exams.find(e => e.id === r.examId);
-      return exam?.class === staff.classTeacherOf && r.approvals.classTeacher === null;
+      const exam = (data.exams||[]).find(e => e.id == r.examId);
+      return exam?.class == staff.classTeacherOf && r.approvals?.classTeacher == null;
     }
     return false;
   }).length;
@@ -32,7 +32,7 @@ export default function Dashboard({ data, user }) {
     <div>
       <div style={{ marginBottom: 22 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-          Welcome back, {user.name.split(' ')[0]} 👋
+          Welcome back, {(user.name||'').split(' ')[0]} 👋
         </h2>
         <p style={{ color: '#64748b', fontSize: 13 }}>
           {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -69,7 +69,7 @@ export default function Dashboard({ data, user }) {
         {/* Students — teaching staff see their class only */}
         {(isPrincipal || isTeaching) && (
           <StatCard
-            icon="students" value={isClassTeacher ? myStudents.length : data.students.length}
+            icon="students" value={isClassTeacher ? (myStudents||[]).length : (data.students||[]).length}
             label={isClassTeacher ? `Students (${myClass})` : 'Total Students'} color="#4f8ef7" />
         )}
 
@@ -80,12 +80,12 @@ export default function Dashboard({ data, user }) {
 
         {/* Staff — principal only */}
         {isPrincipal && (
-          <StatCard icon="teachers" value={data.teachers.filter(t => !t.admin).length} label="Teaching Staff" color="#f59e0b" />
+          <StatCard icon="teachers" value={(data.teachers||[]).filter(t => !t.admin).length} label="Teaching Staff" color="#f59e0b" />
         )}
 
         {/* Departments */}
         {isPrincipal && (
-          <StatCard icon="dept" value={data.departments.length} label="Departments" color="#7c3aed" />
+          <StatCard icon="dept" value={(data.departments||[]).length} label="Departments" color="#7c3aed" />
         )}
 
         {/* Notifications */}
@@ -95,7 +95,7 @@ export default function Dashboard({ data, user }) {
 
         {/* My exams */}
         {(isPrincipal || isTeaching) && (
-          <StatCard icon="exams" value={data.exams.filter(e => isClassTeacher ? e.class === myClass : true).length} label="Exams on Record" color="#ec4899" />
+          <StatCard icon="exams" value={(data.exams||[]).filter(e => isClassTeacher ? e.class == myClass : true).length} label="Exams on Record" color="#ec4899" />
         )}
       </div>
 
@@ -114,7 +114,7 @@ export default function Dashboard({ data, user }) {
               <ProgressBar pct={Math.round(paidFees / totalFees * 100)} color="#10b981" />
             </div>
             {data.students.slice(0, 6).map(s => {
-              const pct = Math.round(s.fees.paid / s.fees.total * 100);
+              const pct = Math.round((s.fees?.paid || 0) / (s.fees?.total || 1) * 100);
               return (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #2a3350' }}>
                   <div style={{ width: 100, fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
@@ -130,7 +130,7 @@ export default function Dashboard({ data, user }) {
         {showKitchen && (
           <Card>
             <SectionTitle icon="kitchen">Kitchen Inventory Status</SectionTitle>
-            {data.inventory.map(i => {
+            {(data.inventory||[]).map(i => {
               const pct = Math.round(i.current / i.max * 100);
               const low = i.current <= i.min;
               return (
@@ -150,7 +150,7 @@ export default function Dashboard({ data, user }) {
         {isClassTeacher && (
           <Card>
             <SectionTitle icon="students">My Class — {myClass}</SectionTitle>
-            {myStudents.length === 0
+            {myStudents.length == 0
               ? <p style={{ color: '#64748b', fontSize: 13 }}>No students in {myClass} yet. Add them from Students.</p>
               : myStudents.map(s => (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a3350', fontSize: 13, alignItems: 'center' }}>
@@ -166,13 +166,13 @@ export default function Dashboard({ data, user }) {
         {!isPrincipal && !isClassTeacher && isTeaching && (
           <Card>
             <SectionTitle icon="timetable">My Teaching Schedule</SectionTitle>
-            {(user.teacherSubjects || []).length === 0
+            {(user.teacherSubjects || []).length == 0
               ? <p style={{ color: '#64748b', fontSize: 13 }}>No subjects assigned to you yet.</p>
               : (user.teacherSubjects || []).map((s, i) => (
                 <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
                   <span style={{ fontWeight: 600, color: '#4f8ef7' }}>{s.subject}</span>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                    {s.classes.map(c => <Tag key={c} color="green">{c}</Tag>)}
+                    {(s.classes||[]).map(c => <Tag key={c} color="green">{c}</Tag>)}
                   </div>
                 </div>
               ))}
@@ -180,15 +180,15 @@ export default function Dashboard({ data, user }) {
         )}
 
         {/* Non-teaching: just department info */}
-        {user.role === 'non_teaching' && !showKitchen && (
+        {user.role == 'non_teaching' && !showKitchen && (
           <Card>
             <SectionTitle icon="dept">Your Department</SectionTitle>
             <div style={{ fontSize: 32, marginBottom: 10 }}>{
-              user.dept === 'Finance' ? '💰' : user.dept === 'Library' ? '📖' : user.dept === 'Security' ? '🔒' : user.dept === 'Sports' ? '⚽' : '🏢'
+              user.dept == 'Finance' ? '💰' : user.dept == 'Library' ? '📖' : user.dept == 'Security' ? '🔒' : user.dept == 'Sports' ? '⚽' : '🏢'
             }</div>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{user.dept} Department</div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
-              {data.teachers.filter(t => t.dept === user.dept).length} staff members
+              {(data.teachers||[]).filter(t => t.dept == user.dept).length} staff members
             </div>
             {unreadMsgs > 0 && (
               <div style={{ marginTop: 12 }}>
@@ -203,9 +203,9 @@ export default function Dashboard({ data, user }) {
           <Card>
             <SectionTitle icon="report">Quick Overview</SectionTitle>
             {[
-              ['Total Students',   data.students.length,                            '#4f8ef7'],
-              ['Total Staff',      data.teachers.filter(t => !t.admin).length,      '#10b981'],
-              ['Exams on Record',  data.exams.length,                               '#f59e0b'],
+              ['Total Students',   (data.students||[]).length,                            '#4f8ef7'],
+              ['Total Staff',      (data.teachers||[]).filter(t => !t.admin).length,      '#10b981'],
+              ['Exams on Record',  (data.exams||[]).length,                               '#f59e0b'],
               ['Pending Approvals',pendingReqs.length,                              pendingReqs.length > 0 ? '#ef4444' : '#64748b'],
               ['Low Stock Items',  lowInv.length,                                   lowInv.length > 0 ? '#ef4444' : '#64748b'],
               ['Unread Messages',  unreadMsgs,                                       unreadMsgs > 0 ? '#f59e0b' : '#64748b'],

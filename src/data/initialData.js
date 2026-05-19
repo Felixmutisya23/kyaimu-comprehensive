@@ -1,94 +1,216 @@
 export const GRADES_CBC = [
-  { label: 'EE1', points: 8, color: '#10b981', scoreMin: 68, scoreMax: 72 },
-  { label: 'EE2', points: 7, color: '#34d399', scoreMin: 60, scoreMax: 67 },
-  { label: 'ME1', points: 6, color: '#4f8ef7', scoreMin: 52, scoreMax: 59 },
-  { label: 'ME2', points: 5, color: '#7c3aed', scoreMin: 43, scoreMax: 51 },
-  { label: 'AE1', points: 4, color: '#f59e0b', scoreMin: 34, scoreMax: 42 },
-  { label: 'AE2', points: 3, color: '#f97316', scoreMin: 25, scoreMax: 33 },
-  { label: 'BE1', points: 2, color: '#ef4444', scoreMin: 16, scoreMax: 24 },
-  { label: 'BE2', points: 1, color: '#dc2626', scoreMin: 9,  scoreMax: 15 },
+  { label: 'EE1', points: 8, color: '#10b981', scoreMin: 75, scoreMax: 100 },
+  { label: 'EE2', points: 7, color: '#34d399', scoreMin: 65, scoreMax: 74  },
+  { label: 'ME1', points: 6, color: '#4f8ef7', scoreMin: 55, scoreMax: 64  },
+  { label: 'ME2', points: 5, color: '#7c3aed', scoreMin: 45, scoreMax: 54  },
+  { label: 'AE1', points: 4, color: '#f59e0b', scoreMin: 35, scoreMax: 44  },
+  { label: 'AE2', points: 3, color: '#f97316', scoreMin: 25, scoreMax: 34  },
+  { label: 'BE1', points: 2, color: '#ef4444', scoreMin: 10, scoreMax: 24  },
+  { label: 'BE2', points: 1, color: '#dc2626', scoreMin: 0,  scoreMax: 9   },
 ];
 
-export function getGrade(score) {
-  if (score >= 68) return GRADES_CBC[0];
-  if (score >= 60) return GRADES_CBC[1];
-  if (score >= 52) return GRADES_CBC[2];
-  if (score >= 43) return GRADES_CBC[3];
-  if (score >= 34) return GRADES_CBC[4];
-  if (score >= 25) return GRADES_CBC[5];
-  if (score >= 16) return GRADES_CBC[6];
-  return GRADES_CBC[7];
+export function getGrade(score, data) {
+  const grades = data?.gradesConfig || GRADES_CBC;
+  for (const g of grades) {
+    if (score >= g.scoreMin && score <= g.scoreMax) return g;
+  }
+  return grades[grades.length - 1];
+}
+
+/* ══════════════════════════════════════════════════════════
+   CBC / JSS CURRICULUM STRUCTURE
+   Kenya's competency-based curriculum organized by level:
+   - Pre-Primary:  PP1, PP2
+   - Lower Primary: Grade 1–3
+   - Upper Primary: Grade 4–6
+   - Junior Secondary: Grade 7–9 (JSS)
+   - Senior Secondary: Form 1–4
+══════════════════════════════════════════════════════════ */
+
+export const CURRICULUM_LEVELS = {
+  PRE_PRIMARY: {
+    label: 'Pre-Primary',
+    classes: ['PP1', 'PP2'],
+    subjects: [
+      'Language Activities',
+      'Mathematical Activities',
+      'Environmental Activities',
+      'Psychomotor & Creative Activities',
+      'Religious Education Activities',
+    ],
+  },
+  LOWER_PRIMARY: {
+    label: 'Lower Primary (Grades 1–3)',
+    classes: ['Grade 1', 'Grade 2', 'Grade 3'],
+    subjects: [
+      'Literacy Activities',
+      'Kiswahili Language Activities',
+      'English Language Activities',
+      'Mathematical Activities',
+      'Environmental Activities',
+      'Creative Arts',
+      'Religious Education',
+      'Physical & Health Education',
+    ],
+  },
+  UPPER_PRIMARY: {
+    label: 'Upper Primary (Grades 4–6)',
+    classes: ['Grade 4', 'Grade 5', 'Grade 6'],
+    subjects: [
+      'English',
+      'Kiswahili',
+      'Mathematics',
+      'Science & Technology',
+      'Social Studies',
+      'CRE',
+      'IRE',
+      'HRE',
+      'Creative Arts & Sports',
+      'Agriculture',
+      'Home Science',
+      'Business Studies',
+    ],
+  },
+  JUNIOR_SECONDARY: {
+    label: 'Junior Secondary (Grades 7–9)',
+    classes: ['Grade 7', 'Grade 8', 'Grade 9'],
+    subjects: [
+      'English',
+      'Kiswahili',
+      'Mathematics',
+      'Integrated Science',
+      'Pre-Technical Studies',
+      'Social Studies',
+      'Creative Arts',
+      'CRE',
+      'Agriculture',
+      'Business Studies',
+      'Home Science',
+      'Computer Science',
+      'Physical Education',
+    ],
+  },
+  SENIOR_SECONDARY: {
+    label: 'Senior Secondary (Form 1–4)',
+    classes: ['Form 1', 'Form 2', 'Form 3', 'Form 4'],
+    subjects: [
+      'English',
+      'Kiswahili',
+      'Mathematics',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'History',
+      'Geography',
+      'CRE',
+      'IRE',
+      'Business Studies',
+      'Computer Studies',
+      'Agriculture',
+      'Home Science',
+      'Art & Design',
+      'Music',
+      'French',
+      'German',
+      'Arabic',
+    ],
+  },
+};
+
+/* Get the curriculum level for a given class name */
+export function getCurriculumLevel(className) {
+  if (!className) return null;
+  const name = className.trim().toLowerCase();
+  for (const [key, level] of Object.entries(CURRICULUM_LEVELS)) {
+    if (level.classes.some(c => name.startsWith(c.toLowerCase()))) {
+      return { key, ...level };
+    }
+  }
+  return null;
+}
+
+/* Get subjects for a specific class */
+export function getSubjectsForClass(className, data) {
+  // 1. Check if school has custom subjects per class
+  const custom = (data.subjectsByClass || {})[className];
+  if (custom && custom.length > 0) return custom;
+
+  // 2. Fall back to curriculum level defaults
+  const level = getCurriculumLevel(className);
+  if (level) return level.subjects;
+
+  // 3. Fall back to school-wide subjects (legacy)
+  const schoolSubs = (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || ''));
+  return schoolSubs.filter(Boolean);
+}
+
+/* Get all unique subjects across all classes in school */
+export function getAllSubjectsForSchool(data) {
+  const classes = getAllClasses(data);
+  const all = new Set();
+  classes.forEach(cls => getSubjectsForClass(cls, data).forEach(s => all.add(s)));
+  // Also include any legacy school-wide subjects
+  (data.subjects || []).forEach(s => {
+    const name = typeof s === 'string' ? s : (s.name || s.code || '');
+    if (name) all.add(name);
+  });
+  return [...all].sort();
 }
 
 export const INITIAL_DATA = {
-  // ── School identity — ALL BLANK by default, principal fills in Settings ──
-  schoolName:        '',   // e.g. "Kiriene Day Primary School"
-  schoolMotto:       '',   // e.g. "Strive To Excel"
-  schoolPOBox:       '',   // e.g. "P.O. Box 159-60607"
-  schoolLocation:    '',   // e.g. "Mikinduri"
-  schoolCounty:      '',   // e.g. "Tharaka Nithi"
+  schoolName:        '',
+  schoolMotto:       '',
+  schoolPOBox:       '',
+  schoolLocation:    '',
+  schoolCounty:      '',
   schoolType:        'Primary',
   principalName:     '',
   principalEmail:    'principal@school.ac.ke',
   principalPassword: 'admin123',
 
-  // ── Classes & Streams — blank by default, principal adds in Settings ──
   classGroups: [],
+  classes:     [],
 
-  get classes() {
-    const list = [];
-    this.classGroups.forEach(g => {
-      if (!g.streams || g.streams.length === 0) { list.push(g.name); }
-      else { g.streams.forEach(s => list.push(`${g.name} ${s}`)); }
-    });
-    return list;
-  },
-
+  // Legacy school-wide subjects (still supported)
   subjects: [],
-  departments: ['Academics', 'Management', 'Kitchen', 'Sports', 'Library', 'Finance', 'Counselling', 'Security'],
 
-  // Only the admin account — all others added by principal
+  // New: per-class subject overrides
+  // { 'Grade 7 East': ['English','Mathematics',...], 'Grade 8': [...] }
+  subjectsByClass: {},
+
+  departments: ['Academics','Management','Kitchen','Sports','Library','Finance','Counselling','Security'],
+
   teachers: [
     {
       id: 1, name: 'Administrator', email: 'principal@school.ac.ke', phone: '',
       staffId: 'T000', dept: 'Management', staffType: 'non_teaching',
       isClassTeacher: false, classTeacherOf: null,
       subjects: [], canSeeKitchenAlerts: true, canSeeFees: true, admin: true,
-      password: 'admin123',
+      password: 'admin123', status: 'active',
     },
   ],
 
-  students:      [],
-  exams:         [],
-  editRequests:  [],
-  notifications: [],
-  messages:      [],
-
-  inventory: [],
-
-  // ── Fee structure — principal defines fee types and amounts per class/term ──
-  // feeTypes: [{ id, name, description, appliesToAll, applicableClasses[] }]
-  // feeSchedule: [{ id, feeTypeId, class, term, amount, year }]
-  feeTypes: [],
-  feeSchedule: [],
-  feePayments:  [],
-  rollCalls:    [],      // [{id, class, term, year, date, takenBy, results:{studentId:true/false}}]
-  permissions:  [],      // [{id, studentId, studentName, reason, dateGiven, dateReturn, approvedBy, returned, returnDate}]
-  statusAlerts: [],      // [{id, type, studentId, message, date, resolved}]
-
-  // ── Term calendar ──
-  terms: [],             // [{id, year, term, startDate, endDate, name, opened, closed}]
-  currentTerm: null,     // set when admin opens a term
-  currentYear: null,
-
-  // ── Parent messaging ──
-  parentMessages: [],    // [{id, date, type, message, class, recipientCount, sentBy, delivered}]
-  smsConfig: {
-    provider: 'manual',
-    apiKey: '',
-    senderId: '',
-    username: '',
-  },
+  students:        [],
+  parents:         [],
+  exams:           [],
+  editRequests:    [],
+  notifications:   [],
+  messages:        [],
+  inventory:       [],
+  feeTypes:        [],
+  feeSchedule:     [],
+  feePayments:     [],
+  rollCalls:       [],
+  permissions:     [],
+  statusAlerts:    [],
+  promotionHistory:[],
+  terms:           [],
+  currentTerm:     null,
+  currentYear:     null,
+  parentMessages:  [],
+  smsConfig: { provider: 'manual', apiKey: '', senderId: '', username: '' },
+  gradesConfig:    GRADES_CBC,
+  licenseData:     {},
 
   bells: [
     { id: 1,  time: '07:30', label: 'Morning Assembly', type: 'assembly', duration: 30 },
@@ -108,9 +230,8 @@ export const INITIAL_DATA = {
   timetable: {},
 };
 
-/* ── Helpers ─────────────────────────────────────────── */
+/* ── Helpers ─────────────────────────────────────────────── */
 
-/** Get all flat class names from classGroups */
 export function getAllClasses(data) {
   const list = [];
   (data.classGroups || []).forEach(g => {
@@ -120,8 +241,8 @@ export function getAllClasses(data) {
   return list;
 }
 
-/** Extract stream from a full class name e.g. 'Grade 8 East' → 'East' */
 export function getStreamFromClass(className, data) {
+  if (!className) return null;
   for (const g of (data.classGroups || [])) {
     if (g.streams && g.streams.length > 0) {
       for (const s of g.streams) {
@@ -132,112 +253,71 @@ export function getStreamFromClass(className, data) {
   return null;
 }
 
-/** Get the base class name without stream, e.g. 'Grade 8 East' → 'Grade 8' */
 export function getBaseClass(className, data) {
+  if (!className) return className;
   for (const g of (data.classGroups || [])) {
     if (g.streams && g.streams.length > 0) {
       for (const s of g.streams) {
         if (className === `${g.name} ${s}`) return g.name;
       }
     }
-    if (className === g.name) return g.name;
   }
   return className;
 }
 
-/** Get all stream classes for the same base class e.g. all 'Grade 8 *' */
 export function getSiblingStreams(className, data) {
-  const base = getBaseClass(className, data);
-  const g = (data.classGroups || []).find(x => x.name === base);
-  if (!g || !g.streams || g.streams.length === 0) return [className];
-  return g.streams.map(s => `${g.name} ${s}`);
+  if (!className) return [className];
+  for (const g of (data.classGroups || [])) {
+    if (!g.streams || g.streams.length === 0) {
+      if (g.name === className) return [className];
+    } else {
+      for (const s of g.streams) {
+        if (className === `${g.name} ${s}`) {
+          return g.streams.map(st => `${g.name} ${st}`);
+        }
+      }
+    }
+  }
+  return [className];
 }
 
-export function canSeeKitchenAlerts(user, data) {
-  if (user.role === 'principal') return true;
-  const staff = data.teachers.find(t => t.staffId === user.staffId);
-  return staff ? !!staff.canSeeKitchenAlerts : false;
-}
-
-export function canSeeFees(user, data) {
-  if (user.role === 'principal') return true;
-  const staff = data.teachers.find(t => t.staffId === user.staffId);
-  return staff ? !!staff.canSeeFees : false;
-}
-
-export function getClassTeacherOf(user, data) {
-  if (user.role === 'principal') return null;
-  const staff = data.teachers.find(t => t.staffId === user.staffId);
-  return staff?.classTeacherOf || null;
-}
-
-export function getTeacherSubjects(user, data) {
-  const staff = data.teachers.find(t => t.staffId === user.staffId);
-  return staff?.subjects || [];
+export function getScore(cell) {
+  if (cell === null || cell === undefined || cell === '') return null;
+  if (typeof cell === 'object' && cell !== null) {
+    const v = cell.score ?? cell.value;
+    return v !== undefined ? Number(v) : null;
+  }
+  const n = Number(cell);
+  return isNaN(n) ? null : n;
 }
 
 export function canEnterScores(user, subject, className, data) {
-  if (user.role === 'principal') return true;
-  const subs = getTeacherSubjects(user, data);
-  return subs.some(s => s.subject === subject && s.classes.includes(className));
+  if (!user) return false;
+  if (user.role === 'principal' || user.admin) return true;
+  const teacher = (data.teachers || []).find(t => t.staffId === user.staffId);
+  if (!teacher) return false;
+  if (teacher.isClassTeacher && teacher.classTeacherOf === className) return true;
+  return (teacher.subjects || []).some(s => s.subject === subject && (s.classes || []).includes(className));
+}
+
+export function getTeacherSubjects(staffId, data) {
+  const teacher = (data.teachers || []).find(t => t.staffId === staffId);
+  return teacher?.subjects || [];
 }
 
 export function getClassTeacherStaffId(className, data) {
-  const ct = data.teachers.find(t => t.classTeacherOf === className);
-  return ct?.staffId || null;
+  const t = (data.teachers || []).find(t => t.isClassTeacher && t.classTeacherOf === className);
+  return t?.staffId || null;
 }
 
-export function isTeachingStaff(user, data) {
-  if (user.role === 'principal') return true;
-  const staff = data.teachers.find(t => t.staffId === user.staffId);
-  return staff?.staffType === 'teaching';
+export function isTeachingStaff(teacher) {
+  return teacher?.staffType === 'teaching' || (!teacher?.staffType && teacher?.subjects?.length > 0);
 }
 
-/** Compute score from result cell (handles {score,submittedBy} or plain number) */
-export function getScore(cell) {
-  if (cell === null || cell === undefined) return null;
-  if (typeof cell === 'object') return cell.score ?? null;
-  return cell;
+export function canSeeKitchenAlerts(teacher) {
+  return teacher?.canSeeKitchenAlerts || teacher?.admin || false;
 }
 
-/* ═══════════════════════════════════════════════════════
-   ADDITIONAL DATA HELPERS
-═══════════════════════════════════════════════════════ */
-
-/** Get all students enrolled (not withdrawn/expelled) */
-export function getActiveStudents(data) {
-  return (data.students || []).filter(s => !s.status || s.status === 'active');
-}
-
-/** Get all withdrawn/expelled students */
-export function getInactiveStudents(data) {
-  return (data.students || []).filter(s => s.status && s.status !== 'active');
-}
-
-/** Compute fee summary for a student across all fee types */
-export function getStudentFeeSummary(studentId, feeTypeId, data) {
-  const payments = (data.feePayments || []).filter(p =>
-    p.studentId === studentId &&
-    (feeTypeId ? p.feeTypeId === feeTypeId : true)
-  );
-  return {
-    totalPaid: payments.reduce((s, p) => s + p.amount, 0),
-    payments,
-  };
-}
-
-/** Get expected fee for a student for a given feeType / class / term / year */
-export function getExpectedFee(studentClass, feeTypeId, term, year, data) {
-  const schedule = (data.feeSchedule || []).find(s =>
-    s.feeTypeId === feeTypeId &&
-    (s.class === studentClass || s.class === 'ALL') &&
-    s.term === Number(term) &&
-    s.year === Number(year)
-  );
-  return schedule ? Number(schedule.amount) : 0;
-}
-
-/** All fee types defined in the system */
-export function getFeeTypes(data) {
-  return data.feeTypes || [];
+export function canSeeFees(teacher) {
+  return teacher?.canSeeFees || teacher?.admin || false;
 }

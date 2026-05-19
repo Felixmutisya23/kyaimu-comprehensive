@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
-import { GRADES_CBC } from '../data/initialData';
+import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel } from '../data/initialData';
 import { printFeeReceipt } from '../utils/print';
 
 /* ══════════════════════════════════════════════════════
@@ -12,7 +12,7 @@ export function Kitchen({ data, setData }) {
   const [itemForm, setItemForm] = useState({ name: '', current: '', max: 100, min: 10, unit: 'kg' });
   const [txHistory, setTxHistory] = useState([]);
 
-  const lowItems = data.inventory.filter(i => i.current <= i.min);
+  const lowItems = (data.inventory||[]).filter(i => i.current <= i.min);
 
   function doTx() {
     const qty = Number(txForm.qty);
@@ -20,11 +20,11 @@ export function Kitchen({ data, setData }) {
     setTxHistory(h => [{ ...txForm, qty, date: now, id: Date.now() }, ...h]);
     setData(d => ({
       ...d,
-      inventory: d.inventory.map(i => i.name === txForm.item ? {
+      inventory: d.inventory.map(i => i.name == txForm.item ? {
         ...i,
-        current: txForm.type === 'in' ? Math.min(i.max, i.current + qty) : Math.max(0, i.current - qty),
-        lastIn:  txForm.type === 'in'  ? qty : i.lastIn,
-        lastOut: txForm.type === 'out' ? qty : i.lastOut,
+        current: txForm.type == 'in' ? Math.min(i.max, i.current + qty) : Math.max(0, i.current - qty),
+        lastIn:  txForm.type == 'in'  ? qty : i.lastIn,
+        lastOut: txForm.type == 'out' ? qty : i.lastOut,
       } : i),
     }));
     setTxForm({ item: '', type: 'in', qty: '' });
@@ -55,7 +55,7 @@ export function Kitchen({ data, setData }) {
           <FormGroup label="Select Item">
             <select value={txForm.item} onChange={e => setTxForm({ ...txForm, item: e.target.value })}>
               <option value="">Choose item...</option>
-              {data.inventory.map(i => <option key={i.id} value={i.name}>{i.name} (current: {i.current}{i.unit})</option>)}
+              {(data.inventory||[]).map(i => <option key={i.id} value={i.name}>{i.name} (current: {i.current}{i.unit})</option>)}
             </select>
           </FormGroup>
           <FormRow>
@@ -82,9 +82,9 @@ export function Kitchen({ data, setData }) {
           </div>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             {[
-              { l: 'Total Items', v: data.inventory.length,                             c: '#4f8ef7' },
+              { l: 'Total Items', v: (data.inventory||[]).length,                             c: '#4f8ef7' },
               { l: 'Low Stock',   v: lowItems.length,                                   c: '#ef4444' },
-              { l: 'OK Stock',    v: data.inventory.length - lowItems.length,           c: '#10b981' },
+              { l: 'OK Stock',    v: (data.inventory||[]).length - lowItems.length,           c: '#10b981' },
             ].map(({ l, v, c }) => (
               <div key={l} style={{ flex: 1, textAlign: 'center', background: '#1e2435', borderRadius: 8, padding: 12 }}>
                 <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
@@ -98,8 +98,8 @@ export function Kitchen({ data, setData }) {
               {txHistory.slice(0, 4).map(tx => (
                 <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #2a3350' }}>
                   <span style={{ color: '#94a3b8' }}>{tx.item}</span>
-                  <span style={{ color: tx.type === 'in' ? '#10b981' : '#ef4444', fontWeight: 600 }}>
-                    {tx.type === 'in' ? '+' : '−'}{tx.qty}
+                  <span style={{ color: tx.type == 'in' ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                    {tx.type == 'in' ? '+' : '−'}{tx.qty}
                   </span>
                   <span style={{ color: '#64748b' }}>{tx.date}</span>
                 </div>
@@ -120,7 +120,7 @@ export function Kitchen({ data, setData }) {
               <tr>{['Item', 'Current', 'Min Level', 'Max Capacity', 'Last In', 'Last Out', 'Status', 'Level'].map(h => <th key={h} style={TS.th}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {data.inventory.map(i => {
+              {(data.inventory||[]).map(i => {
                 const pct = Math.round(i.current / i.max * 100);
                 const low = i.current <= i.min;
                 return (
@@ -193,8 +193,8 @@ export function Departments({ data, setData }) {
         <Btn onClick={() => setShow(true)}><Icon name="add" size={14} /> Add Department</Btn>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
-        {data.departments.map(dept => {
-          const staff = data.teachers.filter(t => t.dept === dept);
+        {(data.departments||[]).map(dept => {
+          const staff = (data.teachers||[]).filter(t => t.dept == dept);
           return (
             <Card key={dept}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -208,7 +208,7 @@ export function Departments({ data, setData }) {
                 </div>
               </div>
               {staff.length > 0
-                ? <div style={{ fontSize: 12, color: '#64748b' }}>Staff: {staff.map(t => t.name.split(' ')[0]).join(', ')}</div>
+                ? <div style={{ fontSize: 12, color: '#64748b' }}>Staff: {staff.map(t => (t.name||'').split(' ')[0]).join(', ')}</div>
                 : <div style={{ fontSize: 12, color: '#64748b' }}>No staff assigned yet</div>}
               <div style={{ marginTop: 8 }}><Tag color="green">Active</Tag></div>
             </Card>
@@ -223,7 +223,7 @@ export function Departments({ data, setData }) {
         <FormGroup label="Department Head (Optional)">
           <select value={form.head} onChange={e => setForm({ ...form, head: e.target.value })}>
             <option value="">Select head...</option>
-            {data.teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+            {(data.teachers||[]).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
           </select>
         </FormGroup>
         <FormGroup label="Description (Optional)">
@@ -263,7 +263,7 @@ export function Fees({ data, setData }) {
     let total = 0;
     feeSchedule.forEach(sch => {
       if (sch.term !== termN || sch.year !== yearN) return;
-      const ft = feeTypes.find(f => f.id === sch.feeTypeId);
+      const ft = feeTypes.find(f => f.id == sch.feeTypeId);
       if (!ft) return;
       const applies = ft.appliesToAll || (ft.applicableClasses || []).includes(student.class);
       if (applies) total += Number(sch.amount);
@@ -273,7 +273,7 @@ export function Fees({ data, setData }) {
 
   function getStudentPaid(studentId, term, year) {
     return feePayments
-      .filter(p => p.studentId === studentId && p.term === Number(term) && p.year === Number(year))
+      .filter(p => p.studentId == studentId && p.term == Number(term) && p.year == Number(year))
       .reduce((s, p) => s + p.amount, 0);
   }
 
@@ -285,7 +285,7 @@ export function Fees({ data, setData }) {
 
   /* ── Record payment ────────────────────────────── */
   function recordPayment() {
-    const student = data.students.find(s => s.id === Number(payForm.studentId));
+    const student = (data.students||[]).find(s => s.id == Number(payForm.studentId));
     if (!student || !payForm.amount) return;
     const amt = Number(payForm.amount);
     const payment = {
@@ -294,7 +294,7 @@ export function Fees({ data, setData }) {
       studentName: student.name,
       studentClass:student.class,
       feeTypeId:   payForm.feeTypeId || null,
-      feeTypeName: payForm.feeTypeId ? (feeTypes.find(f=>f.id===payForm.feeTypeId)?.name || 'General') : 'General',
+      feeTypeName: payForm.feeTypeId ? (feeTypes.find(f=>f.id == payForm.feeTypeId)?.name || 'General') : 'General',
       amount:      amt,
       date:        new Date().toISOString().split('T')[0],
       term:        Number(payForm.term),
@@ -311,7 +311,7 @@ export function Fees({ data, setData }) {
   /* ── Print full invoice ───────────────────────── */
   function printStudentInvoice(student) {
     const curYear = new Date().getFullYear();
-    const allPayments = feePayments.filter(p => p.studentId === student.id);
+    const allPayments = feePayments.filter(p => p.studentId == student.id);
 
     // Build history per term
     const terms = [1, 2, 3];
@@ -324,14 +324,14 @@ export function Fees({ data, setData }) {
       terms.forEach(term => {
         const total = getStudentFeeTotal(student, term, yr);
         const paid  = getStudentPaid(student.id, term, yr);
-        if (total === 0 && paid === 0) return;
+        if (total == 0 && paid == 0) return;
         const balance = total - paid;
         const overP   = Math.max(0, paid - total);
         grandTotal += total;
         grandPaid  += paid;
 
         // Payment breakdown for this term/year
-        const termPayments = allPayments.filter(p => p.term === term && p.year === Number(yr));
+        const termPayments = allPayments.filter(p => p.term == term && p.year == Number(yr));
         const payRows = termPayments.map(p => `
           <tr style="font-size:11px">
             <td style="padding:3px 8px;border:1px solid #eee">${p.date}</td>
@@ -411,12 +411,12 @@ export function Fees({ data, setData }) {
   }
 
   const allClasses = (data.classGroups || []).flatMap(g =>
-    !g.streams || g.streams.length === 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`)
+    !g.streams || g.streams.length == 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`)
   );
 
-  const filtered = data.students.filter(s => {
+  const filtered = (data.students||[]).filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.admNo.includes(search);
-    const matchClass  = !filterClass || s.class === filterClass;
+    const matchClass  = !filterClass || s.class == filterClass;
     return matchSearch && matchClass;
   });
 
@@ -438,12 +438,12 @@ export function Fees({ data, setData }) {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 16, width: 'fit-content' }}>
         {[['overview','Fee Overview'],['payments','Payment History'],['structure','Fee Structure']].map(([v,l]) => (
-          <button key={v} onClick={() => setTab(v)} style={TAB_STYLE(tab===v)}>{l}</button>
+          <button key={v} onClick={() => setTab(v)} style={TAB_STYLE(tab == v)}>{l}</button>
         ))}
       </div>
 
       {/* ── FEE OVERVIEW ───────────────────────────── */}
-      {tab === 'overview' && (
+      {tab == 'overview' && (
         <div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <input placeholder="Search student..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 220 }} />
@@ -480,7 +480,7 @@ export function Fees({ data, setData }) {
                   <tr>{['Adm No','Name','Class','Term Expected','Term Paid','Balance','Overpaid','Status','Invoice'].map(h => <th key={h} style={TS.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
+                  {filtered.length == 0 ? (
                     <tr><td colSpan={9} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 28 }}>No students found.</td></tr>
                   ) : filtered.map(s => {
                     const { total, paid, balance, overpaid } = getStudentBalance(s, curTerm, curYear);
@@ -519,13 +519,13 @@ export function Fees({ data, setData }) {
       )}
 
       {/* ── PAYMENT HISTORY ────────────────────────── */}
-      {tab === 'payments' && (
+      {tab == 'payments' && (
         <div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
             <input placeholder="Search student..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 220 }} />
             <Btn onClick={() => setShowPay(true)}><Icon name="add" size={14} /> Record Payment</Btn>
           </div>
-          {feePayments.length === 0 ? (
+          {feePayments.length == 0 ? (
             <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No payments recorded yet.</Card>
           ) : (
             <Card noPad>
@@ -536,7 +536,7 @@ export function Fees({ data, setData }) {
                     {[...feePayments].reverse().filter(p =>
                       !search || p.studentName.toLowerCase().includes(search.toLowerCase())
                     ).map(p => {
-                      const student = data.students.find(s => s.id === p.studentId);
+                      const student = (data.students||[]).find(s => s.id == p.studentId);
                       return (
                         <tr key={p.id}>
                           <td style={TS.td}>{p.date}</td>
@@ -545,7 +545,7 @@ export function Fees({ data, setData }) {
                           <td style={TS.td}>Term {p.term}</td>
                           <td style={TS.td}>{p.year || curYear}</td>
                           <td style={TS.td}>{p.feeTypeName || 'General'}</td>
-                          <td style={TS.td}><Tag color={p.method==='Mpesa'?'green':p.method==='Bank'?'blue':'gray'}>{p.method}</Tag></td>
+                          <td style={TS.td}><Tag color={p.method == 'Mpesa'?'green':p.method == 'Bank'?'blue':'gray'}>{p.method}</Tag></td>
                           <td style={{ ...TS.td, fontFamily: 'monospace', fontSize: 11 }}>{p.reference}</td>
                           <td style={{ ...TS.td, color: '#10b981', fontWeight: 700 }}>KES {p.amount.toLocaleString()}</td>
                           <td style={TS.td}>
@@ -567,14 +567,14 @@ export function Fees({ data, setData }) {
       )}
 
       {/* ── FEE STRUCTURE (principal sets up fees here) */}
-      {tab === 'structure' && <FeeStructure data={data} setData={setData} />}
+      {tab == 'structure' && <FeeStructure data={data} setData={setData} />}
 
       {/* ── Record Payment Modal ───────────────────── */}
       <Modal show={showPay} onClose={() => setShowPay(false)} title="Record Fee Payment">
         <FormGroup label="Select Student *">
           <select value={payForm.studentId} onChange={e => setPayForm({ ...payForm, studentId: e.target.value })}>
             <option value="">Choose student...</option>
-            {data.students.map(s => (
+            {(data.students||[]).map(s => (
               <option key={s.id} value={s.id}>{s.name} ({s.admNo}) — {s.class}</option>
             ))}
           </select>
@@ -630,7 +630,7 @@ function FeeStructure({ data, setData }) {
   const feeSchedule = data.feeSchedule || [];
 
   const allClasses = (data.classGroups || []).flatMap(g =>
-    !g.streams || g.streams.length === 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`)
+    !g.streams || g.streams.length == 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`)
   );
 
   function addFeeType() {
@@ -676,7 +676,7 @@ function FeeStructure({ data, setData }) {
             <SectionTitle style={{ margin: 0 }}>Fee Types</SectionTitle>
             <Btn size="sm" onClick={() => setShowAddType(true)}><Icon name="add" size={12} /> Add</Btn>
           </div>
-          {feeTypes.length === 0 ? (
+          {feeTypes.length == 0 ? (
             <p style={{ color: '#64748b', fontSize: 13 }}>No fee types yet. Add Tuition Fee, Remedials, etc.</p>
           ) : feeTypes.map(ft => (
             <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
@@ -700,9 +700,9 @@ function FeeStructure({ data, setData }) {
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <SectionTitle style={{ margin: 0 }}>Fee Amounts per Class & Term</SectionTitle>
-            <Btn size="sm" onClick={() => setShowAddSchedule(true)} disabled={feeTypes.length === 0}><Icon name="add" size={12} /> Add</Btn>
+            <Btn size="sm" onClick={() => setShowAddSchedule(true)} disabled={feeTypes.length == 0}><Icon name="add" size={12} /> Add</Btn>
           </div>
-          {feeSchedule.length === 0 ? (
+          {feeSchedule.length == 0 ? (
             <p style={{ color: '#64748b', fontSize: 13 }}>No amounts set yet. First add fee types, then set amounts per class and term.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -710,11 +710,11 @@ function FeeStructure({ data, setData }) {
                 <thead><tr>{['Fee Type','Class','Term','Year','Amount (KES)',''].map(h=><th key={h} style={TS.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {feeSchedule.map(sch => {
-                    const ft = feeTypes.find(f => f.id === sch.feeTypeId);
+                    const ft = feeTypes.find(f => f.id == sch.feeTypeId);
                     return (
                       <tr key={sch.id}>
                         <td style={TS.td}>{ft?.name || '—'}</td>
-                        <td style={TS.td}>{sch.class === 'ALL' ? 'All Classes' : sch.class}</td>
+                        <td style={TS.td}>{sch.class == 'ALL' ? 'All Classes' : sch.class}</td>
                         <td style={TS.td}>Term {sch.term}</td>
                         <td style={TS.td}>{sch.year}</td>
                         <td style={{ ...TS.td, fontWeight: 700, color: '#10b981' }}>KES {Number(sch.amount).toLocaleString()}</td>
@@ -824,6 +824,28 @@ export function Settings({ data, setData }) {
   const [showBell, setShowBell]   = useState(false);
   const [bellForm, setBellForm]   = useState({ time: '', label: '', type: 'lesson', duration: 40 });
   const [subForm, setSubForm]     = useState('');
+  const [selSubLevel, setSelSubLevel] = useState('LOWER_PRIMARY'); // which curriculum level to add extra subject to
+
+  function addExtraSubject() {
+    const name = subForm.trim();
+    if (!name || !selSubLevel) return;
+    setData(d => {
+      const existing = (d.extraSubjectsByLevel || {})[selSubLevel] || [];
+      if (existing.includes(name)) return d; // no duplicates
+      return { ...d, extraSubjectsByLevel: { ...(d.extraSubjectsByLevel || {}), [selSubLevel]: [...existing, name] } };
+    });
+    setSubForm('');
+  }
+
+  function removeExtraSubject(levelKey, subName) {
+    setData(d => ({
+      ...d,
+      extraSubjectsByLevel: {
+        ...(d.extraSubjectsByLevel || {}),
+        [levelKey]: ((d.extraSubjectsByLevel || {})[levelKey] || []).filter(s => s !== subName),
+      },
+    }));
+  }
 
   // Class management
   const [showAddClass, setShowAddClass] = useState(false);
@@ -916,7 +938,7 @@ export function Settings({ data, setData }) {
       : [];
     setData(d => ({
       ...d,
-      classGroups: (d.classGroups || []).map(g => g.id === groupId ? { ...g, streams } : g),
+      classGroups: (d.classGroups || []).map(g => g.id == groupId ? { ...g, streams } : g),
     }));
     setEditingGroup(null);
   }
@@ -975,21 +997,54 @@ export function Settings({ data, setData }) {
             <Btn variant="success" size="sm" onClick={saveProfile}><Icon name="check" size={13} /> Save School Profile</Btn>
           </Card>
 
-          {/* Subjects */}
+          {/* Subjects — per curriculum level */}
           <Card>
-            <SectionTitle icon="exams">Manage Subjects</SectionTitle>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-              {data.subjects.map(s => (
-                <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1e2435', borderRadius: 6, padding: '4px 10px', fontSize: 12 }}>
-                  {s}
-                  <button onClick={() => setData(d => ({ ...d, subjects: d.subjects.filter(x => x !== s) }))}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
-                </div>
-              ))}
+            <SectionTitle icon="exams">Curriculum Subjects</SectionTitle>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+              Kenya CBC subjects are built-in per level. Add extra subjects your school offers on top of the defaults.
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={subForm} onChange={e => setSubForm(e.target.value)} placeholder="e.g. Computer Studies" onKeyDown={e => e.key === 'Enter' && addSubject()} />
-              <Btn size="sm" onClick={addSubject} disabled={!subForm.trim()}><Icon name="add" size={13} /></Btn>
+            {Object.entries(CURRICULUM_LEVELS).map(([key, level]) => {
+              const extras = (data.extraSubjectsByLevel || {})[key] || [];
+              return (
+                <div key={key} style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #2a3350', overflow: 'hidden' }}>
+                  <div style={{ background: '#1a2540', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#4f8ef7', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{level.label}</span>
+                    <span style={{ color: '#64748b', fontWeight: 400 }}>{level.subjects.length} core + {extras.length} extra</span>
+                  </div>
+                  <div style={{ padding: '10px 12px' }}>
+                    {/* Core subjects — read only */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: extras.length ? 8 : 0 }}>
+                      {level.subjects.map(s => (
+                        <span key={s} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#1e2435', color: '#94a3b8', border: '1px solid #2a3350' }}>{s}</span>
+                      ))}
+                    </div>
+                    {/* Extra subjects — removable */}
+                    {extras.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {extras.map(s => (
+                          <span key={s} style={{ fontSize: 11, padding: '2px 8px 2px 10px', borderRadius: 10, background: '#10b98120', color: '#10b981', border: '1px solid #10b98140', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {s}
+                            <button onClick={() => removeExtraSubject(key, s)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Add extra subject */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <select value={selSubLevel} onChange={e => setSelSubLevel(e.target.value)} style={{ flex: '0 0 auto' }}>
+                {Object.entries(CURRICULUM_LEVELS).map(([key, level]) => (
+                  <option key={key} value={key}>{level.label}</option>
+                ))}
+              </select>
+              <input value={subForm} onChange={e => setSubForm(e.target.value)}
+                placeholder="Extra subject name…"
+                onKeyDown={e => e.key == 'Enter' && addExtraSubject()}
+                style={{ flex: 1, minWidth: 140 }} />
+              <Btn size="sm" onClick={addExtraSubject} disabled={!subForm.trim()}><Icon name="add" size={13} /> Add</Btn>
             </div>
           </Card>
         </div>
@@ -1006,20 +1061,20 @@ export function Settings({ data, setData }) {
               Classes with multiple streams (e.g. East, West) are supported. Click streams to edit.
             </div>
             {classGroups.map(g => {
-              const fullNames = g.streams.length === 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`);
+              const fullNames = g.streams.length == 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`);
               return (
                 <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{g.name}</span>
                     <span style={{ fontSize: 11, color: '#64748b' }}>
-                      {g.streams.length === 0 ? 'Single stream' : `${g.streams.length} streams`}
+                      {g.streams.length == 0 ? 'Single stream' : `${g.streams.length} streams`}
                     </span>
                     <button onClick={() => { setEditingGroup(g.id); setEditStreamsVal(g.streams.join(', ')); }}
                       style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 12 }}>✎ Edit streams</button>
                     <button onClick={() => removeClassGroup(g.id)}
                       style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
                   </div>
-                  {editingGroup === g.id ? (
+                  {editingGroup == g.id ? (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input value={editStreamsVal} onChange={e => setEditStreamsVal(e.target.value)}
                         placeholder="East, West, North (comma separated, or empty for single stream)"
@@ -1045,30 +1100,78 @@ export function Settings({ data, setData }) {
               <SectionTitle icon="bell" style={{ margin: 0 }}>Bell Schedule</SectionTitle>
               <Btn size="sm" variant="ghost" onClick={() => setShowBell(true)}><Icon name="add" size={12} /> Add Bell</Btn>
             </div>
-            {data.bells.map(b => (
+            {(data.bells||[]).map(b => (
               <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
                 <span style={{ fontWeight: 700, minWidth: 48, color: TYPE_COLORS[b.type] || '#4f8ef7' }}>{b.time}</span>
                 <span style={{ flex: 1 }}>{b.label}</span>
-                <Tag color={b.type === 'lesson' ? 'blue' : b.type === 'break' ? 'amber' : b.type === 'lunch' ? 'green' : 'purple'}>{b.type}</Tag>
+                <Tag color={b.type == 'lesson' ? 'blue' : b.type == 'break' ? 'amber' : b.type == 'lunch' ? 'green' : 'purple'}>{b.type}</Tag>
                 {b.duration > 0 && <span style={{ fontSize: 11, color: '#64748b', minWidth: 40 }}>{b.duration}min</span>}
                 <button onClick={() => removeBell(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
             ))}
           </Card>
 
-          {/* CBC Scale */}
+          {/* CBC Scale - Editable */}
           <Card>
             <SectionTitle icon="chart">CBC Grading Scale</SectionTitle>
-            {GRADES_CBC.map(g => (
-              <div key={g.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #2a3350', fontSize: 12 }}>
-                <span style={{ minWidth: 36, fontWeight: 700, color: g.color }}>{g.label}</span>
-                <div style={{ flex: 1, height: 6, background: '#1e2435', borderRadius: 20, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${g.points * 12.5}%`, background: g.color, borderRadius: 20 }} />
-                </div>
-                <span style={{ color: '#94a3b8', minWidth: 100 }}>Score: {g.scoreMin}–{g.scoreMax}</span>
-                <span style={{ color: '#64748b', minWidth: 60 }}>{g.points} pts</span>
-              </div>
-            ))}
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Edit score ranges, points and labels. Changes apply immediately to all reports.</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#1e2435' }}>
+                    {['Label','Min Score','Max Score','Points','Color'].map(h => (
+                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #2a3350' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.gradesConfig || GRADES_CBC).map((g, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #2a3350' }}>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input value={g.label} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], label: e.target.value };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: g.color, fontWeight: 700 }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.scoreMin} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], scoreMin: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.scoreMax} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], scoreMax: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="number" value={g.points} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], points: Number(e.target.value) };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                      </td>
+                      <td style={{ padding: '5px 6px' }}>
+                        <input type="color" value={g.color} onChange={e => {
+                          const gc = [...(data.gradesConfig || GRADES_CBC)];
+                          gc[i] = { ...gc[i], color: e.target.value };
+                          setData(d => ({ ...d, gradesConfig: gc }));
+                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid #2a3350', borderRadius: 4, background: '#1e2435', cursor: 'pointer' }} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Btn variant="ghost" size="sm" onClick={() => setData(d => ({ ...d, gradesConfig: GRADES_CBC }))}>
+                Reset to Default
+              </Btn>
+            </div>
           </Card>
 
           {/* Data Backup & Restore */}
