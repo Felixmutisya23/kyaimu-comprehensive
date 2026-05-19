@@ -130,8 +130,18 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   const [lic, setLicRaw]     = useState(() => loadLicense());
   const [tokenState, setTok] = useState(() => loadTokenState());
 
-  const _currentTerm = data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
-  const _currentYear = data.currentYear || new Date().getFullYear();
+  // Re-read localStorage whenever refreshKey changes (triggered after cloud sync on login)
+  React.useEffect(() => {
+    if (refreshKey > 0) {
+      setLicRaw(loadLicense());
+      setTok(loadTokenState());
+    }
+  }, [refreshKey]);
+
+  // Use the open term from terms array as source of truth, fall back to data.currentTerm, then date-based
+  const _openTerm    = (data.terms || []).find(t => t.opened && !t.closed);
+  const _currentTerm = _openTerm?.term || data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
+  const _currentYear = _openTerm?.year || data.currentYear || new Date().getFullYear();
   const alreadyPaid  = (lic.term === _currentTerm && lic.year === _currentYear)
     ? (lic.amountPaid || 0) : 0;
   const amountDue    = Math.max(0, totalDue - alreadyPaid);
