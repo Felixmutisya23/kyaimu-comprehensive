@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, computeRankings, printSubjectPerformance } from '../utils/print';
 
 export default function Exams({ data, setData, user }) {
@@ -20,6 +20,9 @@ export default function Exams({ data, setData, user }) {
   const accessibleClasses = getAccessibleClasses();
 
   const [selClass, setSelClass] = useState(accessibleClasses[0] || getAllClasses(data)[0] || '');
+  const [showSetupSubjects, setShowSetupSubjects] = useState(false);
+  const [setupSubjectInput, setSetupSubjectInput] = useState('');
+  const classSubjects = getSubjectsForClass(selClass, data);
   const [selExamId, setSelExamId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [showEnter, setShowEnter] = useState(false);
@@ -52,7 +55,7 @@ export default function Exams({ data, setData, user }) {
 
   // Subjects this user can ENTER scores for in selClass
   function getEnterableSubjects() {
-    if (isPrincipal) return data.subjects;
+    if (isPrincipal) return getSubjectsForClass(selClass, data);
     return (user.teacherSubjects || [])
       .filter(s => s.classes.includes(selClass))
       .map(s => s.subject);
@@ -302,6 +305,11 @@ export default function Exams({ data, setData, user }) {
           {(isPrincipal || isClassTeacher) && (
             <Btn onClick={() => setShowAdd(true)}><Icon name="add" size={14} /> New Exam</Btn>
           )}
+          {isPrincipal && (
+            <Btn variant="ghost" onClick={() => { setSetupSubjectInput((getSubjectsForClass(selClass, data) || []).join('\n')); setShowSetupSubjects(true); }}>
+              📚 Setup Subjects
+            </Btn>
+          )}
         </div>
       </div>
 
@@ -459,6 +467,34 @@ export default function Exams({ data, setData, user }) {
           </Card>
         ) : null;
       })()}
+
+      {/* Setup Subjects Modal */}
+      <Modal show={showSetupSubjects} onClose={() => setShowSetupSubjects(false)} title={`Setup Subjects — ${selClass}`}>
+        <Alert type="info">
+          <Icon name="alert" size={14} />
+          Enter one subject per line for <strong>{selClass}</strong>. These will be used when entering marks for this class.
+        </Alert>
+        <FormGroup label="Subjects (one per line)">
+          <textarea
+            rows={10}
+            value={setupSubjectInput}
+            onChange={e => setSetupSubjectInput(e.target.value)}
+            placeholder="e.g.&#10;Mathematics&#10;English&#10;Kiswahili&#10;Science"
+            style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
+          />
+        </FormGroup>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+          {setupSubjectInput.split('\n').filter(s => s.trim()).length} subjects configured
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Btn variant="ghost" onClick={() => setShowSetupSubjects(false)}>Cancel</Btn>
+          <Btn variant="success" onClick={() => {
+            const subs = setupSubjectInput.split('\n').map(s => s.trim()).filter(Boolean);
+            setData(d => ({ ...d, subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: subs } }));
+            setShowSetupSubjects(false);
+          }}>Save Subjects</Btn>
+        </div>
+      </Modal>
 
       {/* Create Exam Modal */}
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Create New Exam">

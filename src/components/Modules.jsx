@@ -1224,19 +1224,51 @@ export function Settings({ data, setData }) {
       {/* Add Class Modal */}
       <Modal show={showAddClass} onClose={() => setShowAddClass(false)} title="Add Class / Grade">
         <FormGroup label="Class Name">
-          <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Grade 10, Form 1, JSS 1" autoFocus />
+          <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Grade 7, Form 1, PP1" autoFocus />
         </FormGroup>
         <FormGroup label="Streams (optional — comma separated)">
           <input value={newStreams} onChange={e => setNewStreams(e.target.value)} placeholder="East, West  (leave empty for single stream)" />
         </FormGroup>
+
+        {/* Live preview + curriculum level detection */}
         <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
-          <strong>Preview:</strong>{' '}
-          {newClassName ? (
-            newStreams.trim()
-              ? newStreams.split(',').map(s => `${newClassName} ${s.trim()}`).join(', ')
-              : newClassName
-          ) : '—'}
+          <div style={{ marginBottom: 6 }}>
+            <strong>Preview:</strong>{' '}
+            {newClassName ? (
+              newStreams.trim()
+                ? newStreams.split(',').map(s => `${newClassName} ${s.trim()}`).join(', ')
+                : newClassName
+            ) : '—'}
+          </div>
+          {newClassName && (() => {
+            const level = getCurriculumLevel(newClassName.trim());
+            if (level) {
+              return (
+                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#10b98115', border: '1px solid #10b98140' }}>
+                  <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4 }}>
+                    ✓ Matched: {level.label}
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: 11 }}>
+                    Subjects auto-assigned: {level.subjects.slice(0, 4).join(', ')}{level.subjects.length > 4 ? ` + ${level.subjects.length - 4} more` : ''}
+                  </div>
+                </div>
+              );
+            } else {
+              return (
+                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#f59e0b15', border: '1px solid #f59e0b40' }}>
+                  <div style={{ color: '#f59e0b', fontWeight: 600, marginBottom: 4 }}>
+                    ⚠ No CBC level matched
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: 11 }}>
+                    Use standard names like <strong>Grade 1–9</strong>, <strong>Form 1–4</strong>, <strong>PP1</strong>, <strong>PP2</strong> for auto subjects.
+                    Or go to Exams → 📚 Setup Subjects to assign manually after adding.
+                  </div>
+                </div>
+              );
+            }
+          })()}
         </div>
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowAddClass(false)}>Cancel</Btn>
           <Btn onClick={addClass} disabled={!newClassName.trim()}>Add Class</Btn>

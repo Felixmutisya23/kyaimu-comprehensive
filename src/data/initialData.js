@@ -131,13 +131,16 @@ export function getCurriculumLevel(className) {
 
 /* Get subjects for a specific class */
 export function getSubjectsForClass(className, data) {
-  // 1. Check if school has custom subjects per class
+  // 1. Check if school has custom subjects per class (set via "Setup Subjects" in Exams)
   const custom = (data.subjectsByClass || {})[className];
   if (custom && custom.length > 0) return custom;
 
-  // 2. Fall back to curriculum level defaults
+  // 2. Fall back to curriculum level defaults + any extra subjects added in Settings
   const level = getCurriculumLevel(className);
-  if (level) return level.subjects;
+  if (level) {
+    const extras = (data.extraSubjectsByLevel || {})[level.key] || [];
+    return [...level.subjects, ...extras];
+  }
 
   // 3. Fall back to school-wide subjects (legacy)
   const schoolSubs = (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || ''));
