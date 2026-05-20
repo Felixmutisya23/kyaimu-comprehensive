@@ -849,6 +849,7 @@ export function Settings({ data, setData }) {
 
   // Class management
   const [showAddClass, setShowAddClass] = useState(false);
+  const [newClassLevel, setNewClassLevel] = useState('');
   const [newClassName, setNewClassName] = useState('');
   const [newStreams, setNewStreams]      = useState('');   // comma-separated
 
@@ -925,7 +926,7 @@ export function Settings({ data, setData }) {
     if (!name) return;
     const newGroup = { id: `g${Date.now()}`, name, streams };
     setData(d => ({ ...d, classGroups: [...(d.classGroups || []), newGroup] }));
-    setNewClassName(''); setNewStreams(''); setShowAddClass(false);
+    setNewClassName(''); setNewStreams(''); setNewClassLevel(''); setShowAddClass(false);
   }
 
   function removeClassGroup(id) {
@@ -1223,54 +1224,61 @@ export function Settings({ data, setData }) {
 
       {/* Add Class Modal */}
       <Modal show={showAddClass} onClose={() => setShowAddClass(false)} title="Add Class / Grade">
-        <FormGroup label="Class Name">
-          <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Grade 7, Form 1, PP1" autoFocus />
+        {/* Step 1: Pick CBC level then class */}
+        <FormGroup label="Curriculum Level">
+          <select value={newClassLevel} onChange={e => { setNewClassLevel(e.target.value); setNewClassName(''); }}>
+            <option value="">Select level...</option>
+            {Object.entries(CURRICULUM_LEVELS).map(([key, level]) => (
+              <option key={key} value={key}>{level.label}</option>
+            ))}
+          </select>
         </FormGroup>
+        {newClassLevel && (
+          <FormGroup label="Class">
+            <select value={newClassName} onChange={e => setNewClassName(e.target.value)}>
+              <option value="">Select class...</option>
+              {CURRICULUM_LEVELS[newClassLevel].classes.map(c => {
+                const alreadyAdded = (classGroups || []).some(g => g.name === c);
+                return (
+                  <option key={c} value={c} disabled={alreadyAdded}>
+                    {c}{alreadyAdded ? ' (already added)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </FormGroup>
+        )}
         <FormGroup label="Streams (optional — comma separated)">
-          <input value={newStreams} onChange={e => setNewStreams(e.target.value)} placeholder="East, West  (leave empty for single stream)" />
+          <input
+            value={newStreams}
+            onChange={e => setNewStreams(e.target.value.toUpperCase())}
+            placeholder="EAST, WEST  (leave empty for single stream)"
+          />
         </FormGroup>
 
-        {/* Live preview + curriculum level detection */}
-        <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
-          <div style={{ marginBottom: 6 }}>
-            <strong>Preview:</strong>{' '}
-            {newClassName ? (
-              newStreams.trim()
-                ? newStreams.split(',').map(s => `${newClassName} ${s.trim()}`).join(', ')
-                : newClassName
-            ) : '—'}
+        {/* Live preview + subjects info */}
+        {newClassName && (
+          <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
+            <div style={{ marginBottom: 6 }}>
+              <strong>Preview:</strong>{' '}
+              {newStreams.trim()
+                ? newStreams.split(',').map(s => `${newClassName} ${s.trim()}`).filter(s => s.trim() !== newClassName).join(', ') || newClassName
+                : newClassName}
+            </div>
+            <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#10b98115', border: '1px solid #10b98140' }}>
+              <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4 }}>
+                ✓ {CURRICULUM_LEVELS[newClassLevel].label}
+              </div>
+              <div style={{ color: '#64748b', fontSize: 11 }}>
+                Auto subjects: {CURRICULUM_LEVELS[newClassLevel].subjects.slice(0, 4).join(', ')}
+                {CURRICULUM_LEVELS[newClassLevel].subjects.length > 4 ? ` + ${CURRICULUM_LEVELS[newClassLevel].subjects.length - 4} more` : ''}
+              </div>
+            </div>
           </div>
-          {newClassName && (() => {
-            const level = getCurriculumLevel(newClassName.trim());
-            if (level) {
-              return (
-                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#10b98115', border: '1px solid #10b98140' }}>
-                  <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4 }}>
-                    ✓ Matched: {level.label}
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: 11 }}>
-                    Subjects auto-assigned: {level.subjects.slice(0, 4).join(', ')}{level.subjects.length > 4 ? ` + ${level.subjects.length - 4} more` : ''}
-                  </div>
-                </div>
-              );
-            } else {
-              return (
-                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#f59e0b15', border: '1px solid #f59e0b40' }}>
-                  <div style={{ color: '#f59e0b', fontWeight: 600, marginBottom: 4 }}>
-                    ⚠ No CBC level matched
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: 11 }}>
-                    Use standard names like <strong>Grade 1–9</strong>, <strong>Form 1–4</strong>, <strong>PP1</strong>, <strong>PP2</strong> for auto subjects.
-                    Or go to Exams → 📚 Setup Subjects to assign manually after adding.
-                  </div>
-                </div>
-              );
-            }
-          })()}
-        </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setShowAddClass(false)}>Cancel</Btn>
+          <Btn variant="ghost" onClick={() => { setShowAddClass(false); setNewClassLevel(''); }}>Cancel</Btn>
           <Btn onClick={addClass} disabled={!newClassName.trim()}>Add Class</Btn>
         </div>
       </Modal>
