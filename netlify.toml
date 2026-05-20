@@ -1,5 +1,4 @@
 [build]
-
   command = "npm run build"
   publish = "dist"
 
@@ -7,3 +6,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Force browsers to always revalidate HTML (never cache index.html)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+
+# Cache JS/CSS assets long-term (they have unique hashes in filenames)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
