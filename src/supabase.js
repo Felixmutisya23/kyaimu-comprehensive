@@ -284,7 +284,10 @@ export async function createSchool(setupData) {
 let _lastSnapshot = {};
 function tableFingerprint(items) {
   if (!items || !items.length) return '0:';
-  return items.length + ':' + items.map(i => String(i.id || i._uuid || '')).join(',');
+  // Include JSON content so score/result updates inside existing records are detected
+  try {
+    return items.length + ':' + JSON.stringify(items).length + ':' + items.map(i => String(i.id || i._uuid || '')).join(',');
+  } catch { return items.length + ':'; }
 }
 function isDirty(schoolId, table, items) {
   const key = schoolId + ':' + table;
