@@ -305,6 +305,16 @@ export default function Exams({ data, setData, user }) {
           {(isPrincipal || isClassTeacher) && (
             <Btn onClick={() => setShowAdd(true)}><Icon name="add" size={14} /> New Exam</Btn>
           )}
+          {isPrincipal && selExam && (
+            <Btn variant="danger" size="sm" onClick={() => {
+              if (window.confirm(`Delete exam "${selExam.name}" for ${selExam.class}? This cannot be undone.`)) {
+                setData(d => ({ ...d, exams: d.exams.filter(e => e.id !== selExam.id) }));
+                setSelExamId(null);
+              }
+            }}>
+              <Icon name="trash" size={13} /> Delete Exam
+            </Btn>
+          )}
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => { setSetupSubjectInput((getSubjectsForClass(selClass, data) || []).join('\n')); setShowSetupSubjects(true); }}>
               📚 Setup Subjects
@@ -476,16 +486,60 @@ export default function Exams({ data, setData, user }) {
         </Alert>
         <FormGroup label="Subjects (one per line)">
           <textarea
-            rows={10}
+            rows={8}
             value={setupSubjectInput}
             onChange={e => setSetupSubjectInput(e.target.value)}
             placeholder="e.g.&#10;Mathematics&#10;English&#10;Kiswahili&#10;Science"
             style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
           />
         </FormGroup>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
           {setupSubjectInput.split('\n').filter(s => s.trim()).length} subjects configured
         </div>
+
+        {/* Show subjects currently in exams that are NOT in the configured list */}
+        {selExam && (() => {
+          const configuredSubs = setupSubjectInput.split('\n').map(s => s.trim()).filter(Boolean);
+          const examSubs = [...new Set(
+            Object.values(selExam.results || {}).flatMap(r => Object.keys(r))
+          )];
+          const extraSubs = examSubs.filter(s => !configuredSubs.includes(s));
+          if (!extraSubs.length) return null;
+          return (
+            <div style={{ background: '#ef444415', border: '1px solid #ef444440', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+              <div style={{ color: '#ef4444', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>
+                ⚠ These subjects are in the current exam but not in your list above. Click × to remove them from the exam:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {extraSubs.map(sub => (
+                  <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#ef444420', border: '1px solid #ef444440', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}>
+                    <span style={{ color: '#ef4444' }}>{sub}</span>
+                    <button
+                      onClick={() => {
+                        if (!window.confirm(`Remove "${sub}" from exam "${selExam.name}"? All scores for this subject will be deleted.`)) return;
+                        setData(d => ({
+                          ...d,
+                          exams: d.exams.map(ex => {
+                            if (ex.id !== selExam.id) return ex;
+                            const newResults = {};
+                            Object.entries(ex.results || {}).forEach(([student, subjects]) => {
+                              const cleaned = { ...subjects };
+                              delete cleaned[sub];
+                              newResults[student] = cleaned;
+                            });
+                            return { ...ex, results: newResults };
+                          }),
+                        }));
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, fontWeight: 700 }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowSetupSubjects(false)}>Cancel</Btn>
           <Btn variant="success" onClick={() => {
