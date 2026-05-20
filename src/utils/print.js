@@ -402,14 +402,14 @@ export function printReportForm(student, exam, data) {
       <tr>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
           <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Class Teacher's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px"></div>
+          <div style="min-height:48px;margin-bottom:16px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
           <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
             Name: ___________________________ &nbsp; Sign: _______________
           </div>
         </td>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
           <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Principal's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px"></div>
+          <div style="min-height:48px;margin-bottom:16px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
           <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
             Sign: ___________________________ &nbsp; Stamp: 
             <span style="border:1px solid #ccc;display:inline-block;width:60px;height:24px"></span>
