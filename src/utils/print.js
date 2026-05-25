@@ -42,6 +42,38 @@ function getNextTermDate(exam, data) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   AUTO-GENERATED COMMENTS
+   — Class Teacher, Principal, Subject Teachers
+   Based on CBC grade, mean score, and position.
+   No dependency on teachers being configured.
+═══════════════════════════════════════════════════════ */
+function autoClassTeacherComment(studentName, mean, grade, pos, subCount) {
+  const first = (studentName || '').split(' ')[0];
+  const pts   = grade?.points || 0;
+  if (pts >= 7) return `${first} has demonstrated outstanding academic performance this term. The results reflect exceptional dedication and hard work. Keep it up!`;
+  if (pts >= 5) return `${first} has performed commendably this term. There is clear improvement and with continued effort, even greater results are achievable.`;
+  if (pts >= 3) return `${first} has shown satisfactory progress this term. More consistent effort and focus on weak areas will help improve the overall performance.`;
+  return `${first} needs to put in more effort this term. I encourage ${first} to seek help from subject teachers and dedicate more time to studies.`;
+}
+
+function autoPrincipalComment(studentName, mean, grade, pos) {
+  const first = (studentName || '').split(' ')[0];
+  const pts   = grade?.points || 0;
+  if (pts >= 7) return `Excellent performance. ${first} is a credit to the school and family. We encourage the same commitment next term.`;
+  if (pts >= 5) return `Good performance. ${first} should aim for even higher standards. We are proud of the progress made.`;
+  if (pts >= 3) return `Fair performance. ${first} is encouraged to work harder and utilise all available academic resources.`;
+  return `${first} needs to improve significantly. Parents/guardians are encouraged to support ${first} at home. Please see the class teacher for guidance.`;
+}
+
+function autoSubjectComment(subject, score, grade) {
+  const pts = grade?.points || 0;
+  if (pts >= 7) return `Excellent work in ${subject}. Keep it up.`;
+  if (pts >= 5) return `Good performance in ${subject}. Aim higher next term.`;
+  if (pts >= 3) return `Average in ${subject}. More practice needed.`;
+  return `${subject} needs urgent attention. Revise regularly.`;
+}
+
+/* ═══════════════════════════════════════════════════════
    SHARED HEADER — used by all printed documents
 ═══════════════════════════════════════════════════════ */
 function schoolHeader(data, { logoUrl } = {}) {
@@ -297,13 +329,14 @@ export function printReportForm(student, exam, data) {
       return { name: ex.name, total: t, mean: m, grade: getGrade(Math.round(m)) };
     }).filter(Boolean);
 
-  // Subject rows
+  // Subject rows — with auto subject teacher comment
   const subjectRows = subs.map(sub => {
     const cell    = res[sub];
     const score   = getScore(cell);
     const g       = getGrade(score ?? 0);
     const teacher = cell?.submittedBy ? data.teachers?.find(t => t.staffId === cell.submittedBy) : null;
     const remark  = g.points >= 7 ? 'Excellent' : g.points >= 5 ? 'Good' : g.points >= 3 ? 'Average' : 'Below Average';
+    const subComment = autoSubjectComment(sub, score, g);
     return `
       <tr style="background:${subs.indexOf(sub) % 2 === 0 ? '#fff' : '#f8f9ff'}">
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-weight:600">${sub}</td>
@@ -311,7 +344,9 @@ export function printReportForm(student, exam, data) {
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-weight:900;color:#cc0000">${g.label}</td>
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:center">${g.points}</td>
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#555">${remark}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#777">${teacher?.name || ''}</td>
+        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#444;font-style:italic">${subComment}</td>
+        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#777">${teacher?.name || '_______________'}</td>
+        <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-size:10px;color:#999">_______</td>
       </tr>`;
   }).join('');
 
@@ -374,7 +409,9 @@ export function printReportForm(student, exam, data) {
           <th style="padding:7px 10px;border:1px solid #003399">Grade</th>
           <th style="padding:7px 10px;border:1px solid #003399">Points</th>
           <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Remarks</th>
-          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Subject Teacher</th>
+          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
+          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Teacher</th>
+          <th style="padding:7px 10px;border:1px solid #003399">Sign</th>
         </tr>
       </thead>
       <tbody>
@@ -384,7 +421,7 @@ export function printReportForm(student, exam, data) {
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:15px;font-weight:900">${total}</td>
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:14px;font-weight:900;color:#cc0000">${grade.label}</td>
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-weight:900">${totalPoints}</td>
-          <td colspan="2" style="padding:7px 10px;border:1px solid #ddd;font-size:11px;color:#555">
+          <td colspan="4" style="padding:7px 10px;border:1px solid #ddd;font-size:11px;color:#555">
             Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)
           </td>
         </tr>
@@ -494,12 +531,15 @@ export function printAllReportForms(exam, data) {
       const score = getScore(res[sub]);
       const g     = getGrade(score ?? 0);
       const t     = res[sub]?.submittedBy ? data.teachers?.find(x => x.staffId === res[sub].submittedBy) : null;
+      const subComment = autoSubjectComment(sub, score, g);
       return `<tr>
         <td style="padding:5px 8px;border:1px solid #ddd;font-weight:600">${sub}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:900">${score ?? '—'}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:900;color:#cc0000">${g.label}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${g.points}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#777">${t?.name || ''}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#444;font-style:italic">${subComment}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#777">${t?.name || '_______________'}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-size:10px;color:#999">_______</td>
       </tr>`;
     }).join('');
 
@@ -533,7 +573,9 @@ export function printAllReportForms(exam, data) {
             <th style="padding:6px 8px;border:1px solid #003399">Score</th>
             <th style="padding:6px 8px;border:1px solid #003399">Grade</th>
             <th style="padding:6px 8px;border:1px solid #003399">Points</th>
-            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Subject Teacher</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Teacher</th>
+            <th style="padding:6px 8px;border:1px solid #003399">Sign</th>
           </tr></thead>
           <tbody>${rows}
             <tr style="background:#e8eeff;font-weight:900">
@@ -541,21 +583,31 @@ export function printAllReportForms(exam, data) {
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;font-size:14px">${total}</td>
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#cc0000;font-size:13px">${grade.label}</td>
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${grade.points}</td>
-              <td style="padding:6px 8px;border:1px solid #ddd"></td>
+              <td colspan="3" style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#555">Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)</td>
             </tr>
           </tbody>
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px">
           <tr>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399">Class Teacher:</strong>
-              <div style="min-height:32px"></div>
-              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: _____________________ Date: ____________</div>
+              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Class Teacher's Comment</strong>
+              <div style="margin:6px 0 12px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
+              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Name: _____________________ &nbsp; Sign: _______________ &nbsp; Date: ____________</div>
             </td>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399">Principal:</strong>
-              <div style="min-height:32px"></div>
-              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: ___________________ Stamp: <span style="border:1px solid #ccc;display:inline-block;width:40px;height:18px"></span></div>
+              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Principal's Comment</strong>
+              <div style="margin:6px 0 12px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
+              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: ___________________ &nbsp; Stamp: <span style="border:1px solid #ccc;display:inline-block;width:40px;height:18px"></span></div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:8px;border:1px solid #ccc;vertical-align:top">
+              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Parent / Guardian Comment &amp; Acknowledgement</strong>
+              <div style="min-height:28px;margin:4px 0 10px"></div>
+              <div style="display:flex;justify-content:space-between;border-top:1px solid #ccc;padding-top:4px;font-size:10px;color:#555">
+                <span>Sign: ___________________________</span>
+                <span>Date: ___________________________</span>
+              </div>
             </td>
           </tr>
         </table>
