@@ -38,6 +38,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
       name: '', admNo: '', class: cls, stream: '',
       dob: '', parent: '', phone: '',
       joined: new Date().getFullYear().toString(),
+      category: 'day',
     };
   }
 
@@ -303,6 +304,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             <thead>
               <tr>
                 {['Adm No', 'Name', 'Class', 'Parent/Guardian',
+                  ...(data.schoolBoardingMode === 'both' ? ['Category'] : []),
                   ...(user.canSeeFees || isPrincipal ? ['Fees'] : []),
                   'Cases', ''].map(h => <th key={h} style={TS.th}>{h}</th>)}
               </tr>
@@ -316,6 +318,13 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                     <td style={{ ...TS.td, fontWeight: 500 }}>{s.name}</td>
                     <td style={TS.td}>{s.class}</td>
                     <td style={{ ...TS.td, color: '#94a3b8' }}>{s.parent}</td>
+                    {data.schoolBoardingMode === 'both' && (
+                      <td style={TS.td}>
+                        <Tag color={s.category === 'boarding' ? 'purple' : 'blue'}>
+                          {s.category === 'boarding' ? '🏠 Boarder' : '🚶 Day'}
+                        </Tag>
+                      </td>
+                    )}
                     {(user.canSeeFees || isPrincipal) && (
                       <td style={TS.td}>
                         {s.fees.total > 0 ? (
@@ -395,6 +404,18 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
         <FormGroup label="Year Joined">
           <input value={form.joined} onChange={e => setForm({ ...form, joined: e.target.value })} />
         </FormGroup>
+
+        {(data.schoolBoardingMode === 'both') && (
+          <FormGroup label="Student Category">
+            <select value={form.category || 'day'} onChange={e => setForm({ ...form, category: e.target.value })}>
+              <option value="day">🚶 Day Scholar</option>
+              <option value="boarding">🏠 Boarder</option>
+            </select>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+              This determines which fee schedule applies to the student.
+            </div>
+          </FormGroup>
+        )}
 
         {isClassTeacher && !isPrincipal && (
           <Alert type="info">
