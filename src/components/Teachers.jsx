@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Avatar, Alert, Icon } from './UI';
-import { getAllClasses } from '../data/initialData';
+import { getAllClasses, getSubjectsForClass, CURRICULUM_LEVELS } from '../data/initialData';
+import { printStaffIntakeForm } from '../utils/print';
 import { PendingTeacherApprovals, InviteLinkGenerator } from './TeacherRegistration';
 
 const STAFF_TYPES = [
@@ -13,104 +14,166 @@ const DEPT_ICONS = {
   Library: '📖', Finance: '💰', Counselling: '🧡', Security: '🔒',
 };
 
-export default function Teachers({ data, setData }) {
-  const [show, setShow]     = useState(false);
-  const [search, setSearch] = useState('');
-  const [filterDept, setFilterDept] = useState('');
-  const [form, setForm]     = useState(initForm());
+/* Get all subjects relevant to a set of classes, plus standard non-academic roles */
+function getSubjectsForClasses(classes, data) {
+  const set = new Set();
+  classes.forEach(cls => getSubjectsForClass(cls, data).forEach(s => set.add(s)));
+  ['Administration', 'Guidance & Counselling', 'Sports', 'Library'].forEach(s => set.add(s));
+  return [...set].sort();
+}
 
-  // Subject-class rows: each row = { subject, classes[] }
+const BLANK_FORM = {
+  name: '', email: '', phone: '', staffId: '',
+  dept: 'Academics', staffType: 'teaching',
+  isClassTeacher: false, classTeacherOf: '',
+  canSeeKitchenAlerts: false, canSeeFees: false,
+  admin: false, password: '',
+};
+
+export default function Teachers({ data, setData }) {
+  const [show, setShow]           = useState(false);
+  const [isEditing, setIsEditing] = useState(false);   // true = edit mode
+  const [editId, setEditId]       = useState(null);    // id of staff being edited
+  const [search, setSearch]       = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [form, setForm]           = useState({ ...BLANK_FORM });
   const [subjectRows, setSubjectRows] = useState([{ subject: '', classes: [] }]);
 
-  function initForm() {
-    return {
-      name: '', email: '', phone: '', staffId: '',
-      dept: 'Academics', staffType: 'teaching',
-      isClassTeacher: false, classTeacherOf: '',
-      canSeeKitchenAlerts: false, canSeeFees: false,
-      admin: false, password: '',
-    };
-  }
+  const allClasses = getAllClasses(data);
+  const depts      = data.departments;
 
+  /* ── Subject row helpers ──────────────────────────── */
   function addSubjectRow() {
     setSubjectRows(r => [...r, { subject: '', classes: [] }]);
   }
-
   function removeSubjectRow(i) {
     setSubjectRows(r => r.filter((_, idx) => idx !== i));
   }
-
   function updateSubjectRow(i, field, value) {
-    setSubjectRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: value } : row));
+    setSubjectRows(r => r.map((row, idx) => {
+      if (idx !== i) return row;
+      const updated = { ...row, [field]: value };
+      if (field === 'classes') {
+        const avail = getSubjectsForClasses(value, data);
+        if (updated.subject && !avail.includes(updated.subject)) updated.subject = '';
+      }
+      return updated;
+    }));
   }
-
   function toggleSubjectClass(rowIdx, cls) {
     setSubjectRows(r => r.map((row, idx) => {
       if (idx !== rowIdx) return row;
       const classes = row.classes.includes(cls)
         ? row.classes.filter(c => c !== cls)
         : [...row.classes, cls];
-      return { ...row, classes };
+      const avail   = getSubjectsForClasses(classes, data);
+      const subject = avail.includes(row.subject) ? row.subject : '';
+      return { ...row, classes, subject };
     }));
   }
 
+  /* ── Open add ─────────────────────────────────────── */
+  function openAdd() {
+    setForm({ ...BLANK_FORM });
+    setSubjectRows([{ subject: '', classes: [] }]);
+    setIsEditing(false);
+    setEditId(null);
+    setShow(true);
+  }
+
+  /* ── Open edit ────────────────────────────────────── */
+  function openEdit(t) {
+    setForm({
+      name:               t.name       || '',
+      email:              t.email      || '',
+      phone:              t.phone      || '',
+      staffId:            t.staffId    || '',
+      dept:               t.dept       || 'Academics',
+      staffType:          t.staffType  || 'teaching',
+      isClassTeacher:     t.isClassTeacher || false,
+      classTeacherOf:     t.classTeacherOf || '',
+      canSeeKitchenAlerts: t.canSeeKitchenAlerts || false,
+      canSeeFees:         t.canSeeFees || false,
+      admin:              t.admin      || false,
+      password:           t.password   || t.staffId || '',
+    });
+    // Restore subject rows
+    const rows = (t.subjects && t.subjects.length > 0)
+      ? t.subjects.map(s => ({ subject: s.subject || '', classes: s.classes || [] }))
+      : [{ subject: '', classes: [] }];
+    setSubjectRows(rows);
+    setIsEditing(true);
+    setEditId(t.id);
+    setShow(true);
+  }
+
+  /* ── Save (add or edit) ───────────────────────────── */
   function save() {
     if (!form.name.trim() || !form.staffId.trim()) {
       alert('Please fill in Name and Staff ID.');
       return;
     }
-    // Check duplicate staffId
-    if (data.teachers.find(t => t.staffId === form.staffId.trim())) {
+
+    // Duplicate staffId check — skip self when editing
+    const dupId = data.teachers.find(t => t.staffId === form.staffId.trim() && t.id !== editId);
+    if (dupId) {
       alert(`Staff ID "${form.staffId}" already exists. Please use a unique ID.`);
       return;
     }
-    // Check duplicate email
-    if (form.email && data.teachers.find(t => t.email === form.email.trim())) {
-      alert(`Email "${form.email}" is already registered.`);
-      return;
+    // Duplicate email check — skip self when editing
+    if (form.email) {
+      const dupEmail = data.teachers.find(t => t.email === form.email.trim() && t.id !== editId);
+      if (dupEmail) {
+        alert(`Email "${form.email}" is already registered.`);
+        return;
+      }
     }
 
     const validSubjects = subjectRows.filter(r => r.subject && r.classes.length > 0);
 
-    const newStaff = {
-      id:                  Date.now(),
-      name:                form.name.trim(),
-      email:               form.email.trim(),
-      phone:               form.phone.trim(),
-      staffId:             form.staffId.trim(),
-      dept:                form.dept,
-      staffType:           form.staffType,
-      isClassTeacher:      form.isClassTeacher && form.staffType === 'teaching',
-      classTeacherOf:      form.isClassTeacher && form.classTeacherOf ? form.classTeacherOf : null,
-      subjects:            validSubjects,
+    const record = {
+      name:               form.name.trim(),
+      email:              form.email.trim(),
+      phone:              form.phone.trim(),
+      staffId:            form.staffId.trim(),
+      dept:               form.dept,
+      staffType:          form.staffType,
+      isClassTeacher:     form.isClassTeacher && form.staffType === 'teaching',
+      classTeacherOf:     form.isClassTeacher && form.classTeacherOf ? form.classTeacherOf : null,
+      subjects:           validSubjects,
       canSeeKitchenAlerts: form.canSeeKitchenAlerts || form.dept === 'Kitchen',
-      canSeeFees:          form.canSeeFees || form.dept === 'Finance',
-      admin:               form.admin,
-      password:            form.password || form.staffId.trim(), // default pw = staffId
+      canSeeFees:         form.canSeeFees || form.dept === 'Finance',
+      admin:              form.admin,
+      password:           form.password || form.staffId.trim(),
     };
 
-    setData(d => ({ ...d, teachers: [...d.teachers, newStaff] }));
+    if (isEditing) {
+      setData(d => ({
+        ...d,
+        teachers: d.teachers.map(t => t.id === editId ? { ...t, ...record } : t),
+      }));
+    } else {
+      setData(d => ({
+        ...d,
+        teachers: [...d.teachers, { id: Date.now(), ...record }],
+      }));
+    }
+
     setShow(false);
-    setForm(initForm());
+    setForm({ ...BLANK_FORM });
     setSubjectRows([{ subject: '', classes: [] }]);
+    setIsEditing(false);
+    setEditId(null);
   }
 
+  /* ── Delete ───────────────────────────────────────── */
   function remove(id) {
     if (window.confirm('Remove this staff member? This cannot be undone.')) {
       setData(d => ({ ...d, teachers: d.teachers.filter(t => t.id !== id) }));
     }
   }
 
-  function openAdd() {
-    setForm(initForm());
-    setSubjectRows([{ subject: '', classes: [] }]);
-    setShow(true);
-  }
-
-  const allClasses   = getAllClasses(data);
-  const allSubjects  = [...data.subjects, 'Administration', 'Guidance & Counselling', 'Sports', 'Library'];
-  const depts        = data.departments;
-
+  /* ── Filter ───────────────────────────────────────── */
   const filtered = data.teachers.filter(t => {
     const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
                         (t.staffId || '').toLowerCase().includes(search.toLowerCase());
@@ -122,11 +185,14 @@ export default function Teachers({ data, setData }) {
   const nonTeaching = filtered.filter(t => t.staffType === 'non_teaching' && !t.admin);
   const admins      = filtered.filter(t => t.admin);
 
+  /* ── Staff card ───────────────────────────────────── */
   function StaffGroup({ title, list, color }) {
     if (!list.length) return null;
     return (
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{title} ({list.length})</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+          {title} ({list.length})
+        </div>
         {list.map(t => (
           <div key={t.id} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 16, marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <Avatar name={t.name} size={46} color={color} />
@@ -136,7 +202,9 @@ export default function Teachers({ data, setData }) {
                 {t.admin && <Tag color="purple">Admin</Tag>}
                 {t.isClassTeacher && <Tag color="green">Class Teacher: {t.classTeacherOf}</Tag>}
                 <Tag color="blue">{t.dept}</Tag>
-                <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', background: '#1e2435', padding: '2px 7px', borderRadius: 4 }}>{t.staffId}</span>
+                <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', background: '#1e2435', padding: '2px 7px', borderRadius: 4 }}>
+                  {t.staffId}
+                </span>
               </div>
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
                 {t.email && <span>{t.email}</span>}
@@ -153,19 +221,113 @@ export default function Teachers({ data, setData }) {
                 </div>
               )}
             </div>
-            <Btn size="sm" variant="danger" onClick={() => remove(t.id)}>
-              <Icon name="trash" size={13} />
-            </Btn>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <Btn size="sm" variant="ghost" onClick={() => openEdit(t)} title="Edit staff member">
+                <Icon name="edit" size={13} />
+              </Btn>
+              <Btn size="sm" variant="danger" onClick={() => remove(t.id)} title="Remove staff member">
+                <Icon name="trash" size={13} />
+              </Btn>
+            </div>
           </div>
         ))}
       </div>
     );
   }
 
+  /* ── Subject rows UI (shared by add & edit) ──────── */
+  function SubjectRows() {
+    const levelGroups = Object.entries(CURRICULUM_LEVELS).map(([key, level]) => ({
+      key, label: level.label,
+      classes: allClasses.filter(c =>
+        level.classes.some(lc => c.toLowerCase().startsWith(lc.toLowerCase()))
+      ),
+    })).filter(g => g.classes.length > 0);
+
+    return (
+      <>
+        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
+          Add each subject this teacher teaches and select the classes.
+          <span style={{ color: '#64748b', fontSize: 11 }}> Subject list filters to match selected classes.</span>
+        </div>
+
+        {subjectRows.map((row, i) => {
+          const availSubs = row.classes.length > 0
+            ? getSubjectsForClasses(row.classes, data)
+            : getSubjectsForClasses(allClasses, data);
+
+          return (
+            <div key={i} style={{ background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 10, border: '1px solid #2a3350' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Subject</div>
+                  <select
+                    value={row.subject}
+                    onChange={e => updateSubjectRow(i, 'subject', e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">— Select subject —</option>
+                    {availSubs.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {subjectRows.length > 1 && (
+                  <button onClick={() => removeSubjectRow(i)}
+                    style={{ background: '#ef444415', border: '1px solid #ef444440', color: '#ef4444', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12, alignSelf: 'flex-end' }}>
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>
+                Classes teaching <strong style={{ color: '#94a3b8' }}>{row.subject || 'this subject'}</strong>:
+              </div>
+
+              {levelGroups.map(group => (
+                <div key={group.key} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>
+                    {group.label}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {group.classes.map(c => {
+                      const active = row.classes.includes(c);
+                      return (
+                        <div key={c} onClick={() => toggleSubjectClass(i, c)} style={{
+                          padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 500, userSelect: 'none',
+                          background: active ? '#4f8ef7' : '#252d42',
+                          color:      active ? '#fff'    : '#94a3b8',
+                          border:    `1px solid ${active ? '#4f8ef7' : '#2a3350'}`,
+                        }}>
+                          {c}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {row.subject && row.classes.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#10b981' }}>
+                  ✓ {row.subject} → {row.classes.join(', ')}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <button onClick={addSubjectRow}
+          style={{ background: 'none', border: '1px dashed #2a3350', color: '#64748b', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 12, width: '100%', marginBottom: 8 }}>
+          + Add Another Subject
+        </button>
+      </>
+    );
+  }
+
+  /* ── Render ───────────────────────────────────────── */
   return (
     <div>
       <InviteLinkGenerator data={data} />
       <PendingTeacherApprovals data={data} setData={setData} />
+
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input placeholder="Search by name or staff ID..." value={search}
@@ -174,7 +336,10 @@ export default function Teachers({ data, setData }) {
           <option value="">All Departments</option>
           {depts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <Btn variant="ghost" onClick={() => printStaffIntakeForm(data)}>
+            <Icon name="print" size={14} /> Staff Form
+          </Btn>
           <Btn onClick={openAdd}><Icon name="add" size={14} /> Add Staff Member</Btn>
         </div>
       </div>
@@ -182,10 +347,10 @@ export default function Teachers({ data, setData }) {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { l: 'Total Staff',       v: data.teachers.length,                                  c: '#4f8ef7' },
-          { l: 'Teaching Staff',    v: data.teachers.filter(t => t.staffType==='teaching').length, c: '#10b981' },
-          { l: 'Non-Teaching',      v: data.teachers.filter(t => t.staffType==='non_teaching').length, c: '#f59e0b' },
-          { l: 'Class Teachers',    v: data.teachers.filter(t => t.isClassTeacher).length,    c: '#7c3aed' },
+          { l: 'Total Staff',    v: data.teachers.length,                                        c: '#4f8ef7' },
+          { l: 'Teaching Staff', v: data.teachers.filter(t => t.staffType === 'teaching').length, c: '#10b981' },
+          { l: 'Non-Teaching',   v: data.teachers.filter(t => t.staffType === 'non_teaching').length, c: '#f59e0b' },
+          { l: 'Class Teachers', v: data.teachers.filter(t => t.isClassTeacher).length,          c: '#7c3aed' },
         ].map(({ l, v, c }) => (
           <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v}</div>
@@ -200,25 +365,40 @@ export default function Teachers({ data, setData }) {
         </div>
       )}
 
-      <StaffGroup title="Administrators" list={admins} color="#7c3aed" />
-      <StaffGroup title="Teaching Staff" list={teaching} color="#4f8ef7" />
+      <StaffGroup title="Administrators"     list={admins}      color="#7c3aed" />
+      <StaffGroup title="Teaching Staff"     list={teaching}    color="#4f8ef7" />
       <StaffGroup title="Non-Teaching Staff" list={nonTeaching} color="#10b981" />
 
-      {/* Add Staff Modal */}
-      <Modal show={show} onClose={() => setShow(false)} title="Add Staff Member" wide>
-        <Alert type="info">
-          <Icon name="alert" size={14} />
-          Default login password for this staff member will be their Staff ID. They can change it later.
-        </Alert>
+      {/* ── Add / Edit Staff Modal ─────────────────────── */}
+      <Modal show={show} onClose={() => setShow(false)} title={isEditing ? 'Edit Staff Member' : 'Add Staff Member'} wide>
+
+        {!isEditing && (
+          <Alert type="info">
+            <Icon name="alert" size={14} />
+            Default login password is the Staff ID. They can change it later.
+          </Alert>
+        )}
+
+        {isEditing && (
+          <Alert type="warning">
+            <Icon name="alert" size={14} />
+            Editing staff details. Leave Password blank to keep the existing one.
+          </Alert>
+        )}
 
         {/* Basic info */}
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Basic Information</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+          Basic Information
+        </div>
         <FormRow>
           <FormGroup label="Full Name *">
             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Jane Njeri" autoFocus />
           </FormGroup>
-          <FormGroup label="Staff ID * (used as login password)">
-            <input value={form.staffId} onChange={e => setForm({ ...form, staffId: e.target.value })} placeholder="e.g. T008" />
+          <FormGroup label="Staff ID *">
+            <input value={form.staffId} onChange={e => setForm({ ...form, staffId: e.target.value })} placeholder="e.g. T008"
+              disabled={isEditing} // Don't allow changing staffId on edit — it's a login key
+              style={isEditing ? { opacity: 0.5 } : {}}
+            />
           </FormGroup>
         </FormRow>
         <FormRow>
@@ -242,11 +422,20 @@ export default function Teachers({ data, setData }) {
           </FormGroup>
         </FormRow>
 
+        {isEditing && (
+          <FormGroup label="Password (leave blank to keep current)">
+            <input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+              placeholder="Enter new password or leave blank" />
+          </FormGroup>
+        )}
+
         {/* Teaching-only fields */}
         {form.staffType === 'teaching' && (
           <>
-            <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0 14px' }} />
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Teaching Assignment</div>
+            <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0' }} />
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Teaching Assignment
+            </div>
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, marginBottom: 10 }}>
@@ -264,47 +453,15 @@ export default function Teachers({ data, setData }) {
               )}
             </div>
 
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
-              Subject assignments — add one row per subject. Select which classes they teach it in.
-            </div>
-            {subjectRows.map((row, i) => (
-              <div key={i} style={{ background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-                  <select value={row.subject} onChange={e => updateSubjectRow(i, 'subject', e.target.value)}
-                    style={{ flex: 1 }}>
-                    <option value="">Select subject...</option>
-                    {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  {subjectRows.length > 1 && (
-                    <button onClick={() => removeSubjectRow(i)}
-                      style={{ background: '#ef444420', border: '1px solid #ef444440', color: '#ef4444', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}>
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>Classes this teacher teaches {row.subject || 'this subject'} in:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {allClasses.map(c => (
-                    <div key={c} onClick={() => toggleSubjectClass(i, c)} style={{
-                      padding: '3px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 500,
-                      background: row.classes.includes(c) ? '#4f8ef7' : '#252d42',
-                      color: row.classes.includes(c) ? '#fff' : '#94a3b8',
-                      border: `1px solid ${row.classes.includes(c) ? '#4f8ef7' : '#2a3350'}`,
-                    }}>{c}</div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button onClick={addSubjectRow}
-              style={{ background: 'none', border: '1px dashed #2a3350', color: '#64748b', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, marginBottom: 10, width: '100%' }}>
-              + Add Another Subject
-            </button>
+            <SubjectRows />
           </>
         )}
 
         {/* Permissions */}
-        <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0 14px' }} />
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Permissions</div>
+        <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0' }} />
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+          Permissions
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { field: 'admin',               label: 'Grant Admin / Principal Privileges (full access)' },
@@ -321,7 +478,8 @@ export default function Teachers({ data, setData }) {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
           <Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn>
           <Btn onClick={save} disabled={!form.name.trim() || !form.staffId.trim()}>
-            <Icon name="add" size={14} /> Add Staff Member
+            <Icon name={isEditing ? 'check' : 'add'} size={14} />
+            {isEditing ? 'Save Changes' : 'Add Staff Member'}
           </Btn>
         </div>
       </Modal>

@@ -556,15 +556,18 @@ export default function App() {
           // Build full teacher user object — needed by TeacherPortal
           const teacherRecord = (teacherSchoolData?.teachers || []).find(t => t.email == email || t.staffId == teacher.staff_id);
           setUser({
-            role:            teacher.admin ? 'principal' : 'staff',
-            staffType:       teacherRecord?.staffType || teacher.staff_type || 'teaching',
-            name:            teacher.name,
+            role:               teacher.admin ? 'principal' : 'staff',
+            staffType:          teacherRecord?.staffType       || teacher.staff_type        || 'teaching',
+            name:               teacher.name,
             email,
-            staffId:         teacher.staff_id || teacherRecord?.staffId,
-            isClassTeacher:  teacherRecord?.isClassTeacher || teacher.is_class_teacher || false,
-            classTeacherOf:  teacherRecord?.classTeacherOf || teacher.class_teacher_of || null,
-            teacherSubjects: teacherRecord?.subjects || [],
-            admin:           teacher.admin || false,
+            staffId:            teacher.staff_id               || teacherRecord?.staffId,
+            isClassTeacher:     teacherRecord?.isClassTeacher  || teacher.is_class_teacher  || false,
+            classTeacherOf:     teacherRecord?.classTeacherOf  || teacher.class_teacher_of  || null,
+            teacherSubjects:    teacherRecord?.subjects        || [],
+            admin:              teacher.admin                  || false,
+            dept:               teacherRecord?.dept            || '',
+            canSeeFees:         teacherRecord?.canSeeFees      || false,
+            canSeeKitchenAlerts:teacherRecord?.canSeeKitchenAlerts || false,
           });
           setPage('dashboard');
           // Load subscription for current term

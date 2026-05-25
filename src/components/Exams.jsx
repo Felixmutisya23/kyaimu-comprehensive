@@ -25,11 +25,30 @@ export default function Exams({ data, setData, user }) {
   const classSubjects = getSubjectsForClass(selClass, data);
   const [selExamId, setSelExamId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [showEnter, setShowEnter] = useState(false);
   const [showEditReq, setShowEditReq] = useState(false);
-  const [editTarget, setEditTarget] = useState(null); // { studentName, subject, currentScore, examId }
+  const [editTarget, setEditTarget] = useState(null);
   const [editNewScore, setEditNewScore] = useState('');
-  const [examForm, setExamForm] = useState({ name: '', term: '1', type: 'beginning', class: selClass, year: new Date().getFullYear().toString() });
+
+  const DEFAULT_EXAM_NAMES = [
+    'Opening Exam', 'Mid-Term Exam', 'End-Term Exam',
+    'CAT 1', 'CAT 2', 'CAT 3',
+    'Mock Exam', 'Pre-Mock Exam', 'KCPE Mock',
+    'Assignment 1', 'Assignment 2',
+  ];
+  const allClassesList = getAllClasses(data);
+
+  const blankExamForm = () => ({
+    name: '', customName: '',
+    term: String(data.currentTerm || '1'),
+    type: 'beginning',
+    class: selClass,
+    year: String(data.currentYear || new Date().getFullYear()),
+    forAllClasses: false,
+    selectedStreams: [], // for stream-level selection when class has streams
+  });
+  const [examForm, setExamForm] = useState(blankExamForm);
   const [scores, setScores]     = useState({});
   const [enterSubjects, setEnterSubjects] = useState([]);
   const [enterExam, setEnterExam] = useState(null);
@@ -121,9 +140,47 @@ export default function Exams({ data, setData, user }) {
 
   /* ── Create exam ──────────────────────────────────── */
   function createExam() {
-    const newExam = { id: Date.now(), ...examForm, term: Number(examForm.term), results: {} };
-    setData(d => ({ ...d, exams: [...d.exams, newExam] }));
+    const finalName = examForm.customName.trim() || examForm.name;
+    if (!finalName) { alert('Please enter an exam name.'); return; }
+
+    // Determine which classes to create exams for
+    let targetClasses = [];
+    if (examForm.forAllClasses) {
+      targetClasses = allClassesList;
+    } else if (examForm.selectedStreams && examForm.selectedStreams.length > 0) {
+      targetClasses = examForm.selectedStreams;
+    } else {
+      targetClasses = [examForm.class];
+    }
+
+    const newExams = targetClasses.map(cls => ({
+      id: Date.now() + Math.random(),
+      name: finalName,
+      term: Number(examForm.term),
+      type: examForm.type,
+      class: cls,
+      year: examForm.year,
+      results: {},
+    }));
+
+    setData(d => ({ ...d, exams: [...d.exams, ...newExams] }));
     setShowAdd(false);
+    setExamForm(blankExamForm());
+    if (newExams.length > 1) alert(`Exam "${finalName}" created for ${newExams.length} classes.`);
+  }
+
+  /* ── Edit exam metadata ───────────────────────────── */
+  function saveExamEdit() {
+    const finalName = examForm.customName.trim() || examForm.name;
+    if (!finalName) { alert('Please enter an exam name.'); return; }
+    setData(d => ({
+      ...d,
+      exams: d.exams.map(ex => ex.id === selExam.id
+        ? { ...ex, name: finalName, term: Number(examForm.term), type: examForm.type, year: examForm.year }
+        : ex
+      ),
+    }));
+    setShowEdit(false);
   }
 
   /* ── Open score entry ─────────────────────────────── */
@@ -303,7 +360,15 @@ export default function Exams({ data, setData, user }) {
             </>
           )}
           {(isPrincipal || isClassTeacher) && (
-            <Btn onClick={() => setShowAdd(true)}><Icon name="add" size={14} /> New Exam</Btn>
+            <Btn onClick={() => { setExamForm(blankExamForm()); setShowAdd(true); }}><Icon name="add" size={14} /> New Exam</Btn>
+          )}
+          {isPrincipal && selExam && (
+            <Btn variant="ghost" size="sm" onClick={() => {
+              setExamForm({ ...blankExamForm(), name: selExam.name, customName: '', term: String(selExam.term), type: selExam.type || 'endterm', year: String(selExam.year) });
+              setShowEdit(true);
+            }}>
+              ✎ Edit Exam
+            </Btn>
           )}
           {isPrincipal && selExam && (
             <Btn variant="danger" size="sm" onClick={() => {
@@ -552,18 +617,150 @@ export default function Exams({ data, setData, user }) {
 
       {/* Create Exam Modal */}
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Create New Exam">
-        <FormGroup label="Exam Name"><input value={examForm.name} onChange={e => setExamForm({ ...examForm, name: e.target.value })} placeholder="e.g. Term 2 Midterm" /></FormGroup>
+        {/* Suggested names */}
+        <FormGroup label="Exam Name">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+            {DEFAULT_EXAM_NAMES.map(n => (
+              <button key={n} onClick={() => setExamForm(f => ({ ...f, name: n, customName: '' }))}
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : '#2a3350'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : '#1e2435', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <input
+            value={examForm.customName}
+            onChange={e => setExamForm(f => ({ ...f, customName: e.target.value, name: e.target.value ? '' : f.name }))}
+            placeholder={examForm.name ? `Selected: "${examForm.name}" — or type a custom name` : 'Or type a custom exam name...'}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+            Final name: <strong style={{ color: '#e2e8f0' }}>{examForm.customName || examForm.name || '(none selected)'}</strong>
+          </div>
+        </FormGroup>
+
         <FormRow>
-          <FormGroup label="Term"><select value={examForm.term} onChange={e => setExamForm({ ...examForm, term: e.target.value })}>{['1','2','3'].map(t => <option key={t} value={t}>Term {t}</option>)}</select></FormGroup>
-          <FormGroup label="Type"><select value={examForm.type} onChange={e => setExamForm({ ...examForm, type: e.target.value })}><option value="beginning">Beginning of Term</option><option value="midterm">Midterm</option><option value="endterm">End of Term</option></select></FormGroup>
+          <FormGroup label="Term">
+            <select value={examForm.term} onChange={e => setExamForm(f => ({ ...f, term: e.target.value }))}>
+              {['1','2','3'].map(t => <option key={t} value={t}>Term {t}</option>)}
+            </select>
+          </FormGroup>
+          <FormGroup label="Type">
+            <select value={examForm.type} onChange={e => setExamForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="beginning">Beginning of Term</option>
+              <option value="midterm">Mid-Term</option>
+              <option value="endterm">End of Term</option>
+              <option value="cat">C.A.T</option>
+              <option value="mock">Mock Exam</option>
+              <option value="assignment">Assignment</option>
+            </select>
+          </FormGroup>
+          <FormGroup label="Year">
+            <input value={examForm.year} onChange={e => setExamForm(f => ({ ...f, year: e.target.value }))} style={{ width: 80 }} />
+          </FormGroup>
         </FormRow>
+
+        {/* All classes tick */}
+        {isPrincipal && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>
+              <input type="checkbox" checked={examForm.forAllClasses} onChange={e => setExamForm(f => ({ ...f, forAllClasses: e.target.checked, selectedStreams: [] }))} />
+              Apply to ALL classes (creates one exam per class)
+            </label>
+          </div>
+        )}
+
+        {/* Single class + stream picker (when not all-classes) */}
+        {!examForm.forAllClasses && (
+          <FormGroup label="Class">
+            {(() => {
+              // Find siblings for the selected class
+              const siblings = getSiblingStreams(examForm.class, data);
+              const hasStreams = siblings.length > 1;
+              return (
+                <div>
+                  <select value={examForm.class} onChange={e => setExamForm(f => ({ ...f, class: e.target.value, selectedStreams: [] }))} style={{ width: '100%', marginBottom: hasStreams ? 8 : 0 }}>
+                    {(isPrincipal ? allClassesList : [myClass]).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {hasStreams && (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>This class has streams — select which streams this exam covers:</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: '#e2e8f0' }}>
+                          <input type="checkbox"
+                            checked={examForm.selectedStreams.length === siblings.length}
+                            onChange={e => setExamForm(f => ({ ...f, selectedStreams: e.target.checked ? [...siblings] : [f.class] }))}
+                          /> All Streams
+                        </label>
+                        {siblings.map(s => (
+                          <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: '#e2e8f0' }}>
+                            <input type="checkbox"
+                              checked={examForm.selectedStreams.includes(s) || (examForm.selectedStreams.length === 0 && s === examForm.class)}
+                              onChange={e => {
+                                setExamForm(f => {
+                                  const cur = f.selectedStreams.length > 0 ? f.selectedStreams : [f.class];
+                                  return { ...f, selectedStreams: e.target.checked ? [...new Set([...cur, s])] : cur.filter(x => x !== s) };
+                                });
+                              }}
+                            /> {s}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </FormGroup>
+        )}
+
+        {examForm.forAllClasses && (
+          <Alert type="info">
+            This exam will be created for <strong>{allClassesList.length} classes</strong>: {allClassesList.join(', ')}
+          </Alert>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Btn>
+          <Btn onClick={createExam} disabled={!examForm.customName && !examForm.name}>Create Exam</Btn>
+        </div>
+      </Modal>
+
+      {/* Edit Exam Modal */}
+      <Modal show={showEdit} onClose={() => setShowEdit(false)} title={`Edit Exam — ${selExam?.name}`}>
+        <FormGroup label="Exam Name">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+            {DEFAULT_EXAM_NAMES.map(n => (
+              <button key={n} onClick={() => setExamForm(f => ({ ...f, name: n, customName: '' }))}
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : '#2a3350'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : '#1e2435', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <input value={examForm.customName || examForm.name} onChange={e => setExamForm(f => ({ ...f, customName: e.target.value, name: '' }))} placeholder="Exam name" style={{ width: '100%', boxSizing: 'border-box' }} />
+        </FormGroup>
         <FormRow>
-          <FormGroup label="Class"><select value={examForm.class} onChange={e => setExamForm({ ...examForm, class: e.target.value })}>{(isPrincipal ? getAllClasses(data) : [myClass]).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}</select></FormGroup>
-          <FormGroup label="Year"><input value={examForm.year} onChange={e => setExamForm({ ...examForm, year: e.target.value })} /></FormGroup>
+          <FormGroup label="Term">
+            <select value={examForm.term} onChange={e => setExamForm(f => ({ ...f, term: e.target.value }))}>
+              {['1','2','3'].map(t => <option key={t} value={t}>Term {t}</option>)}
+            </select>
+          </FormGroup>
+          <FormGroup label="Type">
+            <select value={examForm.type} onChange={e => setExamForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="beginning">Beginning of Term</option>
+              <option value="midterm">Mid-Term</option>
+              <option value="endterm">End of Term</option>
+              <option value="cat">C.A.T</option>
+              <option value="mock">Mock Exam</option>
+              <option value="assignment">Assignment</option>
+            </select>
+          </FormGroup>
+          <FormGroup label="Year">
+            <input value={examForm.year} onChange={e => setExamForm(f => ({ ...f, year: e.target.value }))} style={{ width: 80 }} />
+          </FormGroup>
         </FormRow>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Btn>
-          <Btn onClick={createExam} disabled={!examForm.name}>Create Exam</Btn>
+          <Btn variant="ghost" onClick={() => setShowEdit(false)}>Cancel</Btn>
+          <Btn variant="success" onClick={saveExamEdit}>Save Changes</Btn>
         </div>
       </Modal>
 

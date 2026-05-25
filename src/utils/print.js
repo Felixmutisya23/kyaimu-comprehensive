@@ -601,114 +601,125 @@ export function printAllReportForms(exam, data) {
 ═══════════════════════════════════════════════════════ */
 export function printSubjectPerformance(exam, data) {
   if (!exam) return;
-  const students = data.students.filter(s => s.class === exam.class);
-  // Gather all subjects in this exam
-  const allSubjects = [...new Set(
-    Object.values(exam.results).flatMap(r => Object.keys(r))
-  )];
 
-  // Compute stats per subject
-  const subjectStats = allSubjects.map(sub => {
-    const scores = students
-      .map(s => {
-        const cell = exam.results[s.name]?.[sub];
+  // Get all streams for this exam's base class
+  const baseClass = exam.class.includes(' ')
+    ? exam.class.split(' ').slice(0, -1).join(' ')
+    : exam.class;
+
+  // Find all sibling stream exams with same name and same term/year
+  const siblingExams = (data.exams || []).filter(e =>
+    e.name === exam.name &&
+    e.term === exam.term &&
+    e.year === exam.year &&
+    (e.class === exam.class ||
+      e.class.startsWith(baseClass + ' ') ||
+      exam.class.startsWith(baseClass + ' '))
+  );
+
+  const hasStreams = siblingExams.length > 1;
+
+  // Build stats for a given set of exams (for overall or per-stream)
+  function buildStats(exams) {
+    const allSubjects = [...new Set(
+      exams.flatMap(ex => Object.values(ex.results).flatMap(r => Object.keys(r)))
+    )];
+    const allStudents = (data.students || []).filter(s =>
+      exams.some(ex => ex.class === s.class)
+    );
+    return allSubjects.map(sub => {
+      const scores = allStudents.map(s => {
+        const ex = exams.find(e => e.class === s.class);
+        if (!ex) return null;
+        const cell = ex.results[s.name]?.[sub];
         return getScore(cell);
-      })
-      .filter(v => v !== null && v !== undefined);
-    const avg   = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    const max   = scores.length ? Math.max(...scores) : 0;
-    const min   = scores.length ? Math.min(...scores) : 0;
-    const above50 = scores.filter(s => s >= 43).length; // AE or above
-    return {
-      subject: sub, avg: Math.round(avg * 10) / 10, max, min,
-      count: scores.length, above50, grade: getGrade(Math.round(avg)),
-      percent: scores.length ? Math.round((above50 / scores.length) * 100) : 0,
-    };
-  }).sort((a, b) => b.avg - a.avg);
+      }).filter(v => v !== null && v !== undefined);
+      const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      const max = scores.length ? Math.max(...scores) : 0;
+      const min = scores.length ? Math.min(...scores) : 0;
+      const above = scores.filter(s => s >= 43).length;
+      return {
+        subject: sub, avg: Math.round(avg * 10) / 10, max, min,
+        count: scores.length, above, grade: getGrade(Math.round(avg)),
+        percent: scores.length ? Math.round((above / scores.length) * 100) : 0,
+      };
+    }).sort((a, b) => b.avg - a.avg);
+  }
 
-  const rows = subjectStats.map((s, i) => {
-    const bg = i % 2 === 0 ? '#fff' : '#f8f9ff';
-    const barW = Math.round((s.avg / 80) * 100);
-    return `<tr style="background:${bg}">
-      <td style="padding:6px 8px;border:1px solid #ddd;font-weight:700;color:#003399;text-align:center">${i + 1}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;font-weight:700">${s.subject}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">
-        <span style="display:inline-block;width:${barW}%;min-width:4px;height:12px;background:${s.avg>=60?'#10b981':s.avg>=43?'#4f8ef7':s.avg>=25?'#f59e0b':'#ef4444'};border-radius:2px;vertical-align:middle;margin-right:6px"></span>
-        <strong>${s.avg}</strong>
-      </td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">
-        <span style="background:${s.grade.color}20;color:${s.grade.color};padding:1px 8px;border-radius:12px;font-weight:700;font-size:12px">${s.grade.label}</span>
-      </td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#10b981;font-weight:700">${s.max}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#ef4444;font-weight:700">${s.min}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${s.count}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;font-weight:700;color:${s.percent>=60?'#10b981':s.percent>=40?'#f59e0b':'#ef4444'}">${s.percent}%</td>
-    </tr>`;
-  }).join('');
-
-  // Student scores per subject sorted best→worst
-  const studentRows = students.map(student => {
-    const cells = subjectStats.map(({ subject }) => {
-      const cell  = exam.results[student.name]?.[subject];
-      const score = getScore(cell);
-      const g     = score !== null ? getGrade(score) : null;
-      return `<td style="padding:4px 6px;border:1px solid #ddd;text-align:center;font-size:11px">
-        ${score !== null ? `<strong>${score}</strong><sup style="color:#cc0000;font-size:7px">${g.label}</sup>` : '—'}
-      </td>`;
+  function renderStatsTable(stats, title) {
+    if (!stats.length) return '';
+    const rows = stats.map((s, i) => {
+      const bg = i % 2 === 0 ? '#fff' : '#f8f9ff';
+      const barW = Math.round((s.avg / 80) * 100);
+      return `<tr style="background:${bg}">
+        <td style="padding:6px 8px;border:1px solid #ddd;font-weight:700;color:#003399;text-align:center">${i + 1}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;font-weight:700">${s.subject}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">
+          <span style="display:inline-block;width:${barW}%;min-width:4px;height:12px;background:${s.avg>=60?'#10b981':s.avg>=43?'#4f8ef7':s.avg>=25?'#f59e0b':'#ef4444'};border-radius:2px;vertical-align:middle;margin-right:6px"></span>
+          <strong>${s.avg}</strong>
+        </td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">
+          <span style="background:${s.grade.color}20;color:${s.grade.color};padding:1px 8px;border-radius:12px;font-weight:700;font-size:12px">${s.grade.label}</span>
+        </td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#10b981;font-weight:700">${s.max}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#ef4444;font-weight:700">${s.min}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${s.count}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;font-weight:700;color:${s.percent>=60?'#10b981':s.percent>=40?'#f59e0b':'#ef4444'}">${s.percent}%</td>
+      </tr>`;
     }).join('');
-    const total = subjectStats.reduce((a, {subject}) => {
-      const cell  = exam.results[student.name]?.[subject];
-      const score = getScore(cell);
-      return a + (score ?? 0);
-    }, 0);
-    const mean = subjectStats.length ? Math.round(total / subjectStats.length) : 0;
-    return `<tr>
-      <td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;font-size:11px">${student.admNo}</td>
-      <td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;text-align:left;font-size:11px">${student.name.toUpperCase()}</td>
-      ${cells}
-      <td style="padding:4px 6px;border:1px solid #ddd;font-weight:900;text-align:center;color:#003399">${mean}</td>
-    </tr>`;
-  }).join('');
+    return `
+      <h4 style="color:#003399;font-size:13px;margin:18px 0 6px;text-transform:uppercase;border-bottom:2px solid #003399;padding-bottom:4px">${title}</h4>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px">
+        <thead><tr style="background:#003399;color:#fff">
+          <th style="padding:6px 8px;border:1px solid #003399">#</th>
+          <th style="padding:6px 8px;border:1px solid #003399;text-align:left">Subject</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Mean Score</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Grade</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Highest</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Lowest</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Students</th>
+          <th style="padding:6px 8px;border:1px solid #003399">Pass Rate</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // Build overall stats (all streams combined)
+  const overallStats = buildStats(siblingExams);
+  const overallSection = renderStatsTable(overallStats,
+    hasStreams ? `Overall — ${baseClass} (All Streams Combined)` : `Subject Performance — ${exam.class}`
+  );
+
+  // Build per-stream sections
+  const streamSections = hasStreams
+    ? siblingExams.map(ex => {
+        const stats = buildStats([ex]);
+        return renderStatsTable(stats, `Stream: ${ex.class}`);
+      }).join('')
+    : '';
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Subject Performance — ${exam.name} — ${exam.class}</title>
+  <title>Subject Performance — ${exam.name} — ${baseClass}</title>
   <style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}@page{size:A4 landscape;margin:12mm}@media print{body{padding:0}.np{display:none}}</style>
   </head><body>
   ${schoolHeader(data)}
   <h3 style="text-align:center;color:#003399;text-transform:uppercase;font-size:14px;margin:8px 0">
-    Subject Performance Analysis — ${exam.name} — ${exam.class}
+    Subject Performance Analysis — ${exam.name} — ${baseClass}${hasStreams ? ' (All Streams)' : ''}
   </h3>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
-    <thead><tr style="background:#003399;color:#fff">
-      <th style="padding:7px;border:1px solid #003399">#</th>
-      <th style="padding:7px;border:1px solid #003399;text-align:left">Subject</th>
-      <th style="padding:7px;border:1px solid #003399">Class Average</th>
-      <th style="padding:7px;border:1px solid #003399">Grade</th>
-      <th style="padding:7px;border:1px solid #003399">Highest</th>
-      <th style="padding:7px;border:1px solid #003399">Lowest</th>
-      <th style="padding:7px;border:1px solid #003399">Count</th>
-      <th style="padding:7px;border:1px solid #003399">Pass Rate</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  <h4 style="color:#003399;margin-bottom:8px">Student Scores (Subjects ordered: Best → Weakest)</h4>
-  <table style="width:100%;border-collapse:collapse;font-size:10px">
-    <thead><tr style="background:#cc0000;color:#fff">
-      <th style="padding:5px;border:1px solid #cc0000">ADM</th>
-      <th style="padding:5px;border:1px solid #cc0000;text-align:left">STUDENT</th>
-      ${subjectStats.map(s => `<th style="padding:5px;border:1px solid #cc0000;white-space:nowrap">${s.subject.substring(0,8)}</th>`).join('')}
-      <th style="padding:5px;border:1px solid #cc0000">MEAN</th>
-    </tr></thead>
-    <tbody>${studentRows}</tbody>
-  </table>
+  <div style="text-align:center;font-size:11px;color:#555;margin-bottom:12px">
+    Term ${exam.term} · ${exam.year} · Generated: ${new Date().toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}
+    ${hasStreams ? ` · <strong>${siblingExams.length} streams</strong>` : ''}
+  </div>
+  ${overallSection}
+  ${streamSections}
   <div class="np" style="margin-top:16px;text-align:center">
-    <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">🖨 Print Report</button>
+    <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🖨 Print</button>
   </div>
   </body></html>`);
   w.document.close();
 }
+
 
 export function printFeeReceipt(payment, student, data) {
   const w = window.open('', '_blank');
@@ -818,6 +829,427 @@ export function printLeavingCert(student, data) {
     <div class="no-print" style="margin-top:24px;text-align:center">
       <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
         🖨 Print Certificate
+      </button>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
+
+/* ═══════════════════════════════════════════════════════
+   STUDENT INTAKE / ADMISSION FORM
+   Admin prints this, gives to parent/guardian to fill,
+   then uses the details to enrol the student in system.
+═══════════════════════════════════════════════════════ */
+export function printStudentIntakeForm(data, options = {}) {
+  const { prefillClass = '' } = options;
+  const classes = [];
+  (data.classGroups || []).forEach(g => {
+    if (!g.streams || g.streams.length === 0) classes.push(g.name);
+    else g.streams.forEach(s => classes.push(`${g.name} ${s}`));
+  });
+
+  const classOptions = prefillClass
+    ? `<strong>${prefillClass}</strong>`
+    : `<select style="width:200px;border:none;border-bottom:1px solid #333;font-size:13px;font-family:inherit">${classes.map(c => `<option>${c}</option>`).join('')}</select>`;
+
+  const field = (label, width = '240px', lines = 1) => lines > 1
+    ? `<div style="margin-bottom:14px">
+        <div style="font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">${label}</div>
+        ${Array(lines).fill(`<div style="border-bottom:1px solid #999;margin-bottom:6px;height:20px;width:100%"></div>`).join('')}
+       </div>`
+    : `<div style="margin-bottom:14px;display:inline-block;width:${width};margin-right:16px;vertical-align:top">
+        <div style="font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">${label}</div>
+        <div style="border-bottom:1px solid #999;height:22px;width:100%"></div>
+       </div>`;
+
+  const section = (title) =>
+    `<div style="background:#003399;color:#fff;padding:5px 12px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:18px 0 12px;border-radius:2px">${title}</div>`;
+
+  const checkbox = (label) =>
+    `<span style="display:inline-block;margin-right:20px;font-size:12px">
+      <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;margin-right:5px;vertical-align:middle"></span>${label}
+     </span>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Student Admission Form — ${data.schoolName}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,Helvetica,sans-serif;font-size:13px;padding:28px;color:#111;max-width:820px;margin:0 auto}
+      @page{size:A4 portrait;margin:14mm}
+      @media print{body{padding:0}.no-print{display:none!important}}
+      .no-print{margin-top:16px;text-align:center}
+    </style>
+  </head><body>
+    ${schoolHeader(data)}
+
+    <h3 style="text-align:center;font-size:16px;text-transform:uppercase;letter-spacing:2px;color:#003399;margin:10px 0 4px">
+      Student Admission / Intake Form
+    </h3>
+    <p style="text-align:center;font-size:11px;color:#555;margin-bottom:18px">
+      Please fill in all fields clearly in BLOCK LETTERS &nbsp;·&nbsp; Office use only where indicated
+    </p>
+
+    <div style="border:1px solid #ccc;border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:11px;background:#fffbe6">
+      <strong>FOR OFFICE USE:</strong> &nbsp;
+      Adm No: <span style="display:inline-block;border-bottom:1px solid #333;width:120px;margin:0 16px 0 4px">&nbsp;</span>
+      Date Enrolled: <span style="display:inline-block;border-bottom:1px solid #333;width:120px;margin:0 16px 0 4px">&nbsp;</span>
+      Class Assigned: <span style="display:inline-block;border-bottom:1px solid #333;width:120px;margin:0 4px">&nbsp;</span>
+    </div>
+
+    ${section('1. Student Details')}
+    ${field('Full Name (Surname First)', '100%')}
+    <div>
+      ${field('Date of Birth (DD/MM/YYYY)', '220px')}
+      ${field('Gender', '120px')}
+      ${field('Nationality', '180px')}
+    </div>
+    <div>
+      ${field('National ID / Birth Cert No.', '220px')}
+      ${field('Class Applying For', '200px')}
+      ${field('Previous School (if any)', '260px')}
+    </div>
+    ${field('Home / Village Address', '100%')}
+    <div>
+      ${field('Sub-County', '200px')}
+      ${field('County', '200px')}
+    </div>
+
+    ${section('2. Parent / Guardian Information')}
+    <div style="margin-bottom:10px"><strong>Father / Guardian 1</strong></div>
+    <div>
+      ${field('Full Name', '280px')}
+      ${field('Relationship to Student', '200px')}
+    </div>
+    <div>
+      ${field('Phone Number (Primary)', '200px')}
+      ${field('Phone Number (Alternative)', '200px')}
+      ${field('Email Address', '220px')}
+    </div>
+    <div>
+      ${field('Occupation', '200px')}
+      ${field('National ID No.', '200px')}
+    </div>
+
+    <div style="margin:14px 0 10px"><strong>Mother / Guardian 2</strong></div>
+    <div>
+      ${field('Full Name', '280px')}
+      ${field('Relationship to Student', '200px')}
+    </div>
+    <div>
+      ${field('Phone Number (Primary)', '200px')}
+      ${field('Email Address', '220px')}
+    </div>
+
+    <div style="margin:14px 0 10px"><strong>Emergency Contact (if different from above)</strong></div>
+    <div>
+      ${field('Full Name', '280px')}
+      ${field('Phone Number', '200px')}
+      ${field('Relationship', '180px')}
+    </div>
+
+    ${section('3. Medical & Health Information')}
+    <div style="margin-bottom:10px">
+      Any known medical conditions? &nbsp;${checkbox('None')}${checkbox('Yes (specify below)')}
+    </div>
+    ${field('Medical Condition / Disability (if any)', '100%')}
+    <div>
+      ${field('Blood Group', '140px')}
+      ${field('Allergies (if any)', '300px')}
+      ${field('Doctor / Hospital Contact', '260px')}
+    </div>
+    <div style="margin-bottom:10px">
+      Is the student on any regular medication? &nbsp;${checkbox('No')}${checkbox('Yes (attach prescription copy)')}
+    </div>
+
+    ${section('4. Previous Academic Records')}
+    <div>
+      ${field('Last School Attended', '320px')}
+      ${field('Year', '100px')}
+      ${field('Class Completed', '160px')}
+    </div>
+    <div style="margin-bottom:10px">
+      Any special learning needs? &nbsp;${checkbox('None')}${checkbox('Yes (specify below)')}
+    </div>
+    ${field('Special Needs / Learning Support Required', '100%')}
+
+    ${section('5. Documents Submitted (Office Check)')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;font-size:12px">
+      ${['Birth Certificate (Copy)','Previous School Leaving Certificate','Transfer Letter','Passport Photo (2 copies)','National ID of Parent/Guardian (Copy)','Medical Certificate (if applicable)','NHIF Card (Copy)','Any Other (specify): _______________'].map(d =>
+        `<div>${checkbox(d)}</div>`
+      ).join('')}
+    </div>
+
+    ${section('6. Fee Information (Office)')}
+    <div style="border:1px solid #ccc;padding:10px 14px;border-radius:3px;font-size:12px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:10px;color:#555;text-transform:uppercase;font-weight:700;margin-bottom:4px">Total Fee (Term)</div>
+          <div style="border-bottom:1px solid #999;height:22px"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#555;text-transform:uppercase;font-weight:700;margin-bottom:4px">Amount Paid on Admission</div>
+          <div style="border-bottom:1px solid #999;height:22px"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#555;text-transform:uppercase;font-weight:700;margin-bottom:4px">Balance Outstanding</div>
+          <div style="border-bottom:1px solid #999;height:22px"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        Payment Method: &nbsp;${checkbox('Cash')}${checkbox('M-Pesa')}${checkbox('Bank')}${checkbox('Other')}
+        &nbsp;&nbsp; Receipt No: <span style="display:inline-block;border-bottom:1px solid #333;width:140px"></span>
+      </div>
+    </div>
+
+    ${section('7. Declarations & Signatures')}
+    <div style="font-size:12px;line-height:1.8;margin-bottom:14px;border:1px solid #ccc;padding:10px 14px;border-radius:3px;background:#f9f9f9">
+      I/We, the parent(s)/guardian(s), confirm that the information provided above is accurate and complete.
+      I/We agree to abide by the school's rules and regulations and to support the school in the education of the above-named student.
+      I/We consent to the school administering first aid and seeking medical attention as necessary.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:20px">
+      <div>
+        <div style="font-size:11px;color:#555;margin-bottom:28px">Parent / Guardian Signature:</div>
+        <div style="border-bottom:1px solid #333;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Name: ___________________________ &nbsp; Date: _______________</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#555;margin-bottom:28px">Admitted By (Office):</div>
+        <div style="border-bottom:1px solid #333;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Name: ___________________________ &nbsp; Date: _______________</div>
+      </div>
+    </div>
+    <div style="text-align:center;border-top:1px solid #ccc;padding-top:10px">
+      <div style="display:inline-block;border:1px solid #ccc;width:100px;height:50px;vertical-align:middle;margin-right:20px"></div>
+      <span style="font-size:11px;color:#555">Official School Stamp</span>
+      &nbsp;&nbsp;&nbsp;
+      <span style="font-size:11px;color:#555">Principal's Signature: _________________________________</span>
+    </div>
+
+    <div style="font-size:10px;color:#aaa;text-align:center;margin-top:12px">
+      ${data.schoolName} · ${[data.schoolPOBox, data.schoolLocation, data.schoolCounty].filter(Boolean).join(' · ')} · Printed: ${new Date().toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}
+    </div>
+
+    <div class="no-print">
+      <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print Admission Form
+      </button>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
+
+/* ═══════════════════════════════════════════════════════
+   STAFF INTAKE / REGISTRATION FORM
+   Admin prints this for new staff to fill in,
+   then enters their details into the system.
+═══════════════════════════════════════════════════════ */
+export function printStaffIntakeForm(data) {
+  const depts = data.departments || [];
+
+  const field = (label, width = '240px') =>
+    `<div style="margin-bottom:14px;display:inline-block;width:${width};margin-right:16px;vertical-align:top">
+      <div style="font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">${label}</div>
+      <div style="border-bottom:1px solid #999;height:22px;width:100%"></div>
+     </div>`;
+
+  const section = (title) =>
+    `<div style="background:#003399;color:#fff;padding:5px 12px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:18px 0 12px;border-radius:2px">${title}</div>`;
+
+  const checkbox = (label) =>
+    `<span style="display:inline-block;margin-right:18px;font-size:12px">
+      <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;margin-right:5px;vertical-align:middle"></span>${label}
+     </span>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Staff Registration Form — ${data.schoolName}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,Helvetica,sans-serif;font-size:13px;padding:28px;color:#111;max-width:820px;margin:0 auto}
+      @page{size:A4 portrait;margin:14mm}
+      @media print{body{padding:0}.no-print{display:none!important}}
+      .no-print{margin-top:16px;text-align:center}
+    </style>
+  </head><body>
+    ${schoolHeader(data)}
+
+    <h3 style="text-align:center;font-size:16px;text-transform:uppercase;letter-spacing:2px;color:#003399;margin:10px 0 4px">
+      Staff Registration Form
+    </h3>
+    <p style="text-align:center;font-size:11px;color:#555;margin-bottom:18px">
+      Please fill in all fields clearly in BLOCK LETTERS &nbsp;·&nbsp; Return completed form to the administration office
+    </p>
+
+    <div style="border:1px solid #ccc;border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:11px;background:#fffbe6">
+      <strong>FOR OFFICE USE:</strong> &nbsp;
+      Staff ID: <span style="display:inline-block;border-bottom:1px solid #333;width:120px;margin:0 16px 0 4px">&nbsp;</span>
+      Date Employed: <span style="display:inline-block;border-bottom:1px solid #333;width:120px;margin:0 16px 0 4px">&nbsp;</span>
+      Department: <span style="display:inline-block;border-bottom:1px solid #333;width:140px;margin:0 4px">&nbsp;</span>
+    </div>
+
+    ${section('1. Personal Information')}
+    ${field('Full Name (Surname First)', '100%')}
+    <div>
+      ${field('Date of Birth (DD/MM/YYYY)', '220px')}
+      ${field('Gender', '120px')}
+      ${field('Nationality', '180px')}
+    </div>
+    <div>
+      ${field('National ID Number', '220px')}
+      ${field('KRA PIN', '200px')}
+      ${field('NSSF Number', '200px')}
+    </div>
+    <div>
+      ${field('NHIF Number', '200px')}
+      ${field('TSC Number (if applicable)', '220px')}
+    </div>
+    ${field('Postal / Home Address', '100%')}
+    <div>
+      ${field('Sub-County', '200px')}
+      ${field('County', '200px')}
+    </div>
+
+    ${section('2. Contact Information')}
+    <div>
+      ${field('Primary Phone Number', '220px')}
+      ${field('Alternative Phone', '220px')}
+      ${field('Email Address', '260px')}
+    </div>
+
+    <div style="margin-bottom:10px"><strong>Emergency Contact</strong></div>
+    <div>
+      ${field('Name', '240px')}
+      ${field('Relationship', '180px')}
+      ${field('Phone Number', '200px')}
+    </div>
+
+    ${section('3. Employment Details')}
+    <div style="margin-bottom:10px">
+      Staff Type: &nbsp;${checkbox('Teaching Staff')}${checkbox('Non-Teaching Staff')}${checkbox('Administrative')}
+    </div>
+    <div style="margin-bottom:10px">
+      Employment Type: &nbsp;${checkbox('Permanent')}${checkbox('Contract')}${checkbox('Part-Time')}${checkbox('Volunteer / BOM')}
+    </div>
+    <div>
+      ${field('Department / Section', '260px')}
+      ${field('Designation / Title', '260px')}
+    </div>
+    <div>
+      ${field('Date of First Appointment (DD/MM/YYYY)', '280px')}
+      ${field('Reporting Date at This School', '280px')}
+    </div>
+
+    ${section('4. Teaching Details (Teaching Staff Only)')}
+    <div style="margin-bottom:10px">
+      Is this staff a Class Teacher? &nbsp;${checkbox('Yes')}${checkbox('No')}
+      &nbsp;&nbsp; If yes, Class: <span style="display:inline-block;border-bottom:1px solid #333;width:140px"></span>
+    </div>
+    <div style="margin-bottom:10px;font-size:12px;color:#555">List subjects and classes you teach:</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+      <thead>
+        <tr style="background:#003399;color:#fff">
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Subject</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Classes (e.g. Grade 7 East, Grade 8)</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Periods / Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array(6).fill(0).map(() => `
+          <tr>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${section('5. Academic & Professional Qualifications')}
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+      <thead>
+        <tr style="background:#003399;color:#fff">
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Qualification / Certificate</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Institution</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Year</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Grade / Class</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array(5).fill(0).map(() => `
+          <tr>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${section('6. Previous Employment')}
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+      <thead>
+        <tr style="background:#003399;color:#fff">
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">School / Institution</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Position Held</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">From</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">To</th>
+          <th style="padding:6px 10px;border:1px solid #003399;text-align:left">Reason for Leaving</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array(4).fill(0).map(() => `
+          <tr>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+            <td style="border:1px solid #ccc;height:28px;padding:4px 8px"></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${section('7. Documents Submitted (Office Check)')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;font-size:12px">
+      ${['National ID (Copy)','KRA PIN Certificate (Copy)','TSC Certificate (Copy)','Academic Certificates (Copies)','Professional Certificates (Copies)','Passport Photo (2 copies)','NSSF Card (Copy)','NHIF Card (Copy)','Certificate of Good Conduct','Bank Account Details (for payroll)'].map(d =>
+        `<div>${checkbox(d)}</div>`
+      ).join('')}
+    </div>
+
+    ${section('8. Declaration & Signature')}
+    <div style="font-size:12px;line-height:1.8;margin-bottom:14px;border:1px solid #ccc;padding:10px 14px;border-radius:3px;background:#f9f9f9">
+      I declare that the information provided in this form is true and complete to the best of my knowledge.
+      I understand that providing false information may lead to termination of employment.
+      I agree to abide by the rules, regulations, and professional code of conduct of ${data.schoolName}.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:20px">
+      <div>
+        <div style="font-size:11px;color:#555;margin-bottom:28px">Staff Member Signature:</div>
+        <div style="border-bottom:1px solid #333;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Name: ___________________________ &nbsp; Date: _______________</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#555;margin-bottom:28px">Received By (Principal / HR):</div>
+        <div style="border-bottom:1px solid #333;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Name: ___________________________ &nbsp; Date: _______________</div>
+      </div>
+    </div>
+    <div style="text-align:center;border-top:1px solid #ccc;padding-top:10px">
+      <div style="display:inline-block;border:1px solid #ccc;width:100px;height:50px;vertical-align:middle;margin-right:20px"></div>
+      <span style="font-size:11px;color:#555">Official School Stamp</span>
+      &nbsp;&nbsp;&nbsp;
+      <span style="font-size:11px;color:#555">Principal's Signature: _________________________________</span>
+    </div>
+
+    <div style="font-size:10px;color:#aaa;text-align:center;margin-top:12px">
+      ${data.schoolName} · ${[data.schoolPOBox, data.schoolLocation, data.schoolCounty].filter(Boolean).join(' · ')} · Printed: ${new Date().toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}
+    </div>
+
+    <div class="no-print">
+      <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print Staff Registration Form
       </button>
     </div>
   </body></html>`);

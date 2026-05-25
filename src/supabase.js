@@ -96,6 +96,8 @@ function schoolRowToData(row, related = {}) {
     licenseData:       row.license_data       || {},
     gradesConfig:      row.grades_config      || INITIAL_DATA.gradesConfig,
     subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
+    subjectOverridesByLevel: row.subject_overrides_by_level || {},
+    timetableRules:          row.timetable_rules             || [],
     parents:           row.parents            || [],           // FIX: was never loaded
     promotionHistory:  row.promotion_history  || [],          // FIX: was never loaded
     // Related tables
@@ -348,7 +350,9 @@ export async function saveSchoolData(data) {
   schoolPayload.promotion_history = data.promotionHistory ?? []; // FIX: was never saved
   if (data.timetable && Object.keys(data.timetable||{}).length > 0) schoolPayload.timetable = data.timetable;
   if (data.gradesConfig) schoolPayload.grades_config = data.gradesConfig;
-  schoolPayload.subjects_by_class = data.subjectsByClass || {};
+  schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
+  schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
+  schoolPayload.timetable_rules            = data.timetableRules           ?? [];
 
   await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
 

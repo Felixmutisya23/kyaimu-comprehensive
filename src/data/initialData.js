@@ -17,16 +17,6 @@ export function getGrade(score, data) {
   return grades[grades.length - 1];
 }
 
-/* ══════════════════════════════════════════════════════════
-   CBC / JSS CURRICULUM STRUCTURE
-   Kenya's competency-based curriculum organized by level:
-   - Pre-Primary:  PP1, PP2
-   - Lower Primary: Grade 1–3
-   - Upper Primary: Grade 4–6
-   - Junior Secondary: Grade 7–9 (JSS)
-   - Senior Secondary: Form 1–4
-══════════════════════════════════════════════════════════ */
-
 export const CURRICULUM_LEVELS = {
   PRE_PRIMARY: {
     label: 'Pre-Primary',
@@ -117,7 +107,6 @@ export const CURRICULUM_LEVELS = {
   },
 };
 
-/* Get the curriculum level for a given class name */
 export function getCurriculumLevel(className) {
   if (!className) return null;
   const name = className.trim().toLowerCase();
@@ -129,17 +118,17 @@ export function getCurriculumLevel(className) {
   return null;
 }
 
-/* Get subjects for a specific class */
 export function getSubjectsForClass(className, data) {
   // 1. Check if school has custom subjects per class (set via "Setup Subjects" in Exams)
   const custom = (data.subjectsByClass || {})[className];
   if (custom && custom.length > 0) return custom;
 
-  // 2. Fall back to curriculum level defaults + any extra subjects added in Settings
+  // 2. Use school overrides if set, else fall back to CBC defaults. Then add extras.
   const level = getCurriculumLevel(className);
   if (level) {
-    const extras = (data.extraSubjectsByLevel || {})[level.key] || [];
-    return [...level.subjects, ...extras];
+    const coreSubs = (data.subjectOverridesByLevel || {})[level.key] || level.subjects;
+    const extras   = (data.extraSubjectsByLevel    || {})[level.key] || [];
+    return [...coreSubs, ...extras];
   }
 
   // 3. Fall back to school-wide subjects (legacy)
@@ -147,12 +136,10 @@ export function getSubjectsForClass(className, data) {
   return schoolSubs.filter(Boolean);
 }
 
-/* Get all unique subjects across all classes in school */
 export function getAllSubjectsForSchool(data) {
   const classes = getAllClasses(data);
   const all = new Set();
   classes.forEach(cls => getSubjectsForClass(cls, data).forEach(s => all.add(s)));
-  // Also include any legacy school-wide subjects
   (data.subjects || []).forEach(s => {
     const name = typeof s === 'string' ? s : (s.name || s.code || '');
     if (name) all.add(name);
@@ -174,11 +161,7 @@ export const INITIAL_DATA = {
   classGroups: [],
   classes:     [],
 
-  // Legacy school-wide subjects (still supported)
-  subjects: [],
-
-  // New: per-class subject overrides
-  // { 'Grade 7 East': ['English','Mathematics',...], 'Grade 8': [...] }
+  subjects:       [],
   subjectsByClass: {},
 
   departments: ['Academics','Management','Kitchen','Sports','Library','Finance','Counselling','Security'],
@@ -230,10 +213,11 @@ export const INITIAL_DATA = {
     { id: 12, time: '14:20', label: 'End of Day',       type: 'end',      duration: 0  },
   ],
 
-  timetable: {},
+  timetable:               {},
+  timetableRules:          [],
+  extraSubjectsByLevel:    {},
+  subjectOverridesByLevel: {},
 };
-
-/* ── Helpers ─────────────────────────────────────────────── */
 
 export function getAllClasses(data) {
   const list = [];

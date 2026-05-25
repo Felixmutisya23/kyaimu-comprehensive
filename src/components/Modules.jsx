@@ -825,6 +825,8 @@ export function Settings({ data, setData }) {
   const [bellForm, setBellForm]   = useState({ time: '', label: '', type: 'lesson', duration: 40 });
   const [subForm, setSubForm]     = useState('');
   const [selSubLevel, setSelSubLevel] = useState('LOWER_PRIMARY'); // which curriculum level to add extra subject to
+  const [editingSubject, setEditingSubject] = useState(null); // { levelKey, oldName }
+  const [editSubjectVal, setEditSubjectVal] = useState('');
 
   function addExtraSubject() {
     const name = subForm.trim();
@@ -845,6 +847,53 @@ export function Settings({ data, setData }) {
         [levelKey]: ((d.extraSubjectsByLevel || {})[levelKey] || []).filter(s => s !== subName),
       },
     }));
+  }
+
+  function renameSubject(levelKey, oldName, newName) {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    setData(d => {
+      const overrides = { ...(d.subjectOverridesByLevel || {}) };
+      const levelSubs = overrides[levelKey]
+        ? [...overrides[levelKey]]
+        : [...(CURRICULUM_LEVELS[levelKey]?.subjects || [])];
+      const idx = levelSubs.indexOf(oldName);
+      if (idx !== -1) levelSubs[idx] = trimmed;
+      overrides[levelKey] = levelSubs;
+      const extras = { ...(d.extraSubjectsByLevel || {}) };
+      if (extras[levelKey]) {
+        extras[levelKey] = extras[levelKey].map(s => s === oldName ? trimmed : s);
+      }
+      return { ...d, subjectOverridesByLevel: overrides, extraSubjectsByLevel: extras };
+    });
+  }
+
+  function deleteSubject(levelKey, subName) {
+    if (!window.confirm(`Delete "${subName}" from ${CURRICULUM_LEVELS[levelKey]?.label}? This will also remove it from any timetable rules.`)) return;
+    setData(d => {
+      const overrides = { ...(d.subjectOverridesByLevel || {}) };
+      const levelSubs = overrides[levelKey]
+        ? [...overrides[levelKey]]
+        : [...(CURRICULUM_LEVELS[levelKey]?.subjects || [])];
+      overrides[levelKey] = levelSubs.filter(s => s !== subName);
+      const extras = { ...(d.extraSubjectsByLevel || {}) };
+      if (extras[levelKey]) {
+        extras[levelKey] = extras[levelKey].filter(s => s !== subName);
+      }
+      const timetableRules = (d.timetableRules || []).filter(r => r.subject !== subName);
+      return { ...d, subjectOverridesByLevel: overrides, extraSubjectsByLevel: extras, timetableRules };
+    });
+  }
+
+  function restoreDefaults(levelKey) {
+    if (!window.confirm(`Restore all default CBC subjects for ${CURRICULUM_LEVELS[levelKey]?.label}? Your custom edits and additions for this level will be removed.`)) return;
+    setData(d => {
+      const overrides = { ...(d.subjectOverridesByLevel || {}) };
+      delete overrides[levelKey];
+      const extras = { ...(d.extraSubjectsByLevel || {}) };
+      delete extras[levelKey];
+      return { ...d, subjectOverridesByLevel: overrides, extraSubjectsByLevel: extras };
+    });
   }
 
   // Class management
@@ -1000,53 +1049,126 @@ export function Settings({ data, setData }) {
 
           {/* Subjects — per curriculum level */}
           <Card>
-            <SectionTitle icon="exams">Curriculum Subjects</SectionTitle>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
-              Kenya CBC subjects are built-in per level. Add extra subjects your school offers on top of the defaults.
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <SectionTitle icon="exams">Curriculum Subjects</SectionTitle>
             </div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+              Edit or delete any subject — including the built-in CBC ones. Add extras your school offers.
+              Changes apply to timetable rules and teacher assignments automatically.
+            </div>
+
             {Object.entries(CURRICULUM_LEVELS).map(([key, level]) => {
-              const extras = (data.extraSubjectsByLevel || {})[key] || [];
+              const coreSubs  = (data.subjectOverridesByLevel || {})[key] || level.subjects;
+              const extras    = (data.extraSubjectsByLevel    || {})[key] || [];
+              const allSubs   = [...coreSubs, ...extras];
+              const isEditing = editingSubject && editingSubject.levelKey === key;
+
               return (
                 <div key={key} style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #2a3350', overflow: 'hidden' }}>
-                  <div style={{ background: '#1a2540', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#4f8ef7', display: 'flex', justifyContent: 'space-between' }}>
+                  {/* Level header */}
+                  <div style={{ background: '#1a2540', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#4f8ef7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{level.label}</span>
-                    <span style={{ color: '#64748b', fontWeight: 400 }}>{level.subjects.length} core + {extras.length} extra</span>
-                  </div>
-                  <div style={{ padding: '10px 12px' }}>
-                    {/* Core subjects — read only */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: extras.length ? 8 : 0 }}>
-                      {level.subjects.map(s => (
-                        <span key={s} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#1e2435', color: '#94a3b8', border: '1px solid #2a3350' }}>{s}</span>
-                      ))}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontWeight: 400 }}>{allSubs.length} subjects</span>
+                      <button
+                        onClick={() => restoreDefaults(key)}
+                        title="Restore CBC defaults for this level"
+                        style={{ background: 'none', border: '1px solid #2a3350', borderRadius: 5, color: '#64748b', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>
+                        Restore defaults
+                      </button>
                     </div>
-                    {/* Extra subjects — removable */}
-                    {extras.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                        {extras.map(s => (
-                          <span key={s} style={{ fontSize: 11, padding: '2px 8px 2px 10px', borderRadius: 10, background: '#10b98120', color: '#10b981', border: '1px solid #10b98140', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  </div>
+
+                  <div style={{ padding: '10px 12px' }}>
+                    {/* All subjects — editable chips */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                      {allSubs.map(s => {
+                        const isExtra    = extras.includes(s);
+                        const isThisEdit = isEditing && editingSubject.oldName === s;
+
+                        if (isThisEdit) {
+                          return (
+                            <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <input
+                                autoFocus
+                                value={editSubjectVal}
+                                onChange={e => setEditSubjectVal(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') { renameSubject(key, s, editSubjectVal); setEditingSubject(null); }
+                                  if (e.key === 'Escape') setEditingSubject(null);
+                                }}
+                                style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, width: 120, background: '#252d42', border: '1px solid #4f8ef7', color: '#e2e8f0' }}
+                              />
+                              <button
+                                onClick={() => { renameSubject(key, s, editSubjectVal); setEditingSubject(null); }}
+                                style={{ background: '#10b98120', border: '1px solid #10b98140', color: '#10b981', borderRadius: 5, cursor: 'pointer', fontSize: 11, padding: '2px 6px' }}>
+                                ✓
+                              </button>
+                              <button
+                                onClick={() => setEditingSubject(null)}
+                                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}>
+                                ✕
+                              </button>
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span key={s} style={{
+                            fontSize: 11, padding: '2px 6px 2px 10px', borderRadius: 10,
+                            background: isExtra ? '#10b98120' : '#1e2435',
+                            color:      isExtra ? '#10b981'   : '#94a3b8',
+                            border:    `1px solid ${isExtra ? '#10b98140' : '#2a3350'}`,
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                          }}>
                             {s}
-                            <button onClick={() => removeExtraSubject(key, s)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+                            <button
+                              onClick={() => { setEditingSubject({ levelKey: key, oldName: s }); setEditSubjectVal(s); }}
+                              title="Rename"
+                              style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '0 1px', lineHeight: 1 }}>
+                              ✎
+                            </button>
+                            <button
+                              onClick={() => deleteSubject(key, s)}
+                              title="Delete subject"
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: '0 1px', lineHeight: 1 }}>
+                              ×
+                            </button>
                           </span>
-                        ))}
+                        );
+                      })}
+                    </div>
+
+                    {/* Add extra subject inline */}
+                    {selSubLevel === key && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          value={subForm}
+                          onChange={e => setSubForm(e.target.value)}
+                          placeholder="New subject name…"
+                          onKeyDown={e => e.key === 'Enter' && addExtraSubject()}
+                          style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+                          autoFocus
+                        />
+                        <Btn size="sm" onClick={addExtraSubject} disabled={!subForm.trim()}>
+                          <Icon name="add" size={12} /> Add
+                        </Btn>
+                        <Btn size="sm" variant="ghost" onClick={() => { setSelSubLevel(''); setSubForm(''); }}>
+                          Cancel
+                        </Btn>
                       </div>
+                    )}
+                    {selSubLevel !== key && (
+                      <button
+                        onClick={() => { setSelSubLevel(key); setSubForm(''); }}
+                        style={{ background: 'none', border: '1px dashed #2a3350', color: '#64748b', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11 }}>
+                        + Add subject to {level.label}
+                      </button>
                     )}
                   </div>
                 </div>
               );
             })}
-            {/* Add extra subject */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <select value={selSubLevel} onChange={e => setSelSubLevel(e.target.value)} style={{ flex: '0 0 auto' }}>
-                {Object.entries(CURRICULUM_LEVELS).map(([key, level]) => (
-                  <option key={key} value={key}>{level.label}</option>
-                ))}
-              </select>
-              <input value={subForm} onChange={e => setSubForm(e.target.value)}
-                placeholder="Extra subject name…"
-                onKeyDown={e => e.key == 'Enter' && addExtraSubject()}
-                style={{ flex: 1, minWidth: 140 }} />
-              <Btn size="sm" onClick={addExtraSubject} disabled={!subForm.trim()}><Icon name="add" size={13} /> Add</Btn>
-            </div>
           </Card>
         </div>
 
