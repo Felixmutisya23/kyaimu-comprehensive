@@ -17,6 +17,9 @@ import { useLicense, LicenseGate, TokenGenerator } from './components/LicenseSys
 import TeacherPortal from './components/TeacherPortal';
 import { TeacherRegisterPage } from './components/TeacherRegistration';
 import { StudentPortal, ParentPortal } from './components/StudentHistory';
+import PublicPage from './components/PublicPage';
+import AuditLog from './components/AuditLog';
+import { logAction } from './components/AuditLog';
 import {
   loadSchoolData, saveSchoolData, createSchool,
   loginPrincipal, loginTeacher,
@@ -482,14 +485,14 @@ export default function App() {
     <Login
       data={data}
       externalError={loginError}
-      onStudentLogin={(admNo) => {
+      onStudentLogin={(slc) => {
         const student = (data.students || []).find(s =>
-          String(s.admNo || '').trim().toLowerCase() === String(admNo || '').trim().toLowerCase()
+          String(s.slc || '').trim() === String(slc || '').trim()
         );
-        if (student) { setStudentUser(student); return true; }
+        if (student) { setStudentUser(student); logAction(data._schoolId, data.schoolName, {name:student.name,role:'student'}, 'login_student', student.class); return true; }
         return false;
       }}
-      onParentLogin={(phone) => {
+      onParentLogin={(slc) => {
         // Parent: phone number only — no password required
         const clean = s => String(s||'').replace(/\s/g,'').replace(/^0/,'254');
         const cleanPhone = clean(phone);
@@ -663,6 +666,7 @@ export default function App() {
       case 'fees':          return <FeesModule    {...props} />;
       case 'exams':         return <Exams         {...props} />;
       case 'timetable':     return <Timetable     {...props} />;
+      case 'auditlog':      return <AuditLog data={data} />;
       case 'status':        return <StudentStatus {...props} />;
       case 'messages':      return <Messages      {...props} />;
       case 'departments':   return <Departments   {...props} />;

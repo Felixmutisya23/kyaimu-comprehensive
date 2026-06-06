@@ -98,6 +98,22 @@ function schoolRowToData(row, related = {}) {
     subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
     subjectOverridesByLevel: row.subject_overrides_by_level || {},
     timetableRules:          row.timetable_rules             || [],
+    schoolSlug:              row.school_slug              || '',
+    slugLocked:              row.slug_locked              || false,
+    schoolAbout:             row.school_about             || '',
+    schoolVision:            row.school_vision            || '',
+    schoolMission:           row.school_mission           || '',
+    schoolPhone:             row.school_phone             || '',
+    schoolEmail:             row.school_email             || '',
+    schoolWebsite:           row.school_website           || '',
+    schoolGallery:           row.school_gallery           || [],
+    jobVacancies:            row.job_vacancies            || [],
+    onlineApplications:      row.online_applications      || [],
+    customDocReqs:           row.custom_doc_reqs          || [],
+    admissionSetting:        row.admission_setting        || 'manual',
+    schoolCode:              row.school_code              || '',
+    schoolCodeYear:          row.school_code_year         || '',
+    darkTheme:               row.dark_theme               !== false,
     parents:           row.parents            || [],           // FIX: was never loaded
     promotionHistory:  row.promotion_history  || [],          // FIX: was never loaded
     // Related tables
@@ -353,6 +369,22 @@ export async function saveSchoolData(data) {
   schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
   schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
   schoolPayload.timetable_rules            = data.timetableRules           ?? [];
+  schoolPayload.school_slug              = data.schoolSlug              || '';
+  schoolPayload.slug_locked              = data.slugLocked              || false;
+  schoolPayload.school_about             = data.schoolAbout             || '';
+  schoolPayload.school_vision            = data.schoolVision            || '';
+  schoolPayload.school_mission           = data.schoolMission           || '';
+  schoolPayload.school_phone             = data.schoolPhone             || '';
+  schoolPayload.school_email             = data.schoolEmail             || '';
+  schoolPayload.school_website           = data.schoolWebsite           || '';
+  schoolPayload.school_gallery           = data.schoolGallery           ?? [];
+  schoolPayload.job_vacancies            = data.jobVacancies            ?? [];
+  schoolPayload.online_applications      = data.onlineApplications      ?? [];
+  schoolPayload.custom_doc_reqs          = data.customDocReqs           ?? [];
+  schoolPayload.admission_setting        = data.admissionSetting        || 'manual';
+  schoolPayload.school_code              = data.schoolCode              || '';
+  schoolPayload.school_code_year         = data.schoolCodeYear          || '';
+  schoolPayload.dark_theme               = data.darkTheme               !== false;
 
   await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
 

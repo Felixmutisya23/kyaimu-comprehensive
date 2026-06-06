@@ -21,89 +21,27 @@ export const CURRICULUM_LEVELS = {
   PRE_PRIMARY: {
     label: 'Pre-Primary',
     classes: ['PP1', 'PP2'],
-    subjects: [
-      'Language Activities',
-      'Mathematical Activities',
-      'Environmental Activities',
-      'Psychomotor & Creative Activities',
-      'Religious Education Activities',
-    ],
+    subjects: ['Language Activities','Mathematical Activities','Environmental Activities','Psychomotor & Creative Activities','Religious Education Activities'],
   },
   LOWER_PRIMARY: {
     label: 'Lower Primary (Grades 1–3)',
     classes: ['Grade 1', 'Grade 2', 'Grade 3'],
-    subjects: [
-      'Literacy Activities',
-      'Kiswahili Language Activities',
-      'English Language Activities',
-      'Mathematical Activities',
-      'Environmental Activities',
-      'Creative Arts',
-      'Religious Education',
-      'Physical & Health Education',
-    ],
+    subjects: ['Literacy Activities','Kiswahili Language Activities','English Language Activities','Mathematical Activities','Environmental Activities','Creative Arts','Religious Education','Physical & Health Education'],
   },
   UPPER_PRIMARY: {
     label: 'Upper Primary (Grades 4–6)',
     classes: ['Grade 4', 'Grade 5', 'Grade 6'],
-    subjects: [
-      'English',
-      'Kiswahili',
-      'Mathematics',
-      'Science & Technology',
-      'Social Studies',
-      'CRE',
-      'IRE',
-      'HRE',
-      'Creative Arts & Sports',
-      'Agriculture',
-      'Home Science',
-      'Business Studies',
-    ],
+    subjects: ['English','Kiswahili','Mathematics','Science & Technology','Social Studies','CRE','IRE','HRE','Creative Arts & Sports','Agriculture','Home Science','Business Studies'],
   },
   JUNIOR_SECONDARY: {
     label: 'Junior Secondary (Grades 7–9)',
     classes: ['Grade 7', 'Grade 8', 'Grade 9'],
-    subjects: [
-      'English',
-      'Kiswahili',
-      'Mathematics',
-      'Integrated Science',
-      'Pre-Technical Studies',
-      'Social Studies',
-      'Creative Arts',
-      'CRE',
-      'Agriculture',
-      'Business Studies',
-      'Home Science',
-      'Computer Science',
-      'Physical Education',
-    ],
+    subjects: ['English','Kiswahili','Mathematics','Integrated Science','Pre-Technical Studies','Social Studies','Creative Arts','CRE','Agriculture','Business Studies','Home Science','Computer Science','Physical Education'],
   },
   SENIOR_SECONDARY: {
     label: 'Senior Secondary (Form 1–4)',
     classes: ['Form 1', 'Form 2', 'Form 3', 'Form 4'],
-    subjects: [
-      'English',
-      'Kiswahili',
-      'Mathematics',
-      'Biology',
-      'Chemistry',
-      'Physics',
-      'History',
-      'Geography',
-      'CRE',
-      'IRE',
-      'Business Studies',
-      'Computer Studies',
-      'Agriculture',
-      'Home Science',
-      'Art & Design',
-      'Music',
-      'French',
-      'German',
-      'Arabic',
-    ],
+    subjects: ['English','Kiswahili','Mathematics','Biology','Chemistry','Physics','History','Geography','CRE','IRE','Business Studies','Computer Studies','Agriculture','Home Science','Art & Design','Music','French','German','Arabic'],
   },
 };
 
@@ -111,27 +49,20 @@ export function getCurriculumLevel(className) {
   if (!className) return null;
   const name = className.trim().toLowerCase();
   for (const [key, level] of Object.entries(CURRICULUM_LEVELS)) {
-    if (level.classes.some(c => name.startsWith(c.toLowerCase()))) {
-      return { key, ...level };
-    }
+    if (level.classes.some(c => name.startsWith(c.toLowerCase()))) return { key, ...level };
   }
   return null;
 }
 
 export function getSubjectsForClass(className, data) {
-  // 1. Check if school has custom subjects per class (set via "Setup Subjects" in Exams)
   const custom = (data.subjectsByClass || {})[className];
   if (custom && custom.length > 0) return custom;
-
-  // 2. Use school overrides if set, else fall back to CBC defaults. Then add extras.
   const level = getCurriculumLevel(className);
   if (level) {
     const coreSubs = (data.subjectOverridesByLevel || {})[level.key] || level.subjects;
     const extras   = (data.extraSubjectsByLevel    || {})[level.key] || [];
     return [...coreSubs, ...extras];
   }
-
-  // 3. Fall back to school-wide subjects (legacy)
   const schoolSubs = (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || ''));
   return schoolSubs.filter(Boolean);
 }
@@ -140,11 +71,53 @@ export function getAllSubjectsForSchool(data) {
   const classes = getAllClasses(data);
   const all = new Set();
   classes.forEach(cls => getSubjectsForClass(cls, data).forEach(s => all.add(s)));
-  (data.subjects || []).forEach(s => {
-    const name = typeof s === 'string' ? s : (s.name || s.code || '');
-    if (name) all.add(name);
-  });
+  (data.subjects || []).forEach(s => { const n = typeof s === 'string' ? s : (s.name||s.code||''); if(n) all.add(n); });
   return [...all].sort();
+}
+
+/* ── SLC Generator ─────────────────────────────────────────────
+   Student Login Code: YYYY-XXXX (year + 4 random digits)
+   Unique per school. Used for student & parent login.
+──────────────────────────────────────────────────────────────── */
+export function generateSLC(students = []) {
+  const year = new Date().getFullYear();
+  const existing = new Set((students || []).map(s => s.slc).filter(Boolean));
+  let code;
+  do {
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    code = `${year}-${rand}`;
+  } while (existing.has(code));
+  return code;
+}
+
+/* ── Admission number auto-generator ──────────────────────────
+   Format: KPS/001/2019 — schoolCode/sequence/year
+──────────────────────────────────────────────────────────────── */
+export function generateAdmNo(data, students = []) {
+  const code = (data.schoolCode || 'SCH').toUpperCase();
+  const year  = data.schoolCodeYear || new Date().getFullYear();
+  const existing = (students || [])
+    .map(s => s.admNo || '')
+    .filter(a => a.startsWith(`${code}/`))
+    .map(a => parseInt(a.split('/')[1]) || 0);
+  const next = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+  return `${code}/${String(next).padStart(3, '0')}/${year}`;
+}
+
+/* ── School slug generator ─────────────────────────────────── */
+export function generateSlug(schoolName) {
+  return (schoolName || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 60);
+}
+
+/* ── Full student name from name parts ─────────────────────── */
+export function buildStudentName(firstName, lastName, otherName) {
+  return [firstName, otherName, lastName].filter(Boolean).join(' ').trim();
 }
 
 export const INITIAL_DATA = {
@@ -158,10 +131,32 @@ export const INITIAL_DATA = {
   principalEmail:    'principal@school.ac.ke',
   principalPassword: 'admin123',
 
+  // Public page
+  schoolSlug:        '',   // e.g. 'kiriene-day-primary' — set on setup, editable once
+  slugLocked:        false, // once school is live, slug should not change
+  schoolAbout:       '',
+  schoolVision:      '',
+  schoolMission:     '',
+  schoolPhone:       '',
+  schoolEmail:       '',
+  schoolWebsite:     '',
+  schoolGallery:     [],   // max 20 items: { url, caption }
+  jobVacancies:      [],   // { id, title, description, deadline, active }
+  onlineApplications:[], // student applications from public page
+  customDocReqs:     [],   // admin-defined extra required documents for enrollment
+
+  // Admission settings
+  admissionSetting:  'manual', // 'manual' | 'auto' | 'mixed'
+  schoolCode:        '',       // e.g. 'KPS' — used for auto admission format
+  schoolCodeYear:    '',       // e.g. '2019'
+
+  // Theme
+  darkTheme:         true,     // default dark, can switch to light
+
   classGroups: [],
   classes:     [],
 
-  subjects:       [],
+  subjects:        [],
   subjectsByClass: {},
 
   departments: ['Academics','Management','Kitchen','Sports','Library','Finance','Counselling','Security'],
@@ -176,27 +171,27 @@ export const INITIAL_DATA = {
     },
   ],
 
-  students:        [],
-  parents:         [],
-  exams:           [],
-  editRequests:    [],
-  notifications:   [],
-  messages:        [],
-  inventory:       [],
-  feeTypes:        [],
-  feeSchedule:     [],
-  feePayments:     [],
-  rollCalls:       [],
-  permissions:     [],
-  statusAlerts:    [],
-  promotionHistory:[],
-  terms:           [],
-  currentTerm:     null,
-  currentYear:     null,
-  parentMessages:  [],
+  students:          [],
+  parents:           [],
+  exams:             [],
+  editRequests:      [],
+  notifications:     [],
+  messages:          [],
+  inventory:         [],
+  feeTypes:          [],
+  feeSchedule:       [],
+  feePayments:       [],
+  rollCalls:         [],
+  permissions:       [],
+  statusAlerts:      [],
+  promotionHistory:  [],
+  terms:             [],
+  currentTerm:       null,
+  currentYear:       null,
+  parentMessages:    [],
   smsConfig: { provider: 'manual', apiKey: '', senderId: '', username: '' },
-  gradesConfig:    GRADES_CBC,
-  licenseData:     {},
+  gradesConfig:      GRADES_CBC,
+  licenseData:       {},
 
   bells: [
     { id: 1,  time: '07:30', label: 'Morning Assembly', type: 'assembly', duration: 30 },
@@ -232,9 +227,7 @@ export function getStreamFromClass(className, data) {
   if (!className) return null;
   for (const g of (data.classGroups || [])) {
     if (g.streams && g.streams.length > 0) {
-      for (const s of g.streams) {
-        if (className === `${g.name} ${s}`) return s;
-      }
+      for (const s of g.streams) { if (className === `${g.name} ${s}`) return s; }
     }
   }
   return null;
@@ -244,9 +237,7 @@ export function getBaseClass(className, data) {
   if (!className) return className;
   for (const g of (data.classGroups || [])) {
     if (g.streams && g.streams.length > 0) {
-      for (const s of g.streams) {
-        if (className === `${g.name} ${s}`) return g.name;
-      }
+      for (const s of g.streams) { if (className === `${g.name} ${s}`) return g.name; }
     }
   }
   return className;
@@ -255,13 +246,10 @@ export function getBaseClass(className, data) {
 export function getSiblingStreams(className, data) {
   if (!className) return [className];
   for (const g of (data.classGroups || [])) {
-    if (!g.streams || g.streams.length === 0) {
-      if (g.name === className) return [className];
-    } else {
+    if (!g.streams || g.streams.length === 0) { if (g.name === className) return [className]; }
+    else {
       for (const s of g.streams) {
-        if (className === `${g.name} ${s}`) {
-          return g.streams.map(st => `${g.name} ${st}`);
-        }
+        if (className === `${g.name} ${s}`) return g.streams.map(st => `${g.name} ${st}`);
       }
     }
   }
