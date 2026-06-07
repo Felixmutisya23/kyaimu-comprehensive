@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
-import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel } from '../data/initialData';
+import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug } from '../data/initialData';
 import { printFeeReceipt } from '../utils/print';
 
 /* ══════════════════════════════════════════════════════
@@ -828,6 +828,87 @@ export function Settings({ data, setData }) {
   const [editingSubject, setEditingSubject] = useState(null); // { levelKey, oldName }
   const [editSubjectVal, setEditSubjectVal] = useState('');
 
+  // Admission settings state
+  const [admSettings, setAdmSettings] = useState({
+    admissionSetting: data.admissionSetting || 'manual',
+    schoolCode:       data.schoolCode       || '',
+    schoolCodeYear:   data.schoolCodeYear   || String(new Date().getFullYear()),
+  });
+
+  // Public page state
+  const [pubPage, setPubPage] = useState({
+    schoolSlug:    data.schoolSlug    || generateSlug(data.schoolName || ''),
+    schoolAbout:   data.schoolAbout   || '',
+    schoolVision:  data.schoolVision  || '',
+    schoolMission: data.schoolMission || '',
+    schoolPhone:   data.schoolPhone   || '',
+    schoolEmail:   data.schoolEmail   || '',
+    schoolWebsite: data.schoolWebsite || '',
+  });
+  const [newJob,     setNewJob]     = useState({ title:'', description:'', deadline:'' });
+  const [showAddJob, setShowAddJob] = useState(false);
+  const [newGallery, setNewGallery] = useState({ url:'', caption:'' });
+  const [newDocReq,  setNewDocReq]  = useState('');
+
+  // Theme state
+  const [darkTheme, setDarkTheme] = useState(data.darkTheme !== false);
+
+  function saveAdmSettings() {
+    setData(d => ({ ...d,
+      admissionSetting: admSettings.admissionSetting,
+      schoolCode:       admSettings.schoolCode.toUpperCase(),
+      schoolCodeYear:   admSettings.schoolCodeYear,
+    }));
+    alert('Admission settings saved!');
+  }
+
+  function savePubPage() {
+    setData(d => ({ ...d, ...pubPage, slugLocked: true }));
+    alert('Public page settings saved!');
+  }
+
+  function addJob() {
+    if (!newJob.title.trim()) return;
+    const job = { id: Date.now(), ...newJob, active: true };
+    setData(d => ({ ...d, jobVacancies: [...(d.jobVacancies || []), job] }));
+    setNewJob({ title:'', description:'', deadline:'' });
+    setShowAddJob(false);
+  }
+
+  function removeJob(id) {
+    setData(d => ({ ...d, jobVacancies: (d.jobVacancies || []).filter(j => j.id !== id) }));
+  }
+
+  function addGalleryPhoto() {
+    if (!newGallery.url.trim()) return;
+    const gallery = data.schoolGallery || [];
+    if (gallery.length >= 20) { alert('Maximum 20 photos allowed.'); return; }
+    setData(d => ({ ...d, schoolGallery: [...(d.schoolGallery || []), { ...newGallery, id: Date.now() }] }));
+    setNewGallery({ url:'', caption:'' });
+  }
+
+  function removeGalleryPhoto(id) {
+    setData(d => ({ ...d, schoolGallery: (d.schoolGallery || []).filter(p => p.id !== id) }));
+  }
+
+  function addDocReq() {
+    if (!newDocReq.trim()) return;
+    setData(d => ({ ...d, customDocReqs: [...(d.customDocReqs || []), newDocReq.trim()] }));
+    setNewDocReq('');
+  }
+
+  function removeDocReq(req) {
+    setData(d => ({ ...d, customDocReqs: (d.customDocReqs || []).filter(r => r !== req) }));
+  }
+
+  function toggleTheme() {
+    const next = !darkTheme;
+    setDarkTheme(next);
+    setData(d => ({ ...d, darkTheme: next }));
+    // Apply immediately
+    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+  }
+
   function addExtraSubject() {
     const name = subForm.trim();
     if (!name || !selSubLevel) return;
@@ -1323,8 +1404,223 @@ export function Settings({ data, setData }) {
               ⚠ Restoring a backup will replace ALL current data. Always download a fresh backup before restoring.
             </div>
           </Card>
+
+          {/* ── ADMISSION SETTINGS ─────────────────── */}
+          <Card style={{ marginTop: 16 }}>
+            <SectionTitle icon="settings">Admission Number Settings</SectionTitle>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14, lineHeight: 1.7 }}>
+              Choose how admission numbers work for your school.
+            </div>
+
+            {[
+              { value: 'manual', label: 'Type A — Manual', desc: 'Admin types admission number for each student. Required field. (Default for existing schools — no change needed)' },
+              { value: 'auto',   label: 'Type B — Auto-assign', desc: 'System assigns numbers automatically e.g. KJS/001/2019. Field hidden from Add Student form.' },
+              { value: 'mixed',  label: 'Type C — Mixed', desc: 'Some students have admission numbers, some do not. Field is optional. System assigns a hidden internal ID where blank.' },
+            ].map(opt => (
+              <div key={opt.value} onClick={() => setAdmSettings(s => ({ ...s, admissionSetting: opt.value }))}
+                style={{ border: `1.5px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#2a3350'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', background: admSettings.admissionSetting === opt.value ? '#4f8ef710' : 'transparent' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#2a3350'}`, background: admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'transparent', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#e2e8f0' }}>{opt.label}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{opt.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {(admSettings.admissionSetting === 'auto' || admSettings.admissionSetting === 'mixed') && (
+              <div style={{ background: '#1e2435', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>
+                  Auto-assign format: <span style={{ color: '#4f8ef7' }}>{(admSettings.schoolCode||'KJS').toUpperCase()}/001/{admSettings.schoolCodeYear||'2019'}</span>
+                </div>
+                <FormRow>
+                  <FormGroup label="School Code (2-5 letters)">
+                    <input value={admSettings.schoolCode} maxLength={5}
+                      onChange={e => setAdmSettings(s => ({ ...s, schoolCode: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. KJS" />
+                  </FormGroup>
+                  <FormGroup label="Start Year">
+                    <input value={admSettings.schoolCodeYear}
+                      onChange={e => setAdmSettings(s => ({ ...s, schoolCodeYear: e.target.value }))}
+                      placeholder="e.g. 2019" />
+                  </FormGroup>
+                </FormRow>
+              </div>
+            )}
+
+            <Btn variant="success" size="sm" onClick={saveAdmSettings}>
+              <Icon name="check" size={13} /> Save Admission Settings
+            </Btn>
+          </Card>
+
+          {/* ── THEME TOGGLE ───────────────────────── */}
+          <Card style={{ marginTop: 16 }}>
+            <SectionTitle icon="settings">Theme Preference</SectionTitle>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+              Switch between dark and light theme for the admin/teacher interface.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[{ v: true, label: '🌙 Dark', desc: 'Dark navy theme' }, { v: false, label: '☀️ Light', desc: 'Clean light theme' }].map(t => (
+                  <div key={String(t.v)} onClick={() => { setDarkTheme(t.v); setData(d => ({ ...d, darkTheme: t.v })); }}
+                    style={{ border: `1.5px solid ${darkTheme === t.v ? '#4f8ef7' : '#2a3350'}`, borderRadius: 10, padding: '12px 20px', cursor: 'pointer', background: darkTheme === t.v ? '#4f8ef710' : 'transparent', textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{t.label.split(' ')[0]}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: darkTheme === t.v ? '#4f8ef7' : '#94a3b8' }}>{t.label.split(' ')[1]}</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>{t.desc}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                Current: <strong style={{ color: darkTheme ? '#4f8ef7' : '#f59e0b' }}>{darkTheme ? 'Dark Theme' : 'Light Theme'}</strong>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
+
+      {/* ── PUBLIC PAGE SETTINGS (full width) ──────── */}
+      <Card style={{ marginTop: 16 }}>
+        <SectionTitle icon="globe">🌐 Public School Page</SectionTitle>
+        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16, lineHeight: 1.7 }}>
+          This is your school's public website — anyone can view it without logging in.
+          {pubPage.schoolSlug && (
+            <span> Your public URL: <a href={`/school/${pubPage.schoolSlug}`} target="_blank" rel="noreferrer"
+              style={{ color: '#4f8ef7', fontWeight: 700 }}>
+              elimu-pro.netlify.app/school/{pubPage.schoolSlug}
+            </a></span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <FormGroup label="School Slug (URL identifier — set once, cannot change after sharing)">
+              <input value={pubPage.schoolSlug}
+                onChange={e => { if (!data.slugLocked) setPubPage(p => ({ ...p, schoolSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-') })); }}
+                placeholder="e.g. kamatungu-junior-school"
+                disabled={data.slugLocked}
+                style={{ opacity: data.slugLocked ? 0.5 : 1 }}
+              />
+              {data.slugLocked && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>⚠ Slug is locked — it has been shared publicly. Contact support to change it.</div>}
+              {!data.slugLocked && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Will be locked once you save and share the link.</div>}
+            </FormGroup>
+            <FormGroup label="School Phone">
+              <input value={pubPage.schoolPhone} onChange={e => setPubPage(p => ({ ...p, schoolPhone: e.target.value }))} placeholder="e.g. 0712345678" />
+            </FormGroup>
+            <FormGroup label="School Email">
+              <input value={pubPage.schoolEmail} onChange={e => setPubPage(p => ({ ...p, schoolEmail: e.target.value }))} placeholder="info@school.ac.ke" />
+            </FormGroup>
+            <FormGroup label="School Website (optional)">
+              <input value={pubPage.schoolWebsite} onChange={e => setPubPage(p => ({ ...p, schoolWebsite: e.target.value }))} placeholder="https://yourschool.ac.ke" />
+            </FormGroup>
+          </div>
+          <div>
+            <FormGroup label="About Us (appears on public page)">
+              <textarea value={pubPage.schoolAbout} onChange={e => setPubPage(p => ({ ...p, schoolAbout: e.target.value }))}
+                rows={3} placeholder="Brief description of your school..." style={{ width: '100%', resize: 'vertical' }} />
+            </FormGroup>
+            <FormGroup label="School Vision">
+              <input value={pubPage.schoolVision} onChange={e => setPubPage(p => ({ ...p, schoolVision: e.target.value }))} placeholder="e.g. To be a centre of excellence..." />
+            </FormGroup>
+            <FormGroup label="School Mission">
+              <input value={pubPage.schoolMission} onChange={e => setPubPage(p => ({ ...p, schoolMission: e.target.value }))} placeholder="e.g. To provide quality education..." />
+            </FormGroup>
+          </div>
+        </div>
+
+        <Btn variant="success" size="sm" onClick={savePubPage} style={{ marginBottom: 20 }}>
+          <Icon name="check" size={13} /> Save Public Page Info
+        </Btn>
+
+        {/* Gallery */}
+        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+            📸 Gallery ({(data.schoolGallery || []).length}/20 photos)
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <input value={newGallery.url} onChange={e => setNewGallery(g => ({ ...g, url: e.target.value }))}
+              placeholder="Photo URL (external link, under 3MB)" style={{ flex: 2, minWidth: 200 }} />
+            <input value={newGallery.caption} onChange={e => setNewGallery(g => ({ ...g, caption: e.target.value }))}
+              placeholder="Caption (optional)" style={{ flex: 1, minWidth: 120 }} />
+            <Btn size="sm" onClick={addGalleryPhoto} disabled={!newGallery.url.trim() || (data.schoolGallery||[]).length >= 20}>
+              <Icon name="add" size={12} /> Add Photo
+            </Btn>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {(data.schoolGallery || []).map(photo => (
+              <div key={photo.id} style={{ position: 'relative', width: 100, height: 75 }}>
+                <img src={photo.url} alt={photo.caption} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1px solid #2a3350' }}
+                  onError={e => { e.target.style.display = 'none'; }} />
+                <button onClick={() => removeGalleryPhoto(photo.id)} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', border: 'none', color: '#fff', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Job Vacancies */}
+        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>💼 Job Vacancies</div>
+            <Btn size="sm" onClick={() => setShowAddJob(true)}><Icon name="add" size={12} /> Post Job</Btn>
+          </div>
+          {(data.jobVacancies || []).length === 0
+            ? <div style={{ fontSize: 12, color: '#64748b' }}>No vacancies posted yet. Post a job and it will appear on your public page.</div>
+            : (data.jobVacancies || []).map(job => (
+              <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{job.title}</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>{job.description?.slice(0, 80)}{job.description?.length > 80 ? '...' : ''}</div>
+                  {job.deadline && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Deadline: {job.deadline}</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setData(d => ({ ...d, jobVacancies: (d.jobVacancies||[]).map(j => j.id===job.id?{...j,active:!j.active}:j) }))}
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #2a3350', background: 'none', color: job.active?'#10b981':'#64748b', cursor: 'pointer' }}>
+                    {job.active ? 'Active' : 'Hidden'}
+                  </button>
+                  <button onClick={() => removeJob(job.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
+                </div>
+              </div>
+            ))}
+        </div>
+
+        {/* Required Documents */}
+        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>📋 Required Documents for Student Enrollment</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+            Default: Birth certificate photocopy, Parent ID, Transfer letter (if applicable). Add extras your school requires.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={newDocReq} onChange={e => setNewDocReq(e.target.value)} placeholder="e.g. Medical certificate, Passport photo" style={{ flex: 1 }} />
+            <Btn size="sm" onClick={addDocReq} disabled={!newDocReq.trim()}><Icon name="add" size={12} /> Add</Btn>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(data.customDocReqs || []).map(req => (
+              <span key={req} style={{ background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, padding: '3px 10px', fontSize: 12, color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {req}
+                <button onClick={() => removeDocReq(req)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* Add Job Modal */}
+      <Modal show={showAddJob} onClose={() => setShowAddJob(false)} title="Post Job Vacancy">
+        <FormGroup label="Job Title *">
+          <input value={newJob.title} onChange={e => setNewJob(j => ({ ...j, title: e.target.value }))} placeholder="e.g. Mathematics Teacher" autoFocus />
+        </FormGroup>
+        <FormGroup label="Description">
+          <textarea value={newJob.description} onChange={e => setNewJob(j => ({ ...j, description: e.target.value }))}
+            rows={4} placeholder="Requirements, qualifications, responsibilities..." style={{ width: '100%', resize: 'vertical' }} />
+        </FormGroup>
+        <FormGroup label="Application Deadline">
+          <input type="date" value={newJob.deadline} onChange={e => setNewJob(j => ({ ...j, deadline: e.target.value }))} />
+        </FormGroup>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Btn variant="ghost" onClick={() => setShowAddJob(false)}>Cancel</Btn>
+          <Btn onClick={addJob} disabled={!newJob.title.trim()}>Post Vacancy</Btn>
+        </div>
+      </Modal>
 
       {/* Add Bell Modal */}
       <Modal show={showBell} onClose={() => setShowBell(false)} title="Add Bell">
