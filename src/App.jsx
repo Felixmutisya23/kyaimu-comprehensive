@@ -347,6 +347,48 @@ export default function App() {
   const [saveError, setSaveError] = React.useState(null);
   const [loginError, setLoginError] = React.useState('');
 
+  // ── Public school page route — /school/:slug ─────────────────
+  // Check this BEFORE any auth logic so it never redirects to login
+  const [publicPageData,    setPublicPageData]    = React.useState(null);
+  const [publicPageLoading, setPublicPageLoading] = React.useState(false);
+  const [isPublicRoute,     setIsPublicRoute]     = React.useState(() => {
+    const path = window.location.pathname;
+    return path.startsWith('/school/') && path.length > 8;
+  });
+
+  // ── Load public school page data by slug ─────────────────────
+  React.useEffect(() => {
+    if (!isPublicRoute) return;
+    const slug = window.location.pathname.replace('/school/', '').replace(/^\/|\/$/g, '');
+    if (!slug) return;
+    setPublicPageLoading(true);
+    async function loadPublicData() {
+      try {
+        // Import supabase client directly
+        const { getSupabase } = await import('./supabase');
+        const { data: rows, error } = await getSupabase()
+          .from('schools')
+          .select('*')
+          .eq('school_slug', slug)
+          .limit(1);
+        if (!error && rows && rows.length > 0) {
+          // Load full school data using existing loadSchoolData function
+          const { loadSchoolData } = await import('./supabase');
+          const schoolData = await loadSchoolData(rows[0].id);
+          setPublicPageData(schoolData || rows[0]);
+        } else {
+          setPublicPageData({ notFound: true, slug });
+        }
+      } catch(e) {
+        console.error('Public page load error:', e);
+        setPublicPageData({ notFound: true, slug });
+      } finally {
+        setPublicPageLoading(false);
+      }
+    }
+    loadPublicData();
+  }, [isPublicRoute]);
+
   // ── Load school data from Supabase on mount ──────────────────
   React.useEffect(() => {
     async function init() {
@@ -485,22 +527,19 @@ export default function App() {
     <Login
       data={data}
       externalError={loginError}
-      onStudentLogin={(slc) => {
+      onStudentLogin={(admNo) => {
         const student = (data.students || []).find(s =>
-          String(s.slc || '').trim() === String(slc || '').trim()
+          String(s.slc || '').trim() === String(admNo || '').trim()
         );
-        if (student) { setStudentUser(student); logAction(data._schoolId, data.schoolName, {name:student.name,role:'student'}, 'login_student', student.class); return true; }
+        if (student) { setStudentUser(student); return true; }
         return false;
       }}
       onParentLogin={(slc) => {
-        // Parent: phone number only — no password required
-        const clean = s => String(s||'').replace(/\s/g,'').replace(/^0/,'254');
-        const cleanPhone = clean(phone);
-        const student = (data.students || []).find(s => {
-          const ph = clean(s.parentPhone);
-          return ph && ph === cleanPhone;
-        });
-        if (student) { setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone }); return true; }
+        // Parent login uses child's SLC code
+        const student = (data.students || []).find(s =>
+          String(s.slc || '').trim() === String(slc || '').trim()
+        );
+        if (student) { setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id }); return true; }
         return false;
       }}
       onTeacherRegister={() => {
