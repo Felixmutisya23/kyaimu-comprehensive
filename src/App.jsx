@@ -390,6 +390,11 @@ export default function App() {
 
   // ── Load school data from Supabase on mount ──────────────────
   React.useEffect(() => {
+    // Skip all auth/data loading if this is a public school page route
+    if (window.location.pathname.startsWith('/school/')) {
+      setLoading(false);
+      return;
+    }
     async function init() {
       try {
         const schoolId = getLocalSchoolId();
@@ -548,6 +553,18 @@ export default function App() {
           }
         }}
       />
+    );
+  }
+
+  // Final guard — never show login on public routes
+  if (window.location.pathname.startsWith('/school/')) {
+    return (
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc' }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:48, marginBottom:12 }}>🏫</div>
+          <div style={{ fontSize:16, color:'#64748b' }}>Loading school page...</div>
+        </div>
+      </div>
     );
   }
 
