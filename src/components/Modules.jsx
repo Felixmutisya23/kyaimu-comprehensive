@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
 import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug } from '../data/initialData';
+import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
 import { printFeeReceipt } from '../utils/print';
 
 /* ══════════════════════════════════════════════════════
@@ -847,7 +848,9 @@ export function Settings({ data, setData }) {
   });
   const [newJob,     setNewJob]     = useState({ title:'', description:'', deadline:'' });
   const [showAddJob, setShowAddJob] = useState(false);
-  const [newGallery, setNewGallery] = useState({ url:'', caption:'' });
+  const [newGallery, setNewGallery] = useState({ caption:'' });
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const [galleryError, setGalleryError] = useState('');
   const [newDocReq,  setNewDocReq]  = useState('');
 
   // Theme state
@@ -879,16 +882,68 @@ export function Settings({ data, setData }) {
     setData(d => ({ ...d, jobVacancies: (d.jobVacancies || []).filter(j => j.id !== id) }));
   }
 
-  function addGalleryPhoto() {
-    if (!newGallery.url.trim()) return;
+  async function handleGalleryUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     const gallery = data.schoolGallery || [];
-    if (gallery.length >= 20) { alert('Maximum 20 photos allowed.'); return; }
-    setData(d => ({ ...d, schoolGallery: [...(d.schoolGallery || []), { ...newGallery, id: Date.now() }] }));
-    setNewGallery({ url:'', caption:'' });
+    if (gallery.length >= 20) { setGalleryError('Maximum 20 photos allowed.'); return; }
+    const remaining = 20 - gallery.length;
+    const toProcess = files.slice(0, remaining);
+    setGalleryError('');
+    setGalleryUploading(true);
+
+    const schoolId = data._schoolId || 'unknown';
+    let uploaded = 0;
+
+    for (const file of toProcess) {
+      // Validate size — max 3MB
+      if (file.size > 3 * 1024 * 1024) {
+        setGalleryError(`"${file.name}" is over 3MB. Please compress it and try again.`);
+        continue;
+      }
+      // Validate type
+      if (!file.type.startsWith('image/')) {
+        setGalleryError(`"${file.name}" is not an image file.`);
+        continue;
+      }
+      try {
+        const caption = newGallery.caption || file.name.replace(/\.[^.]+$/, '');
+        const { url, fileName } = await uploadGalleryPhoto(file, schoolId);
+        setData(d => ({
+          ...d,
+          schoolGallery: [
+            ...(d.schoolGallery || []),
+            {
+              id:       Date.now() + Math.random(),
+              url,
+              fileName, // storage path — needed for deletion
+              caption,
+            },
+          ].slice(0, 20),
+        }));
+        uploaded++;
+      } catch (err) {
+        setGalleryError(`Failed to upload "${file.name}": ${err.message}`);
+      }
+    }
+
+    setGalleryUploading(false);
+    setNewGallery({ caption: '' });
+    e.target.value = '';
+
+    if (uploaded > 0) {
+      // Save immediately so photos persist
+      setGalleryError('');
+    }
   }
 
-  function removeGalleryPhoto(id) {
-    setData(d => ({ ...d, schoolGallery: (d.schoolGallery || []).filter(p => p.id !== id) }));
+  async function removeGalleryPhoto(photo) {
+    // Delete from Supabase Storage first
+    if (photo.fileName) {
+      await deleteGalleryPhoto(photo.fileName);
+    }
+    // Then remove from school data
+    setData(d => ({ ...d, schoolGallery: (d.schoolGallery || []).filter(p => p.id !== photo.id) }));
   }
 
   function addDocReq() {
@@ -1534,27 +1589,105 @@ export function Settings({ data, setData }) {
 
         {/* Gallery */}
         <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
-            📸 Gallery ({(data.schoolGallery || []).length}/20 photos)
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
+              📸 School Gallery
+              <span style={{ fontSize: 11, fontWeight: 400, color: '#64748b', marginLeft: 8 }}>
+                {(data.schoolGallery || []).length}/20 photos
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>
+              Max 20 photos · Each under 3MB · JPEG, PNG, WebP
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <input value={newGallery.url} onChange={e => setNewGallery(g => ({ ...g, url: e.target.value }))}
-              placeholder="Photo URL (external link, under 3MB)" style={{ flex: 2, minWidth: 200 }} />
-            <input value={newGallery.caption} onChange={e => setNewGallery(g => ({ ...g, caption: e.target.value }))}
-              placeholder="Caption (optional)" style={{ flex: 1, minWidth: 120 }} />
-            <Btn size="sm" onClick={addGalleryPhoto} disabled={!newGallery.url.trim() || (data.schoolGallery||[]).length >= 20}>
-              <Icon name="add" size={12} /> Add Photo
-            </Btn>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {(data.schoolGallery || []).map(photo => (
-              <div key={photo.id} style={{ position: 'relative', width: 100, height: 75 }}>
-                <img src={photo.url} alt={photo.caption} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1px solid #2a3350' }}
-                  onError={e => { e.target.style.display = 'none'; }} />
-                <button onClick={() => removeGalleryPhoto(photo.id)} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', border: 'none', color: '#fff', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+
+          {/* Upload area */}
+          <div style={{ background: '#1e2435', borderRadius: 10, border: '1px dashed #2a3350', padding: 16, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                value={newGallery.caption}
+                onChange={e => setNewGallery(g => ({ ...g, caption: e.target.value }))}
+                placeholder="Caption for these photos (optional)"
+                style={{ flex: 1, minWidth: 160 }}
+              />
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
+                background: galleryUploading || (data.schoolGallery||[]).length >= 20 ? '#2a3350' : 'linear-gradient(135deg,#1e40af,#7c3aed)',
+                color: '#fff', borderRadius: 8,
+                cursor: galleryUploading || (data.schoolGallery||[]).length >= 20 ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', border: 'none',
+              }}>
+                {galleryUploading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #ffffff60', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    Uploading to cloud...
+                  </span>
+                ) : (
+                  <>📁 Upload Photos from Computer</>
+                )}
+                <input
+                  type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple onChange={handleGalleryUpload}
+                  disabled={galleryUploading || (data.schoolGallery||[]).length >= 20}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>
+              📌 Photos are uploaded directly to cloud storage and appear on your public school page permanently.
+              You can select multiple photos at once.
+            </div>
+            {galleryError && (
+              <div style={{ fontSize: 12, color: '#ef4444', marginTop: 8, background: '#ef444415', padding: '8px 12px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                ⚠ {galleryError}
+                <button onClick={() => setGalleryError('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', marginLeft: 'auto', fontSize: 14 }}>×</button>
               </div>
-            ))}
+            )}
           </div>
+
+          {/* Photo grid */}
+          {(data.schoolGallery || []).length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: '#64748b', fontSize: 13 }}>
+              No photos yet. Click "Upload Photos from Computer" to add your first photo.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+              {(data.schoolGallery || []).map(photo => (
+                <div key={photo.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid #2a3350', background: '#1e2435' }}>
+                  <img
+                    src={photo.url} alt={photo.caption || 'School photo'}
+                    style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
+                    onError={e => { e.target.style.background = '#2a3350'; e.target.style.height = '100px'; }}
+                  />
+                  {/* Caption */}
+                  {photo.caption && (
+                    <div style={{ padding: '4px 8px', fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {photo.caption}
+                    </div>
+                  )}
+                  {/* Delete button */}
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete "${photo.caption || 'this photo'}"? This cannot be undone.`)) {
+                        removeGalleryPhoto(photo);
+                      }
+                    }}
+                    title="Delete photo"
+                    style={{
+                      position: 'absolute', top: 6, right: 6,
+                      background: '#ef4444ee', border: 'none', color: '#fff',
+                      borderRadius: '50%', width: 22, height: 22,
+                      cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 6px #00000040',
+                    }}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
 
         {/* Job Vacancies */}
