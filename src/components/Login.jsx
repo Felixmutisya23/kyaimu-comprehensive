@@ -1,23 +1,31 @@
 import React, { useState } from 'react';
 
-const IS = (focus) => ({
-  width:'100%', padding:'11px 14px',
-  background: focus ? '#fff' : '#f8fafc',
-  border: `1.5px solid ${focus ? '#1e40af' : '#e2e8f0'}`,
-  borderRadius:10, color:'#1e293b', fontSize:14,
-  outline:'none', boxSizing:'border-box',
-  transition:'all 0.15s',
-});
+const IS = {
+  base: {
+    width:'100%', padding:'11px 14px',
+    background:'#f8fafc',
+    border:'1.5px solid #e2e8f0',
+    borderRadius:10, color:'#1e293b', fontSize:14,
+    outline:'none', boxSizing:'border-box',
+    transition:'all 0.15s',
+  },
+  focused: {
+    background:'#fff',
+    border:'1.5px solid #1e40af',
+  },
+};
 
 function Field({ label, value, onChange, type='text', placeholder, hint, autoFocus }) {
   const [focus, setFocus] = useState(false);
   return (
     <div style={{marginBottom:16}}>
       <label style={{fontSize:12,fontWeight:600,color:'#475569',display:'block',marginBottom:5}}>{label}</label>
-      <input value={value} onChange={e=>onChange(e.target.value)} type={type}
-        placeholder={placeholder} autoFocus={autoFocus}
-        style={IS(focus)}
-        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)} />
+      <input
+        value={value} onChange={e=>onChange(e.target.value)}
+        type={type} placeholder={placeholder} autoFocus={autoFocus}
+        style={focus ? {...IS.base,...IS.focused} : IS.base}
+        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}
+      />
       {hint && <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{hint}</div>}
     </div>
   );
@@ -27,12 +35,13 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
   const [tab,      setTab]      = useState('staff');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [slc,      setSlc]      = useState(''); // Student Login Code
+  const [showPw,   setShowPw]   = useState(false);
+  const [pwFocus,  setPwFocus]  = useState(false);
+  const [slc,      setSlc]      = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
-  const [showPw,   setShowPw]   = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [cForm,    setCForm]    = useState({ schoolName:'',yourName:'',email:'',password:'',confirm:'' });
+  const [cForm,    setCForm]    = useState({ schoolName:'', yourName:'', email:'', password:'', confirm:'' });
   const [cError,   setCError]   = useState('');
   const [cLoading, setCLoading] = useState(false);
 
@@ -66,9 +75,15 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
     if (cForm.password !== cForm.confirm) { setCError('Passwords do not match.'); return; }
     setCLoading(true);
     try {
-      await onCreateSchool({ schoolName:cForm.schoolName.trim(), principalName:cForm.yourName.trim(), principalEmail:cForm.email.trim(), principalPassword:cForm.password });
-    } catch(err) { setCError('Failed to create school: '+(err?.message||'Please try again.')); }
-    finally { setCLoading(false); }
+      await onCreateSchool({
+        schoolName:        cForm.schoolName.trim(),
+        principalName:     cForm.yourName.trim(),
+        principalEmail:    cForm.email.trim(),
+        principalPassword: cForm.password,
+      });
+    } catch(err) {
+      setCError('Failed to create school: ' + (err?.message || 'Please try again.'));
+    } finally { setCLoading(false); }
   }
 
   const TABS = [
@@ -80,146 +95,251 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
   const isStaff   = tab === 'staff';
   const isStudent = tab === 'student';
   const isParent  = tab === 'parent';
-
-  const submitDisabled = loading || (isStaff ? (!email||!password) : !slc);
+  const submitDisabled = loading || (isStaff ? (!email || !password) : !slc);
 
   return (
-    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#eff6ff 0%,#f0fdf4 50%,#fefce8 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
-
-      {/* Background decorations */}
+    <div style={{
+      minHeight:'100vh',
+      background:'linear-gradient(135deg,#eff6ff 0%,#f0fdf4 50%,#fefce8 100%)',
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+      fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+    }}>
+      {/* Background blobs */}
       <div style={{position:'fixed',inset:0,pointerEvents:'none',overflow:'hidden'}}>
         <div style={{position:'absolute',top:-100,right:-100,width:400,height:400,borderRadius:'50%',background:'radial-gradient(circle,#dbeafe80,transparent 70%)'}}/>
         <div style={{position:'absolute',bottom:-80,left:-80,width:350,height:350,borderRadius:'50%',background:'radial-gradient(circle,#dcfce780,transparent 70%)'}}/>
       </div>
 
-      <div style={{width:'100%',maxWidth:460,position:'relative'}}>
+      <div style={{width:'100%', maxWidth:460, position:'relative'}}>
 
-        {/* Logo */}
-        <div style={{textAlign:'center',marginBottom:28}}>
-          <div style={{width:64,height:64,borderRadius:18,background:'linear-gradient(135deg,#1e40af,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',fontSize:26,fontWeight:900,color:'#fff',boxShadow:'0 12px 32px #1e40af40'}}>E</div>
-          <div style={{fontSize:22,fontWeight:800,color:'#1e293b',letterSpacing:-0.5}}>EduManage Pro</div>
-          <div style={{fontSize:13,color:'#64748b',marginTop:3}}>{data.schoolName || 'School Management System'}</div>
+        {/* Logo — never show school name before login */}
+        <div style={{textAlign:'center', marginBottom:28}}>
+          <div style={{
+            width:64, height:64, borderRadius:18,
+            background:'linear-gradient(135deg,#1e40af,#7c3aed)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            margin:'0 auto 14px', fontSize:26, fontWeight:900, color:'#fff',
+            boxShadow:'0 12px 32px #1e40af40',
+          }}>E</div>
+          <div style={{fontSize:22, fontWeight:800, color:'#1e293b', letterSpacing:-0.5}}>EduManage Pro</div>
+          <div style={{fontSize:13, color:'#94a3b8', marginTop:3}}>School Management System</div>
         </div>
 
         {/* Tab switcher */}
-        <div style={{display:'flex',background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:14,padding:5,marginBottom:20,gap:4,boxShadow:'0 2px 8px #0000000a'}}>
+        <div style={{
+          display:'flex', background:'#fff', border:'1.5px solid #e2e8f0',
+          borderRadius:14, padding:5, marginBottom:20, gap:4,
+          boxShadow:'0 2px 8px #0000000a',
+        }}>
           {TABS.map(t => (
-            <button key={t.id} onClick={()=>{setTab(t.id);reset();}} style={{
-              flex:1,padding:'10px 6px',border:'none',borderRadius:10,cursor:'pointer',
+            <button key={t.id} onClick={() => { setTab(t.id); reset(); }} style={{
+              flex:1, padding:'10px 6px', border:'none', borderRadius:10, cursor:'pointer',
               background: tab===t.id ? 'linear-gradient(135deg,#1e40af,#7c3aed)' : 'transparent',
               color: tab===t.id ? '#fff' : '#64748b',
               transition:'all 0.2s',
             }}>
-              <div style={{fontSize:20,marginBottom:2}}>{t.emoji}</div>
-              <div style={{fontSize:12,fontWeight:700}}>{t.label}</div>
-              <div style={{fontSize:10,opacity:0.8}}>{t.sub}</div>
+              <div style={{fontSize:20, marginBottom:2}}>{t.emoji}</div>
+              <div style={{fontSize:12, fontWeight:700}}>{t.label}</div>
+              <div style={{fontSize:10, opacity:0.8}}>{t.sub}</div>
             </button>
           ))}
         </div>
 
         {/* Login card */}
-        <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:20,padding:32,boxShadow:'0 20px 60px #0000000f',marginBottom:16}}>
-
+        <div style={{
+          background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:20,
+          padding:32, boxShadow:'0 20px 60px #0000000f', marginBottom:16,
+        }}>
           <div style={{marginBottom:22}}>
-            <div style={{fontSize:17,fontWeight:800,color:'#1e293b'}}>{TABS.find(t=>t.id===tab)?.label} Login</div>
-            <div style={{fontSize:13,color:'#94a3b8',marginTop:3}}>{TABS.find(t=>t.id===tab)?.sub}</div>
+            <div style={{fontSize:17, fontWeight:800, color:'#1e293b'}}>
+              {TABS.find(t=>t.id===tab)?.label} Login
+            </div>
+            <div style={{fontSize:13, color:'#94a3b8', marginTop:3}}>
+              {TABS.find(t=>t.id===tab)?.sub}
+            </div>
           </div>
 
           <form onSubmit={handleLogin}>
+
+            {/* STAFF fields */}
             {isStaff && (
               <>
-                <Field label="Email Address" value={email} onChange={setEmail} type="email" placeholder="you@school.ac.ke" autoFocus />
+                <Field
+                  label="Email Address"
+                  value={email} onChange={setEmail}
+                  type="email" placeholder="you@school.ac.ke"
+                  autoFocus
+                />
                 <div style={{marginBottom:16}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
-                    <label style={{fontSize:12,fontWeight:600,color:'#475569'}}>Password</label>
-                    <span style={{fontSize:12,color:'#1e40af',cursor:'pointer',fontWeight:500}} onClick={()=>setShowPw(!showPw)}>{showPw?'Hide':'Show'}</span>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                    <label style={{fontSize:12, fontWeight:600, color:'#475569'}}>Password</label>
+                    <span style={{fontSize:12, color:'#1e40af', cursor:'pointer', fontWeight:500}}
+                      onClick={() => setShowPw(!showPw)}>
+                      {showPw ? 'Hide' : 'Show'}
+                    </span>
                   </div>
-                  {(() => { const [f,setF]=useState(false); return (
-                    <input type={showPw?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}
-                      placeholder="Your password" style={IS(f)}
-                      onFocus={()=>setF(true)} onBlur={()=>setF(false)} />
-                  ); })()}
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    value={password} onChange={e=>setPassword(e.target.value)}
+                    placeholder="Your password"
+                    style={pwFocus ? {...IS.base,...IS.focused} : IS.base}
+                    onFocus={()=>setPwFocus(true)} onBlur={()=>setPwFocus(false)}
+                  />
                 </div>
               </>
             )}
 
-            {(isStudent || isParent) && (
+            {/* STUDENT fields */}
+            {isStudent && (
               <>
                 <Field
                   label="Student Login Code (SLC)"
                   value={slc} onChange={setSlc}
                   placeholder="e.g. 2024-4872"
                   autoFocus
-                  hint={isParent ? "Use your child's SLC code printed on their report form" : "Your SLC code is printed on your report form and class list"}
+                  hint="Your SLC code is printed on your report form and class list"
                 />
-                <div style={{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10,padding:'10px 14px',fontSize:12,color:'#0369a1',marginBottom:16}}>
-                  <strong>Where is my Login Code?</strong> — It's printed on every report form, class list, and leaving certificate. Ask your class teacher if you can't find it.
+                <div style={{
+                  background:'#f0f9ff', border:'1px solid #bae6fd', borderRadius:10,
+                  padding:'10px 14px', fontSize:12, color:'#0369a1', marginBottom:16,
+                }}>
+                  <strong>Where is my Login Code?</strong> — It is printed on every report form, class list, and leaving certificate. Ask your class teacher if you cannot find it.
                 </div>
               </>
             )}
 
-            {(error||externalError) && (
-              <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',borderRadius:10,padding:'11px 14px',fontSize:13,marginBottom:16,display:'flex',gap:8}}>
-                <span>⚠</span><span>{externalError||error}</span>
+            {/* PARENT fields */}
+            {isParent && (
+              <>
+                <Field
+                  label="Student Login Code (SLC)"
+                  value={slc} onChange={setSlc}
+                  placeholder="e.g. 2024-4872"
+                  autoFocus
+                  hint="Use your child's SLC code printed on their report form"
+                />
+                <div style={{
+                  background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10,
+                  padding:'10px 14px', fontSize:12, color:'#15803d', marginBottom:16,
+                }}>
+                  <strong>Parent Login:</strong> Use your child's SLC code from their latest report form. Each child has a unique code.
+                </div>
+              </>
+            )}
+
+            {/* Error */}
+            {(error || externalError) && (
+              <div style={{
+                background:'#fef2f2', border:'1px solid #fecaca', color:'#dc2626',
+                borderRadius:10, padding:'11px 14px', fontSize:13, marginBottom:16,
+                display:'flex', gap:8,
+              }}>
+                <span>⚠</span><span>{externalError || error}</span>
               </div>
             )}
 
+            {/* Submit */}
             <button type="submit" disabled={submitDisabled} style={{
-              width:'100%',padding:13,borderRadius:12,border:'none',
-              background: submitDisabled ? '#e2e8f0' : 'linear-gradient(135deg,#1e40af,#7c3aed)',
+              width:'100%', padding:13, borderRadius:12, border:'none',
+              background: submitDisabled
+                ? '#e2e8f0'
+                : 'linear-gradient(135deg,#1e40af,#7c3aed)',
               color: submitDisabled ? '#94a3b8' : '#fff',
-              fontSize:15,fontWeight:700,cursor:submitDisabled?'not-allowed':'pointer',
+              fontSize:15, fontWeight:700,
+              cursor: submitDisabled ? 'not-allowed' : 'pointer',
               boxShadow: submitDisabled ? 'none' : '0 6px 20px #1e40af40',
               transition:'all 0.2s',
             }}>
-              {loading ? 'Signing in...' : `Sign In →`}
+              {loading ? 'Signing in...' : 'Sign In →'}
             </button>
           </form>
         </div>
 
-        <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,fontSize:12,color:'#94a3b8',padding:'0 4px'}}>
-          <span>New school? <span style={{color:'#1e40af',cursor:'pointer',fontWeight:700}} onClick={()=>setShowCreate(true)}>Register here</span></span>
-          {data.schoolSlug && (
-            <a href={`/school/${data.schoolSlug}`} target="_blank" rel="noreferrer"
-              style={{color:'#10b981',fontWeight:600,textDecoration:'none'}}>
-              🌐 View School Page
-            </a>
-          )}
+        {/* Footer links */}
+        <div style={{
+          display:'flex', justifyContent:'space-between', flexWrap:'wrap',
+          gap:8, fontSize:12, color:'#94a3b8', padding:'0 4px',
+        }}>
+          <span>
+            New school?{' '}
+            <span style={{color:'#1e40af', cursor:'pointer', fontWeight:700}}
+              onClick={() => setShowCreate(true)}>
+              Register here
+            </span>
+          </span>
         </div>
       </div>
 
       {/* Create School Modal */}
       {showCreate && (
-        <div style={{position:'fixed',inset:0,background:'#00000070',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-          <div style={{background:'#fff',borderRadius:20,padding:32,width:'100%',maxWidth:460,boxShadow:'0 24px 80px #00000020',maxHeight:'90vh',overflowY:'auto'}}>
-            <div style={{fontSize:18,fontWeight:800,color:'#1e293b',marginBottom:4}}>🏫 Register Your School</div>
-            <div style={{fontSize:13,color:'#64748b',marginBottom:22}}>Set up your school on EduManage Pro</div>
+        <div style={{
+          position:'fixed', inset:0, background:'#00000070', zIndex:9999,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+        }}>
+          <div style={{
+            background:'#fff', borderRadius:20, padding:32,
+            width:'100%', maxWidth:460,
+            boxShadow:'0 24px 80px #00000020',
+            maxHeight:'90vh', overflowY:'auto',
+          }}>
+            <div style={{fontSize:18, fontWeight:800, color:'#1e293b', marginBottom:4}}>
+              🏫 Register Your School
+            </div>
+            <div style={{fontSize:13, color:'#64748b', marginBottom:22}}>
+              Set up your school on EduManage Pro
+            </div>
             <form onSubmit={handleCreateSchool}>
               {[
-                {label:'School Name *',    key:'schoolName', ph:'e.g. Kyaimu Comprehensive',  type:'text'},
-                {label:'Your Name',        key:'yourName',   ph:'e.g. Felix Mutisya',          type:'text'},
-                {label:'Email Address *',  key:'email',      ph:'you@school.ac.ke',            type:'email'},
-                {label:'Password *',       key:'password',   ph:'Min 6 characters',            type:'password'},
-                {label:'Confirm Password *',key:'confirm',   ph:'Re-enter password',           type:'password'},
+                { label:'School Name *',     key:'schoolName', ph:'e.g. Kyaimu Comprehensive',  type:'text'     },
+                { label:'Your Name',         key:'yourName',   ph:'e.g. Felix Mutisya',          type:'text'     },
+                { label:'Email Address *',   key:'email',      ph:'you@school.ac.ke',            type:'email'    },
+                { label:'Password *',        key:'password',   ph:'Min 6 characters',            type:'password' },
+                { label:'Confirm Password *',key:'confirm',    ph:'Re-enter password',           type:'password' },
               ].map(f => (
                 <div key={f.key} style={{marginBottom:14}}>
-                  <label style={{fontSize:12,fontWeight:600,color:'#475569',display:'block',marginBottom:5}}>{f.label}</label>
-                  <input type={f.type} value={cForm[f.key]} onChange={e=>setCForm(p=>({...p,[f.key]:e.target.value}))}
-                    placeholder={f.ph} style={IS(false)} />
+                  <label style={{fontSize:12, fontWeight:600, color:'#475569', display:'block', marginBottom:5}}>
+                    {f.label}
+                  </label>
+                  <input
+                    type={f.type}
+                    value={cForm[f.key]}
+                    onChange={e => setCForm(p => ({...p, [f.key]: e.target.value}))}
+                    placeholder={f.ph}
+                    style={IS.base}
+                  />
                 </div>
               ))}
-              {cError && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',borderRadius:10,padding:'11px 14px',fontSize:13,marginBottom:14}}>⚠ {cError}</div>}
-              <div style={{display:'flex',gap:10,marginTop:8}}>
-                <button type="button" onClick={()=>setShowCreate(false)} style={{flex:1,padding:12,borderRadius:10,border:'1.5px solid #e2e8f0',background:'transparent',color:'#64748b',fontSize:14,cursor:'pointer',fontWeight:600}}>Cancel</button>
-                <button type="submit" disabled={cLoading} style={{flex:2,padding:12,borderRadius:10,border:'none',background:'linear-gradient(135deg,#1e40af,#7c3aed)',color:'#fff',fontSize:14,fontWeight:700,cursor:cLoading?'not-allowed':'pointer'}}>
-                  {cLoading?'Creating...':'Create School Account →'}
+              {cError && (
+                <div style={{
+                  background:'#fef2f2', border:'1px solid #fecaca', color:'#dc2626',
+                  borderRadius:10, padding:'11px 14px', fontSize:13, marginBottom:14,
+                }}>
+                  ⚠ {cError}
+                </div>
+              )}
+              <div style={{display:'flex', gap:10, marginTop:8}}>
+                <button type="button" onClick={() => setShowCreate(false)} style={{
+                  flex:1, padding:12, borderRadius:10,
+                  border:'1.5px solid #e2e8f0', background:'transparent',
+                  color:'#64748b', fontSize:14, cursor:'pointer', fontWeight:600,
+                }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={cLoading} style={{
+                  flex:2, padding:12, borderRadius:10, border:'none',
+                  background:'linear-gradient(135deg,#1e40af,#7c3aed)',
+                  color:'#fff', fontSize:14, fontWeight:700,
+                  cursor: cLoading ? 'not-allowed' : 'pointer',
+                }}>
+                  {cLoading ? 'Creating...' : 'Create School Account →'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      <style>{`input::placeholder{color:#94a3b8} * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }`}</style>
+
+      <style>{`input::placeholder { color: #94a3b8; }`}</style>
     </div>
   );
 }
