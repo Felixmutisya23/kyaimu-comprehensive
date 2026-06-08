@@ -24,7 +24,7 @@ function getSupabase() {
 }
 
 // Export single shared client for use across the app
-export const supabaseClient = { from: (...a) => getSupabase().from(...a) };
+export const supabaseClient = { from: (...a) => getSupabase().from(...a), storage: { from: (...a) => getSupabase().storage.from(...a) } };
 
 // FIX 2: Set RLS context before queries so DB enforces school isolation
 async function setSchoolContext(schoolId) {
