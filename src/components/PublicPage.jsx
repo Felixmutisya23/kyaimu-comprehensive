@@ -18,9 +18,9 @@ const C = {
   gradient:  'linear-gradient(135deg,#1e40af 0%,#7c3aed 100%)',
 };
 
-function Section({ children, bg = C.white, style = {} }) {
+function Section({ children, bg = C.white, style = {}, id }) {
   return (
-    <section style={{ background: bg, padding: '72px 24px', ...style }}>
+    <section id={id} style={{ background: bg, padding: '72px 24px', scrollMarginTop: 70, ...style }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>{children}</div>
     </section>
   );
@@ -87,10 +87,12 @@ export default function PublicPage({ data, onLoginClick }) {
           </div>
           <div style={{ display:'flex',alignItems:'center',gap:8 }}>
             {['About','Academics','Gallery','Jobs','Apply','Contact'].map(l => (
-              <a key={l} href={`#${l.toLowerCase()}`} style={{ fontSize:13,color:C.sub,textDecoration:'none',padding:'6px 12px',borderRadius:8,fontWeight:500 }}
+              <button key={l}
+                onClick={() => document.getElementById(l.toLowerCase())?.scrollIntoView({ behavior:'smooth' })}
+                style={{ fontSize:13,color:C.sub,textDecoration:'none',padding:'6px 12px',borderRadius:8,fontWeight:500,background:'none',border:'none',cursor:'pointer' }}
                 onMouseEnter={e=>e.target.style.color=C.primary} onMouseLeave={e=>e.target.style.color=C.sub}>
                 {l}
-              </a>
+              </button>
             ))}
             <button onClick={onLoginClick} style={{ padding:'9px 20px',borderRadius:10,border:'none',background:C.gradient,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',marginLeft:8 }}>
               Login →
@@ -109,7 +111,7 @@ export default function PublicPage({ data, onLoginClick }) {
           <h1 style={{ fontSize:52,fontWeight:900,color:'#fff',margin:'0 0 20px',lineHeight:1.1 }}>{data.schoolName}</h1>
           {data.schoolMotto && <div style={{ fontSize:22,color:'#e0e7ff',marginBottom:32,fontStyle:'italic' }}>"{data.schoolMotto}"</div>}
           <div style={{ display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap' }}>
-            <button onClick={()=>document.getElementById('apply')?.scrollIntoView({behavior:'smooth'})}
+            <button onClick={()=>document.getElementById('apply')?.scrollIntoView({behavior:'smooth',block:'start'})}
               style={{ padding:'14px 32px',borderRadius:12,border:'none',background:'#fff',color:C.primary,fontSize:15,fontWeight:800,cursor:'pointer' }}>
               Apply for Admission
             </button>

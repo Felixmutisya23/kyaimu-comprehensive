@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Avatar, GradeBadge, Icon } from './UI';
 import { getGrade, getAllClasses, getScore, getStreamFromClass, generateSLC, generateAdmNo, buildStudentName } from '../data/initialData';
+import * as XLSX from 'xlsx';
 import { printLeavingCert, printReportForm, printStudentIntakeForm } from '../utils/print';
 
 export default function Students({ data, setData, user, isUnlocked = true }) {
@@ -46,6 +47,158 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
       dob: '', parentName: '', parentPhone: '', parentEmail: '',
       joined: new Date().getFullYear().toString(),
     };
+  }
+
+  // ── Bulk upload state ──────────────────────────────────────
+  const [showUpload,    setShowUpload]    = useState(false);
+  const [uploadRows,    setUploadRows]    = useState([]); // parsed rows
+  const [uploadErrors,  setUploadErrors]  = useState([]); // row errors
+  const [uploadDone,    setUploadDone]    = useState(false);
+  const [uploadSummary, setUploadSummary] = useState(null); // { added, skipped }
+
+  /* Download Excel template */
+  function downloadTemplate() {
+    const admMode = data.admissionSetting || 'manual';
+    const headers = admMode === 'auto'
+      ? ['First Name','Last Name','Other Name','Class','Date of Birth (DD/MM/YYYY)','Parent Name','Parent Phone','Year Joined']
+      : ['First Name','Last Name','Other Name','Admission Number','Class','Date of Birth (DD/MM/YYYY)','Parent Name','Parent Phone','Year Joined'];
+
+    const example = admMode === 'auto'
+      ? ['Kamau','Njoroge','Mwangi','Grade 7 A','01/01/2012','Jane Njoroge','0712345678','2024']
+      : ['Kamau','Njoroge','Mwangi','KPS/001/2024','Grade 7 A','01/01/2012','Jane Njoroge','0712345678','2024'];
+
+    const ws   = XLSX.utils.aoa_to_sheet([headers, example]);
+    // Set column widths
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 18) }));
+    const wb   = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    XLSX.writeFile(wb, 'student_upload_template.xlsx');
+  }
+
+  /* Parse uploaded Excel/CSV file */
+  function handleUploadFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadErrors([]);
+    setUploadRows([]);
+    setUploadDone(false);
+    setUploadSummary(null);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb   = XLSX.read(ev.target.result, { type: 'binary', cellDates: true });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rows.length < 2) { setUploadErrors(['File is empty or has no data rows.']); return; }
+
+        const headers = (rows[0] || []).map(h => String(h).trim().toLowerCase());
+        const dataRows = rows.slice(1).filter(r => r.some(cell => String(cell).trim()));
+
+        // Map header names flexibly
+        function col(row, ...names) {
+          for (const name of names) {
+            const idx = headers.findIndex(h => h.includes(name.toLowerCase()));
+            if (idx >= 0 && row[idx] !== undefined) return String(row[idx]).trim();
+          }
+          return '';
+        }
+
+        const parsed = dataRows.map((row, i) => ({
+          rowNum:      i + 2,
+          firstName:   col(row, 'first name', 'firstname', 'first'),
+          lastName:    col(row, 'last name', 'lastname', 'last'),
+          otherName:   col(row, 'other', 'middle', 'clan'),
+          admNo:       col(row, 'admission', 'adm'),
+          class:       col(row, 'class', 'grade', 'form'),
+          dob:         col(row, 'birth', 'dob', 'date of birth'),
+          parentName:  col(row, 'parent name', 'guardian name', 'parent'),
+          parentPhone: col(row, 'phone', 'mobile', 'contact'),
+          joined:      col(row, 'year joined', 'joined', 'year'),
+        }));
+
+        setUploadRows(parsed);
+      } catch(err) {
+        setUploadErrors(['Could not read file: ' + err.message]);
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  }
+
+  /* Import all valid rows */
+  function importRows() {
+    const admMode  = data.admissionSetting || 'manual';
+    const allCls   = getAllClasses(data);
+    const errors   = [];
+    const toAdd    = [];
+    let   students = [...data.students];
+
+    uploadRows.forEach((row, i) => {
+      // Validate required fields
+      if (!row.firstName && !row.lastName) {
+        errors.push(`Row ${row.rowNum}: Missing first and last name — skipped.`);
+        return;
+      }
+      if (!row.class) {
+        errors.push(`Row ${row.rowNum}: Missing class — skipped.`);
+        return;
+      }
+      // Validate class exists
+      const matchedClass = allCls.find(c => c.toLowerCase() === row.class.toLowerCase());
+      if (!matchedClass) {
+        errors.push(`Row ${row.rowNum}: Class "${row.class}" not found in school. Check spelling — skipped.`);
+        return;
+      }
+      // Admission number logic
+      let admNo = '';
+      let internalId = '';
+      if (admMode === 'manual') {
+        if (!row.admNo) { errors.push(`Row ${row.rowNum}: Admission number required — skipped.`); return; }
+        admNo = row.admNo;
+      } else if (admMode === 'auto') {
+        admNo = generateAdmNo(data, [...students, ...toAdd.map(s => ({ admNo: s.admNo }))]);
+      } else {
+        if (row.admNo) admNo = row.admNo;
+        else internalId = `INT-${Date.now()}-${i}-${Math.random().toString(36).slice(2,7)}`;
+      }
+
+      // Check duplicate (same name + class)
+      const fullName = buildStudentName(row.firstName, row.lastName, row.otherName);
+      const dup = students.find(s => s.name?.toLowerCase() === fullName.toLowerCase() && s.class?.toLowerCase() === matchedClass.toLowerCase());
+      if (dup) { errors.push(`Row ${row.rowNum}: "${fullName}" in ${matchedClass} already exists — skipped.`); return; }
+
+      const slc = generateSLC([...students, ...toAdd]);
+      const stream = getStreamFromClass(matchedClass, data) || '';
+
+      toAdd.push({
+        id:          Date.now() + i + Math.random(),
+        firstName:   row.firstName,
+        lastName:    row.lastName,
+        otherName:   row.otherName,
+        name:        fullName,
+        admNo,
+        internalId,
+        slc,
+        class:       matchedClass,
+        stream,
+        dob:         row.dob,
+        parentName:  row.parentName,
+        parentPhone: row.parentPhone,
+        parentEmail: '',
+        joined:      row.joined || String(new Date().getFullYear()),
+        fees:        { paid: 0, total: 0 },
+        cases:       [],
+      });
+    });
+
+    if (toAdd.length > 0) {
+      setData(d => ({ ...d, students: [...d.students, ...toAdd] }));
+    }
+    setUploadErrors(errors);
+    setUploadSummary({ added: toAdd.length, skipped: errors.length });
+    setUploadDone(true);
+    setUploadRows([]);
   }
 
   const canAdd         = isPrincipal || isClassTeacher;
@@ -290,6 +443,11 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               <Icon name="print" size={14} /> Intake Form
             </Btn>
           )}
+          {isPrincipal && (
+            <Btn variant="ghost" onClick={() => { setShowUpload(true); setUploadRows([]); setUploadErrors([]); setUploadDone(false); setUploadSummary(null); }}>
+              <Icon name="upload" size={14} /> Bulk Upload
+            </Btn>
+          )}
           {canAdd && (
             <Btn onClick={() => { setForm(initForm()); setShow(true); }}>
               <Icon name="add" size={14} /> Add Student
@@ -423,6 +581,119 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
     </div>
   );
 }
+
+      {/* ── Bulk Upload Modal ───────────────────────── */}
+      <Modal show={showUpload} onClose={() => setShowUpload(false)} title="Bulk Upload Students" wide>
+
+        {!uploadDone ? (
+          <>
+            {/* Step 1 — Download template */}
+            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>
+                Step 1 — Download the Excel template
+              </div>
+              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+                Fill in student details in the template. Column names must stay the same.
+                Admission Number column {data.admissionSetting === 'auto' ? 'is NOT included (auto-assigned)' : data.admissionSetting === 'mixed' ? 'is optional' : 'is required'}.
+              </div>
+              <Btn variant="ghost" size="sm" onClick={downloadTemplate}>
+                <Icon name="download" size={13} /> Download Template (.xlsx)
+              </Btn>
+            </div>
+
+            {/* Step 2 — Upload filled file */}
+            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>
+                Step 2 — Upload your filled Excel or CSV file
+              </div>
+              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+                Supported formats: .xlsx, .xls, .csv
+              </div>
+              <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#4f8ef7', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
+                <Icon name="upload" size={13} /> Choose File
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleUploadFile} style={{ display:'none' }} />
+              </label>
+            </div>
+
+            {/* Preview parsed rows */}
+            {uploadRows.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:8 }}>
+                  Step 3 — Review & Import ({uploadRows.length} rows found)
+                </div>
+                <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+                    <thead>
+                      <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
+                        {['Row','First Name','Last Name','Other Name',...(data.admissionSetting!=='auto'?['Adm No']:[]),'Class','DOB','Parent Name','Parent Phone','Year'].map(h=>(
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'#64748b', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadRows.map((row,i) => (
+                        <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
+                          <td style={{ padding:'5px 10px', color:'#64748b' }}>{row.rowNum}</td>
+                          <td style={{ padding:'5px 10px', color: row.firstName?'#e2e8f0':'#ef4444', fontWeight:row.firstName?400:700 }}>{row.firstName||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color: row.lastName?'#e2e8f0':'#ef4444' }}>{row.lastName||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.otherName||'—'}</td>
+                          {data.admissionSetting!=='auto' && <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.admNo||'—'}</td>}
+                          <td style={{ padding:'5px 10px', color: row.class?'#e2e8f0':'#ef4444' }}>{row.class||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.dob||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.parentName||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.parentPhone||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.joined||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display:'flex', gap:10, marginTop:12, justifyContent:'flex-end' }}>
+                  <Btn variant="ghost" onClick={() => { setUploadRows([]); setUploadErrors([]); }}>Clear</Btn>
+                  <Btn variant="success" onClick={importRows}>
+                    <Icon name="check" size={14} /> Import {uploadRows.length} Students
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {uploadErrors.length > 0 && !uploadDone && (
+              <Alert type="warning">
+                <div style={{ fontSize:12 }}>
+                  {uploadErrors.slice(0,5).map((e,i) => <div key={i}>⚠ {e}</div>)}
+                  {uploadErrors.length > 5 && <div>...and {uploadErrors.length-5} more issues</div>}
+                </div>
+              </Alert>
+            )}
+          </>
+        ) : (
+          /* Done screen */
+          <div style={{ textAlign:'center', padding:'32px 0' }}>
+            <div style={{ fontSize:56, marginBottom:16 }}>
+              {uploadSummary?.added > 0 ? '✅' : '⚠️'}
+            </div>
+            <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0', marginBottom:8 }}>
+              Upload Complete
+            </div>
+            <div style={{ fontSize:14, color:'#94a3b8', marginBottom:20 }}>
+              <span style={{ color:'#10b981', fontWeight:700 }}>{uploadSummary?.added} students added</span>
+              {uploadSummary?.skipped > 0 && <span style={{ color:'#f59e0b' }}> · {uploadSummary.skipped} rows skipped</span>}
+            </div>
+            {uploadErrors.length > 0 && (
+              <div style={{ background:'#1e2435', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:160, overflowY:'auto' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>Skipped rows:</div>
+                {uploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'#64748b', marginBottom:2 }}>• {e}</div>)}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+              <Btn variant="ghost" onClick={() => { setUploadDone(false); setUploadRows([]); setUploadErrors([]); setUploadSummary(null); }}>
+                Upload Another File
+              </Btn>
+              <Btn onClick={() => setShowUpload(false)}>Done</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
 
 const TS = {
   table: { width:'100%',borderCollapse:'collapse',fontSize:13 },

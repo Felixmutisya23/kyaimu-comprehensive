@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Avatar, Alert, Icon } from './UI';
+import * as XLSX from 'xlsx';
 import { getAllClasses, getSubjectsForClass, CURRICULUM_LEVELS } from '../data/initialData';
 import { printStaffIntakeForm } from '../utils/print';
 import { PendingTeacherApprovals, InviteLinkGenerator } from './TeacherRegistration';
@@ -41,6 +42,104 @@ export default function Teachers({ data, setData }) {
 
   const allClasses = getAllClasses(data);
   const depts      = data.departments;
+
+  // ── Bulk upload state ─────────────────────────────────────
+  const [showStaffUpload,    setShowStaffUpload]    = useState(false);
+  const [staffUploadRows,    setStaffUploadRows]    = useState([]);
+  const [staffUploadErrors,  setStaffUploadErrors]  = useState([]);
+  const [staffUploadDone,    setStaffUploadDone]    = useState(false);
+  const [staffUploadSummary, setStaffUploadSummary] = useState(null);
+
+  function downloadStaffTemplate() {
+    const headers = ['Name','Staff ID','Email','Phone','Department','Staff Type (teaching/non_teaching)','Is Class Teacher (Yes/No)','Class Teacher Of','Password'];
+    const example = ['Jane Njeri','T009','jane@school.ac.ke','0712345678','Academics','teaching','No','',''];
+    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 20) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff');
+    XLSX.writeFile(wb, 'staff_upload_template.xlsx');
+  }
+
+  function handleStaffUploadFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStaffUploadErrors([]);
+    setStaffUploadRows([]);
+    setStaffUploadDone(false);
+    setStaffUploadSummary(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb   = XLSX.read(ev.target.result, { type:'binary' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+        if (rows.length < 2) { setStaffUploadErrors(['File is empty or has no data rows.']); return; }
+        const headers = (rows[0]||[]).map(h => String(h).trim().toLowerCase());
+        const dataRows = rows.slice(1).filter(r => r.some(cell => String(cell).trim()));
+        function col(row, ...names) {
+          for (const name of names) {
+            const idx = headers.findIndex(h => h.includes(name.toLowerCase()));
+            if (idx >= 0 && row[idx] !== undefined) return String(row[idx]).trim();
+          }
+          return '';
+        }
+        const parsed = dataRows.map((row, i) => ({
+          rowNum:        i + 2,
+          name:          col(row, 'name'),
+          staffId:       col(row, 'staff id', 'staffid', 'id'),
+          email:         col(row, 'email'),
+          phone:         col(row, 'phone', 'mobile'),
+          dept:          col(row, 'department', 'dept'),
+          staffType:     col(row, 'staff type', 'type').toLowerCase().includes('non') ? 'non_teaching' : 'teaching',
+          isClassTeacher:col(row, 'class teacher', 'isclassteacher').toLowerCase() === 'yes',
+          classTeacherOf:col(row, 'class teacher of', 'classteacherof'),
+          password:      col(row, 'password'),
+        }));
+        setStaffUploadRows(parsed);
+      } catch(err) {
+        setStaffUploadErrors(['Could not read file: ' + err.message]);
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  }
+
+  function importStaffRows() {
+    const errors = [];
+    const toAdd  = [];
+    staffUploadRows.forEach(row => {
+      if (!row.name) { errors.push(`Row ${row.rowNum}: Missing name — skipped.`); return; }
+      if (!row.staffId) { errors.push(`Row ${row.rowNum}: Missing Staff ID — skipped.`); return; }
+      if (data.teachers.find(t => t.staffId === row.staffId)) {
+        errors.push(`Row ${row.rowNum}: Staff ID "${row.staffId}" already exists — skipped.`); return;
+      }
+      const dept = depts.find(d => d.toLowerCase() === row.dept.toLowerCase()) || row.dept || 'Academics';
+      toAdd.push({
+        id:             Date.now() + Math.random(),
+        name:           row.name,
+        staffId:        row.staffId,
+        email:          row.email,
+        phone:          row.phone,
+        dept,
+        staffType:      row.staffType || 'teaching',
+        isClassTeacher: row.isClassTeacher || false,
+        classTeacherOf: row.classTeacherOf || null,
+        subjects:       [],
+        canSeeKitchenAlerts: dept.toLowerCase() === 'kitchen',
+        canSeeFees:     dept.toLowerCase() === 'finance',
+        admin:          false,
+        password:       row.password || row.staffId,
+        status:         'active',
+      });
+    });
+    if (toAdd.length > 0) {
+      setData(d => ({ ...d, teachers: [...d.teachers, ...toAdd] }));
+    }
+    setStaffUploadErrors(errors);
+    setStaffUploadSummary({ added: toAdd.length, skipped: errors.length });
+    setStaffUploadDone(true);
+    setStaffUploadRows([]);
+  }
 
   /* ── Subject row helpers ──────────────────────────── */
   function addSubjectRow() {
@@ -340,6 +439,9 @@ export default function Teachers({ data, setData }) {
           <Btn variant="ghost" onClick={() => printStaffIntakeForm(data)}>
             <Icon name="print" size={14} /> Staff Form
           </Btn>
+          <Btn variant="ghost" onClick={() => { setShowStaffUpload(true); setStaffUploadRows([]); setStaffUploadErrors([]); setStaffUploadDone(false); setStaffUploadSummary(null); }}>
+            <Icon name="upload" size={14} /> Bulk Upload
+          </Btn>
           <Btn onClick={openAdd}><Icon name="add" size={14} /> Add Staff Member</Btn>
         </div>
       </div>
@@ -483,6 +585,100 @@ export default function Teachers({ data, setData }) {
           </Btn>
         </div>
       </Modal>
+
+      {/* ── Staff Bulk Upload Modal ─────────────────── */}
+      <Modal show={showStaffUpload} onClose={() => setShowStaffUpload(false)} title="Bulk Upload Staff Members" wide>
+        {!staffUploadDone ? (
+          <>
+            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>Step 1 — Download the Excel template</div>
+              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+                Fill in staff details. Columns: Name, Staff ID, Email, Phone, Department, Staff Type, Is Class Teacher, Class Teacher Of, Password.
+                Subjects are assigned manually after upload.
+              </div>
+              <Btn variant="ghost" size="sm" onClick={downloadStaffTemplate}>
+                <Icon name="download" size={13} /> Download Template (.xlsx)
+              </Btn>
+            </div>
+
+            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>Step 2 — Upload your filled file</div>
+              <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#4f8ef7', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
+                <Icon name="upload" size={13} /> Choose File (.xlsx / .csv)
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleStaffUploadFile} style={{ display:'none' }} />
+              </label>
+            </div>
+
+            {staffUploadRows.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:8 }}>
+                  Step 3 — Review & Import ({staffUploadRows.length} rows found)
+                </div>
+                <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+                    <thead>
+                      <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
+                        {['Row','Name','Staff ID','Email','Phone','Dept','Type','Class Teacher'].map(h => (
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'#64748b', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffUploadRows.map((row,i) => (
+                        <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
+                          <td style={{ padding:'5px 10px', color:'#64748b' }}>{row.rowNum}</td>
+                          <td style={{ padding:'5px 10px', color:row.name?'#e2e8f0':'#ef4444', fontWeight:row.name?400:700 }}>{row.name||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:row.staffId?'#4f8ef7':'#ef4444', fontFamily:'monospace' }}>{row.staffId||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.email||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.phone||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.dept||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.staffType}</td>
+                          <td style={{ padding:'5px 10px', color:row.isClassTeacher?'#10b981':'#64748b' }}>{row.isClassTeacher?`Yes — ${row.classTeacherOf}`:'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display:'flex', gap:10, marginTop:12, justifyContent:'flex-end' }}>
+                  <Btn variant="ghost" onClick={() => { setStaffUploadRows([]); setStaffUploadErrors([]); }}>Clear</Btn>
+                  <Btn variant="success" onClick={importStaffRows}>
+                    <Icon name="check" size={14} /> Import {staffUploadRows.length} Staff
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {staffUploadErrors.length > 0 && !staffUploadDone && (
+              <Alert type="warning">
+                <div style={{ fontSize:12 }}>
+                  {staffUploadErrors.slice(0,5).map((e,i) => <div key={i}>⚠ {e}</div>)}
+                  {staffUploadErrors.length > 5 && <div>...and {staffUploadErrors.length-5} more issues</div>}
+                </div>
+              </Alert>
+            )}
+          </>
+        ) : (
+          <div style={{ textAlign:'center', padding:'32px 0' }}>
+            <div style={{ fontSize:56, marginBottom:16 }}>{staffUploadSummary?.added > 0 ? '✅' : '⚠️'}</div>
+            <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0', marginBottom:8 }}>Upload Complete</div>
+            <div style={{ fontSize:14, color:'#94a3b8', marginBottom:20 }}>
+              <span style={{ color:'#10b981', fontWeight:700 }}>{staffUploadSummary?.added} staff members added</span>
+              {staffUploadSummary?.skipped > 0 && <span style={{ color:'#f59e0b' }}> · {staffUploadSummary.skipped} rows skipped</span>}
+            </div>
+            {staffUploadErrors.length > 0 && (
+              <div style={{ background:'#1e2435', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:140, overflowY:'auto' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>Skipped rows:</div>
+                {staffUploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'#64748b', marginBottom:2 }}>• {e}</div>)}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+              <Btn variant="ghost" onClick={() => { setStaffUploadDone(false); setStaffUploadRows([]); setStaffUploadErrors([]); setStaffUploadSummary(null); }}>Upload Another File</Btn>
+              <Btn onClick={() => setShowStaffUpload(false)}>Done</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 }
