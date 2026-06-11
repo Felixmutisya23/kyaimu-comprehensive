@@ -77,21 +77,28 @@ function parseToken(token) {
 /* ═══════════════════════════════════════════════════════
    LICENSE STATE — persisted in localStorage
 ═══════════════════════════════════════════════════════ */
-function loadLicense() {
+function loadLicense(schoolId) {
   try {
-    const raw = localStorage.getItem(LICENSE_STORAGE_KEY);
+    // Try school-specific key first, fall back to legacy
+    const raw = localStorage.getItem(getLicenseKey(schoolId)) 
+             || localStorage.getItem(LICENSE_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
   return { paid: false, paidUntil: null, term: null, year: null, txRef: null, studentCount: 0 };
 }
 
-function saveLicense(lic) {
-  try { localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify(lic)); } catch {}
+function saveLicense(lic, schoolId) {
+  try {
+    localStorage.setItem(getLicenseKey(schoolId), JSON.stringify(lic));
+    // Clean up legacy key to avoid confusion
+    localStorage.removeItem(LICENSE_STORAGE_KEY);
+  } catch {}
 }
 
-function loadTokenState() {
+function loadTokenState(schoolId) {
   try {
-    const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const raw = localStorage.getItem(getTokenKey(schoolId))
+             || localStorage.getItem(TOKEN_STORAGE_KEY);
     if (raw) {
       const t = JSON.parse(raw);
       if (t.expiry && new Date(t.expiry) > new Date()) return t;
@@ -100,8 +107,12 @@ function loadTokenState() {
   return null;
 }
 
-function saveTokenState(state) {
-  try { localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(state)); } catch {}
+function saveTokenState(state, schoolId) {
+  try {
+    localStorage.setItem(getTokenKey(schoolId), JSON.stringify(state));
+    // Clean up legacy key
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {}
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -127,16 +138,17 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   const isFirstTerm = studentCount === 0;
   const totalDue    = isFirstTerm ? FIRST_TERM_FLAT_FEE : studentCount * PER_STUDENT_FEE;
 
-  const [lic, setLicRaw]     = useState(() => loadLicense());
-  const [tokenState, setTok] = useState(() => loadTokenState());
+  const schoolId = data._schoolId || '';
+  const [lic, setLicRaw]     = useState(() => loadLicense(schoolId));
+  const [tokenState, setTok] = useState(() => loadTokenState(schoolId));
 
   // Re-read localStorage whenever refreshKey changes (triggered after cloud sync on login)
   React.useEffect(() => {
     if (refreshKey > 0) {
-      setLicRaw(loadLicense());
-      setTok(loadTokenState());
+      setLicRaw(loadLicense(schoolId));
+      setTok(loadTokenState(schoolId));
     }
-  }, [refreshKey]);
+  }, [refreshKey, schoolId]);
 
   // Use the open term from terms array as source of truth, fall back to data.currentTerm, then date-based
   const _openTerm    = (data.terms || []).find(t => t.opened && !t.closed);
@@ -153,7 +165,7 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   // ── Save license to localStorage AND to Supabase via data.licenseData ──
   function setLic(val) {
     setLicRaw(val);
-    saveLicense(val);
+    saveLicense(val, schoolId); // school-specific key
     // Push into Supabase by updating data.licenseData
     if (setData) {
       setData(d => ({
@@ -166,7 +178,7 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   // ── Save token to localStorage AND to Supabase via data.licenseData ──
   function setToken(state) {
     setTok(state);
-    saveTokenState(state);
+    saveTokenState(state, schoolId); // school-specific key
     if (setData) {
       setData(d => ({
         ...d,
@@ -420,7 +432,9 @@ export function LicenseGate({ license, data }) {
               </div>
             )}
             <div style={{ marginTop: 12, fontSize: 11, color: '#475569', lineHeight: 1.7 }}>
-              Contact the system developer (Felix) to get a token if you paid via bank or other method.
+              Contact the system developer to get a token:<br/>
+            📞 <strong style={{color:'#e2e8f0'}}>+254 758 568 804</strong> &nbsp;/&nbsp; <strong style={{color:'#e2e8f0'}}>+254 769 581 067</strong><br/>
+            (WhatsApp or call — available Mon–Sat)
             </div>
           </div>
         )}

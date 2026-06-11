@@ -332,65 +332,6 @@ function SetupWizard({ data, setData, onDone }) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────
-// PUBLIC PAGE LOADER — completely independent of App auth flow
-// Renders when URL path is /school/:slug
-// ─────────────────────────────────────────────────────────────────
-const _PUBLIC_PATH = window.location.pathname;
-const _IS_PUBLIC   = _PUBLIC_PATH.startsWith('/school/') && _PUBLIC_PATH.length > 8;
-const _PUBLIC_SLUG = _IS_PUBLIC ? _PUBLIC_PATH.split('/school/')[1].replace(/\/+$/,'') : '';
-
-function PublicPageLoader({ slug }) {
-  const [schoolData, setSchoolData] = React.useState(null);
-  const [status, setStatus]         = React.useState('loading');
-
-  React.useEffect(() => {
-    if (!slug) { setStatus('notfound'); return; }
-    async function go() {
-      try {
-        // Use statically imported supabaseClient and loadSchoolData
-        const { data: rows, error } = await supabaseClient
-          .from('schools').select('id').eq('school_slug', slug).limit(1);
-        if (error || !rows || !rows.length) { setStatus('notfound'); return; }
-        const d = await loadSchoolData(rows[0].id);
-        if (d) { setSchoolData(d); setStatus('found'); }
-        else setStatus('notfound');
-      } catch(e) { console.error(e); setStatus('error'); }
-    }
-    go();
-  }, [slug]);
-
-  if (status === 'loading') return (
-    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#eff6ff,#f0fdf4)',fontFamily:'sans-serif'}}>
-      <div style={{fontSize:56,marginBottom:16}}>🏫</div>
-      <div style={{fontSize:18,fontWeight:700,color:'#1e40af',marginBottom:6}}>EduManage Pro</div>
-      <div style={{fontSize:14,color:'#64748b'}}>Loading school page...</div>
-    </div>
-  );
-
-  if (status !== 'found') return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f8fafc',fontFamily:'sans-serif'}}>
-      <div style={{textAlign:'center',maxWidth:440,padding:32}}>
-        <div style={{fontSize:64,marginBottom:16}}>🔍</div>
-        <div style={{fontSize:22,fontWeight:900,color:'#1e293b',marginBottom:10}}>School not found</div>
-        <div style={{fontSize:13,color:'#64748b',marginBottom:24}}>No school found for <b>/school/{slug}</b>. The school may not have set up their public page yet.</div>
-        <a href="/" style={{padding:'11px 28px',background:'#1e40af',color:'#fff',borderRadius:10,textDecoration:'none',fontWeight:700}}>Back to Login</a>
-      </div>
-    </div>
-  );
-
-  return <PublicPage data={schoolData} onLoginClick={() => { window.location.href = '/'; }} />;
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Entry point — if public route, render PublicPageLoader directly
-// This bypasses all of App's auth logic
-// ─────────────────────────────────────────────────────────────────
-if (_IS_PUBLIC) {
-  // Render PublicPageLoader as root — React will pick this up from main.jsx
-  // We override the default export to return the loader
-}
-
 export default function App() {
   const [data, setDataRaw]        = React.useState({ ...INITIAL_DATA });
   const [user, setUser]           = React.useState(null);
@@ -408,53 +349,11 @@ export default function App() {
   const [saveError, setSaveError] = React.useState(null);
   const [loginError, setLoginError] = React.useState('');
 
-  // ── Public school page route — /school/:slug ─────────────────
-  // Check this BEFORE any auth logic so it never redirects to login
-  const [publicPageData,    setPublicPageData]    = React.useState(null);
-  const [publicPageLoading, setPublicPageLoading] = React.useState(false);
-  const [isPublicRoute,     setIsPublicRoute]     = React.useState(() => {
-    const path = window.location.pathname;
-    return path.startsWith('/school/') && path.length > 8;
-  });
 
-  // ── Load public school page data by slug ─────────────────────
-  React.useEffect(() => {
-    if (!isPublicRoute) return;
-    const slug = window.location.pathname.replace('/school/', '').replace(/^\/|\/$/g, '');
-    if (!slug) return;
-    setPublicPageLoading(true);
-    async function loadPublicData() {
-      try {
-        // Import supabase client directly
-        // Query Supabase for school by slug
-        const { data: rows, error } = await supabaseClient
-          .from('schools')
-          .select('id, school_slug')
-          .eq('school_slug', slug)
-          .limit(1);
-        if (!error && rows && rows.length > 0) {
-          const schoolData = await loadSchoolData(rows[0].id);
-          setPublicPageData(schoolData || { notFound: true, slug });
-        } else {
-          setPublicPageData({ notFound: true, slug });
-        }
-      } catch(e) {
-        console.error('Public page load error:', e);
-        setPublicPageData({ notFound: true, slug });
-      } finally {
-        setPublicPageLoading(false);
-      }
-    }
-    loadPublicData();
-  }, [isPublicRoute]);
+
 
   // ── Load school data from Supabase on mount ──────────────────
   React.useEffect(() => {
-    // Skip all auth/data loading if this is a public school page route
-    if (window.location.pathname.startsWith('/school/')) {
-      setLoading(false);
-      return;
-    }
     async function init() {
       try {
         const schoolId = getLocalSchoolId();
@@ -551,39 +450,6 @@ export default function App() {
 
   // Early returns AFTER all hooks — loading must be here too so hooks run every render
 
-  // ── Public school page — show WITHOUT login ─────────────────
-  if (isPublicRoute) {
-    if (publicPageLoading) return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc', fontFamily:'sans-serif' }}>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:48, marginBottom:12 }}>🏫</div>
-          <div style={{ fontSize:16, color:'#64748b', fontWeight:600 }}>Loading school page...</div>
-        </div>
-      </div>
-    );
-    if (publicPageData?.notFound) return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc', fontFamily:'sans-serif' }}>
-        <div style={{ textAlign:'center', maxWidth:400, padding:24 }}>
-          <div style={{ fontSize:64, marginBottom:16 }}>🔍</div>
-          <div style={{ fontSize:24, fontWeight:900, color:'#1e293b', marginBottom:8 }}>School not found</div>
-          <div style={{ fontSize:14, color:'#64748b', marginBottom:24, lineHeight:1.7 }}>
-            No school found at this link. It may be incorrect or the school may not have set up their public page yet.
-          </div>
-          <a href="/" style={{ padding:'12px 28px', background:'#1e40af', color:'#fff', borderRadius:10, textDecoration:'none', fontWeight:700, fontSize:15 }}>
-            Back to Login
-          </a>
-        </div>
-      </div>
-    );
-    if (publicPageData) return (
-      <PublicPage data={publicPageData} onLoginClick={() => { window.location.href = '/'; }} />
-    );
-    return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc' }}>
-        <div style={{ fontSize:32 }}>⏳</div>
-      </div>
-    );
-  }
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
@@ -616,17 +482,6 @@ export default function App() {
     );
   }
 
-  // Final guard — never show login on public routes
-  if (window.location.pathname.startsWith('/school/')) {
-    return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc' }}>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:48, marginBottom:12 }}>🏫</div>
-          <div style={{ fontSize:16, color:'#64748b' }}>Loading school page...</div>
-        </div>
-      </div>
-    );
-  }
 
   if (!user) {
     if (showTeacherRegister) {

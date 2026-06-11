@@ -714,26 +714,31 @@ export async function incrementWaUsed(schoolId, term, year, count = 1) {
  * @param {string} caption - Optional caption
  */
 export async function uploadGalleryPhoto(file, schoolId) {
-  const ext      = file.name.split('.').pop().toLowerCase();
-  const fileName = `${schoolId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  // Validate file type
+  if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
+  // Validate size — 3MB max
+  if (file.size > 3 * 1024 * 1024) throw new Error(`File too large: ${(file.size/1024/1024).toFixed(1)}MB. Maximum is 3MB.`);
+
+  const ext      = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const safeName = `${(schoolId||'school').replace(/-/g,'').slice(0,8)}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
 
   const { data, error } = await getSupabase()
     .storage
     .from('school-gallery')
-    .upload(fileName, file, {
+    .upload(safeName, file, {
       cacheControl: '3600',
       upsert: false,
       contentType: file.type,
     });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error('Upload failed: ' + error.message);
 
   const { data: urlData } = getSupabase()
     .storage
     .from('school-gallery')
-    .getPublicUrl(fileName);
+    .getPublicUrl(safeName);
 
-  return { url: urlData.publicUrl, fileName };
+  return { url: urlData.publicUrl, fileName: safeName };
 }
 
 /**

@@ -273,8 +273,10 @@ function TeacherMarks({ user, data, setData }) {
   function loadExamScores(exam, subject) {
     const init = {};
     (data.students || []).filter(s => s.class == exam.class).forEach(st => {
-      const cell = exam.results?.[st.id]?.[subject];
-      init[st.id] = getScore(cell) ?? '';
+      // CRITICAL: use student.name as key — must match Exams.jsx and saveMarks
+      const cell       = exam.results?.[st.name]?.[subject];
+      const legacyCell = exam.results?.[st.id]?.[subject]; // migrate old data
+      init[st.name] = getScore(cell) ?? getScore(legacyCell) ?? '';
     });
     setScores(init);
     setSaved(false);
@@ -301,11 +303,11 @@ function TeacherMarks({ user, data, setData }) {
         if (ex.id !== selExam.id) return ex;
         const newResults = { ...ex.results };
         classStudents.forEach(st => {
-          // Use student.id as key — consistent with Exams.jsx
-          if (!newResults[st.id]) newResults[st.id] = {};
-          const v = Number(scores[st.id]);
-          if (!isNaN(v) && scores[st.id] !== '') {
-            newResults[st.id][selSubject.subject] = { score: v, submittedBy: user.staffId, locked: false };
+          // CRITICAL: use student.name as key — must match Exams.jsx
+          if (!newResults[st.name]) newResults[st.name] = {};
+          const v = Number(scores[st.name]);
+          if (!isNaN(v) && String(scores[st.name]) !== '') {
+            newResults[st.name][selSubject.subject] = { score: v, submittedBy: user.staffId, locked: false };
           }
         });
         return { ...ex, results: newResults };
@@ -387,7 +389,7 @@ function TeacherMarks({ user, data, setData }) {
               </thead>
               <tbody>
                 {classStudents.map((st, i) => {
-                  const score = scores[st.id];
+                  const score = scores[st.name]; // FIXED: use st.name not st.id
                   const numScore = score !== '' && !isNaN(Number(score)) ? Number(score) : null;
                   return (
                     <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
@@ -396,7 +398,7 @@ function TeacherMarks({ user, data, setData }) {
                       <td style={{ padding: '8px 12px', color: '#64748b', fontFamily: 'monospace' }}>{st.admNo}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>
                         <input type="number" min={0} max={100} value={score ?? ''}
-                          onChange={e => { setScores(p => ({ ...p, [st.id]: e.target.value })); setSaved(false); }}
+                          onChange={e => { setScores(p => ({ ...p, [st.name]: e.target.value })); setSaved(false); }}
                           style={{ width: 72, textAlign: 'center', padding: '6px 8px', fontSize: 14, fontWeight: 700 }} />
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>

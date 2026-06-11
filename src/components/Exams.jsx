@@ -73,8 +73,10 @@ export default function Exams({ data, setData, user }) {
   const visibleSubjects = selExam ? getVisibleSubjects(selExam) : [];
 
   // Subjects this user can ENTER scores for in selClass
+  // Class teacher can enter ALL subjects for their class
   function getEnterableSubjects() {
     if (isPrincipal) return getSubjectsForClass(selClass, data);
+    if (isClassTeacher && myClass === selClass) return getSubjectsForClass(selClass, data);
     return (user.teacherSubjects || [])
       .filter(s => s.classes.includes(selClass))
       .map(s => s.subject);
@@ -378,6 +380,25 @@ export default function Exams({ data, setData, user }) {
               }
             }}>
               <Icon name="trash" size={13} /> Delete Exam
+            </Btn>
+          )}
+          {isPrincipal && (
+            <Btn variant="ghost" size="sm" onClick={() => {
+              const studentNames = new Set((data.students||[]).map(s=>s.name));
+              const orphaned = (data.exams||[]).filter(ex => {
+                const hasRealStudents = Object.keys(ex.results||{}).some(name=>studentNames.has(name));
+                return !hasRealStudents && Object.keys(ex.results||{}).length > 0;
+              });
+              if (orphaned.length === 0) { alert('No orphaned exam records found. All exams have valid students.'); return; }
+              if (window.confirm(`Found ${orphaned.length} exam record(s) with no matching students (from deleted/test students).\n\nDelete them?\n\n${orphaned.map(e=>e.name+' — '+e.class).join('\n')}`)) {
+                setData(d => ({ ...d, exams: d.exams.filter(ex => {
+                  const hasReal = Object.keys(ex.results||{}).some(name=>studentNames.has(name));
+                  return hasReal || Object.keys(ex.results||{}).length === 0;
+                })}));
+                alert('Orphaned exam records removed.');
+              }
+            }}>
+              🧹 Clean Orphaned Exams
             </Btn>
           )}
           {isPrincipal && (

@@ -271,6 +271,50 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
     }
   }
 
+  // ── Edit student ──────────────────────────────────────
+  const [showEdit,   setShowEdit]   = useState(false);
+  const [editForm,   setEditForm]   = useState(null);
+  const [editId,     setEditId]     = useState(null);
+
+  function openEdit(s) {
+    setEditForm({
+      firstName:   s.firstName  || s.name?.split(' ')[0] || '',
+      lastName:    s.lastName   || s.name?.split(' ').slice(-1)[0] || '',
+      otherName:   s.otherName  || '',
+      admNo:       s.admNo      || '',
+      class:       s.class      || '',
+      dob:         s.dob        || '',
+      parentName:  s.parentName || s.parent || '',
+      parentPhone: s.parentPhone|| s.phone  || '',
+      joined:      s.joined     || '',
+    });
+    setEditId(s.id);
+    setShowEdit(true);
+  }
+
+  function saveEdit() {
+    const fullName = buildStudentName(editForm.firstName.trim(), editForm.lastName.trim(), editForm.otherName.trim());
+    setData(d => ({
+      ...d,
+      students: d.students.map(s => s.id === editId ? {
+        ...s,
+        firstName:   editForm.firstName.trim(),
+        lastName:    editForm.lastName.trim(),
+        otherName:   editForm.otherName.trim(),
+        name:        fullName,
+        admNo:       editForm.admNo,
+        class:       editForm.class,
+        dob:         editForm.dob,
+        parentName:  editForm.parentName.trim(),
+        parentPhone: editForm.parentPhone.trim(),
+        joined:      editForm.joined,
+      } : s),
+    }));
+    setShowEdit(false);
+    setEditId(null);
+    setEditForm(null);
+  }
+
   function addCase(s) {
     if (!caseText.trim()) return;
     const entry = `${caseText} — ${new Date().toISOString().split('T')[0]}`;
@@ -493,6 +537,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                     <td style={TS.td}>
                       <div style={{display:'flex',gap:6}}>
                         <Btn size="sm" variant="ghost" onClick={()=>setViewStudent(s)}><Icon name="eye" size={13}/></Btn>
+                        {(isPrincipal||isClassTeacher)&&<Btn size="sm" variant="ghost" onClick={()=>openEdit(s)}><Icon name="edit" size={13}/></Btn>}
                         {isPrincipal&&<Btn size="sm" variant="danger" onClick={()=>deleteStudent(s.id)}><Icon name="trash" size={13}/></Btn>}
                       </div>
                     </td>
@@ -694,6 +739,60 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           </div>
         )}
       </Modal>
+
+      {/* Edit Student Modal */}
+      {showEdit && editForm && (
+        <Modal show={showEdit} onClose={() => { setShowEdit(false); setEditForm(null); }} title="Edit Student">
+          <div style={{fontSize:12,fontWeight:600,color:'#4f8ef7',marginBottom:8,textTransform:'uppercase'}}>Student Name</div>
+          <FormRow>
+            <FormGroup label="First Name *">
+              <input value={editForm.firstName} onChange={e=>setEditForm({...editForm,firstName:e.target.value})} autoFocus />
+            </FormGroup>
+            <FormGroup label="Last Name *">
+              <input value={editForm.lastName} onChange={e=>setEditForm({...editForm,lastName:e.target.value})} />
+            </FormGroup>
+          </FormRow>
+          <FormGroup label="Other Name (optional)">
+            <input value={editForm.otherName} onChange={e=>setEditForm({...editForm,otherName:e.target.value})} />
+          </FormGroup>
+          <div style={{fontSize:11,color:'#64748b',marginBottom:14,padding:'6px 10px',background:'#f0f9ff',borderRadius:6}}>
+            Full name preview: <strong>{buildStudentName(editForm.firstName,editForm.lastName,editForm.otherName)||'—'}</strong>
+          </div>
+          {admMode==='manual' && (
+            <FormGroup label="Admission Number">
+              <input value={editForm.admNo} onChange={e=>setEditForm({...editForm,admNo:e.target.value})} />
+            </FormGroup>
+          )}
+          <FormRow>
+            <FormGroup label="Class">
+              <select value={editForm.class} onChange={e=>setEditForm({...editForm,class:e.target.value})}
+                disabled={isClassTeacher&&!isPrincipal}>
+                {(isPrincipal ? getAllClasses(data) : [myClass]).map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </FormGroup>
+            <FormGroup label="Date of Birth">
+              <input type="date" value={editForm.dob} onChange={e=>setEditForm({...editForm,dob:e.target.value})} />
+            </FormGroup>
+          </FormRow>
+          <FormRow>
+            <FormGroup label="Parent/Guardian Name">
+              <input value={editForm.parentName} onChange={e=>setEditForm({...editForm,parentName:e.target.value})} />
+            </FormGroup>
+            <FormGroup label="Parent Phone">
+              <input value={editForm.parentPhone} onChange={e=>setEditForm({...editForm,parentPhone:e.target.value})} />
+            </FormGroup>
+          </FormRow>
+          <FormGroup label="Year Joined">
+            <input value={editForm.joined} onChange={e=>setEditForm({...editForm,joined:e.target.value})} />
+          </FormGroup>
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <Btn variant="ghost" onClick={()=>{setShowEdit(false);setEditForm(null);}}>Cancel</Btn>
+            <Btn variant="success" onClick={saveEdit} disabled={!editForm.firstName.trim()&&!editForm.lastName.trim()}>
+              Save Changes
+            </Btn>
+          </div>
+        </Modal>
+      )}
 
 const TS = {
   table: { width:'100%',borderCollapse:'collapse',fontSize:13 },
