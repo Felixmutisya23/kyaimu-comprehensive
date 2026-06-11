@@ -27,6 +27,18 @@ const PER_STUDENT_FEE     = 100;   // KES 100 per student per term from next ter
 const LICENSE_STORAGE_KEY = 'edumanage_license_v1';
 const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
 
+// ── School-specific storage key helpers ──────────────
+// Each school gets its own key using first 8 chars of UUID
+// Prevents token/license sharing between schools in same browser
+function getLicenseKey(schoolId) {
+  const code = (schoolId || 'default').replace(/-/g, '').slice(0, 8);
+  return 'edumanage_license_v1_' + code;
+}
+function getTokenKey(schoolId) {
+  const code = (schoolId || 'default').replace(/-/g, '').slice(0, 8);
+  return 'edumanage_token_v1_' + code;
+}
+
 /* ═══════════════════════════════════════════════════════
    TOKEN SYSTEM
    Format: EDU-XXXX-YYYYMMDD-NNNN-CCCC

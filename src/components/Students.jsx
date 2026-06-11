@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Avatar, GradeBadge, Icon } from './UI';
 import { getGrade, getAllClasses, getScore, getStreamFromClass, generateSLC, generateAdmNo, buildStudentName } from '../data/initialData';
 import * as XLSX from 'xlsx';
-import { printLeavingCert, printReportForm, printStudentIntakeForm } from '../utils/print';
+import { printLeavingCert, printReportForm, printStudentIntakeForm, printClassList } from '../utils/print';
 
 export default function Students({ data, setData, user, isUnlocked = true }) {
   const isPrincipal    = user.role === 'principal';
@@ -485,6 +485,25 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => printStudentIntakeForm(data)}>
               <Icon name="print" size={14} /> Intake Form
+            </Btn>
+          )}
+          {(isPrincipal || isClassTeacher) && (
+            <Btn variant="ghost" onClick={() => {
+              const cls = filterClass || myClass || '';
+              const studentsForList = cls
+                ? filtered.filter(s => s.class === cls)
+                : filtered;
+              if (!studentsForList.length) { alert('No students to print. Select a class first.'); return; }
+              const teacher = cls
+                ? (data.teachers||[]).find(t => t.isClassTeacher && t.classTeacherOf === cls)
+                : null;
+              printClassList(studentsForList, cls || 'All Classes', data, {
+                classTeacher: teacher ? teacher.name : (isClassTeacher ? user.name : ''),
+                term: data.currentTerm ? `Term ${data.currentTerm}` : '',
+                year: data.currentYear || new Date().getFullYear(),
+              });
+            }}>
+              <Icon name="print" size={14} /> Class List
             </Btn>
           )}
           {isPrincipal && (
