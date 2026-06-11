@@ -623,9 +623,6 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           <Btn onClick={save} disabled={!form.firstName.trim()&&!form.lastName.trim()}>Add Student</Btn>
         </div>
       </Modal>
-    </div>
-  );
-}
 
       {/* ── Bulk Upload Modal ───────────────────────── */}
       <Modal show={showUpload} onClose={() => setShowUpload(false)} title="Bulk Upload Students" wide>
@@ -793,6 +790,10 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           </div>
         </Modal>
       )}
+
+    </div>
+  );
+}
 
 const TS = {
   table: { width:'100%',borderCollapse:'collapse',fontSize:13 },
