@@ -1313,7 +1313,7 @@ export function printStaffIntakeForm(data) {
    Admin/Class Teacher prints a list of all students in a class
    with admission numbers, SLC codes, parent details
 ═══════════════════════════════════════════════════════ */
-export function printClassList(students, className, data, options = {}) {
+export function printStudentRegister(students, className, data, options = {}) {
   const { term = '', year = '', classTeacher = '' } = options;
   const sorted = [...students].sort((a, b) => (a.name||'').localeCompare(b.name||''));
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Avatar, GradeBadge, Icon } from './UI';
 import { getGrade, getAllClasses, getScore, getStreamFromClass, generateSLC, generateAdmNo, buildStudentName } from '../data/initialData';
 import * as XLSX from 'xlsx';
-import { printLeavingCert, printReportForm, printStudentIntakeForm, printClassList } from '../utils/print';
+import { printLeavingCert, printReportForm, printStudentIntakeForm, printStudentRegister } from '../utils/print';
 
 export default function Students({ data, setData, user, isUnlocked = true }) {
   const isPrincipal    = user.role === 'principal';
@@ -497,7 +497,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               const teacher = cls
                 ? (data.teachers||[]).find(t => t.isClassTeacher && t.classTeacherOf === cls)
                 : null;
-              printClassList(studentsForList, cls || 'All Classes', data, {
+              printStudentRegister(studentsForList, cls || 'All Classes', data, {
                 classTeacher: teacher ? teacher.name : (isClassTeacher ? user.name : ''),
                 term: data.currentTerm ? `Term ${data.currentTerm}` : '',
                 year: data.currentYear || new Date().getFullYear(),
