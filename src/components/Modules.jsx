@@ -836,12 +836,12 @@ export function Settings({ data, setData }) {
     schoolCodeYear:   data.schoolCodeYear   || String(new Date().getFullYear()),
   });
 
-  // Public page state
+  // Public page state — pre-fill with school details as defaults
   const [pubPage, setPubPage] = useState({
     schoolSlug:    data.schoolSlug    || generateSlug(data.schoolName || ''),
-    schoolAbout:   data.schoolAbout   || '',
-    schoolVision:  data.schoolVision  || '',
-    schoolMission: data.schoolMission || '',
+    schoolAbout:   data.schoolAbout   || `${data.schoolName || 'Our School'} is a learning institution ${data.schoolLocation ? 'located in ' + data.schoolLocation : 'in Kenya'}, committed to providing quality ${data.schoolType || 'primary'} education and nurturing well-rounded students who excel academically and in character.`,
+    schoolVision:  data.schoolVision  || 'To be a centre of excellence in education, producing all-round individuals who positively impact society.',
+    schoolMission: data.schoolMission || `To provide quality education that equips learners with knowledge, skills, and values for life in a ${data.schoolType === 'Secondary' ? 'competitive' : 'digital'} world.`,
     schoolPhone:   data.schoolPhone   || '',
     schoolEmail:   data.schoolEmail   || '',
     schoolWebsite: data.schoolWebsite || '',
@@ -866,8 +866,17 @@ export function Settings({ data, setData }) {
   }
 
   function savePubPage() {
-    setData(d => ({ ...d, ...pubPage, slugLocked: true }));
-    alert('Public page settings saved!');
+    setData(d => ({ ...d,
+      schoolSlug:    pubPage.schoolSlug,
+      slugLocked:    true,
+      schoolAbout:   pubPage.schoolAbout,
+      schoolVision:  pubPage.schoolVision,
+      schoolMission: pubPage.schoolMission,
+      schoolPhone:   pubPage.schoolPhone,
+      schoolEmail:   pubPage.schoolEmail,
+      schoolWebsite: pubPage.schoolWebsite,
+    }));
+    alert('Public page settings saved! The slug is now locked.');
   }
 
   function addJob() {

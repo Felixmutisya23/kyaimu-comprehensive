@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 /* ═══════════════════════════════════════════════════════
    LICENSE & SUBSCRIPTION SYSTEM
    ─────────────────────────────────────────────────────
-   • Each term: KES 100 per registered student
+   • Each term: KES 30 per registered student
    • Payment via InstaSend (M-Pesa STK push)
    • Token system: developer-generated codes for time-limited access
    • Read-only mode if unpaid (data always preserved)
@@ -21,15 +21,12 @@ const VERIFY_PAYMENT_URL = '/.netlify/functions/verify-payment';
 
 // ── PRICING CONSTANTS ────────────────────────────────
 const FIRST_TERM_FLAT_FEE = 5000;  // KES 5,000 flat for first-ever term (no students yet)
-const PER_STUDENT_FEE     = 100;   // KES 100 per student per term from next term onward
+const PER_STUDENT_FEE     = 30;    // KES 30 per student per term
 
 // ── STORAGE KEYS ─────────────────────────────────────
 const LICENSE_STORAGE_KEY = 'edumanage_license_v1';
 const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
 
-// ── School-specific storage key helpers ──────────────
-// Each school gets its own key using first 8 chars of UUID
-// Prevents token/license sharing between schools in same browser
 function getLicenseKey(schoolId) {
   const code = (schoolId || 'default').replace(/-/g, '').slice(0, 8);
   return 'edumanage_license_v1_' + code;
@@ -38,6 +35,7 @@ function getTokenKey(schoolId) {
   const code = (schoolId || 'default').replace(/-/g, '').slice(0, 8);
   return 'edumanage_token_v1_' + code;
 }
+const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
 
 /* ═══════════════════════════════════════════════════════
    TOKEN SYSTEM
@@ -375,7 +373,7 @@ export function LicenseGate({ license, data }) {
           </span><br />
           {license.isFirstTerm
             ? <span style={{ fontSize: 12 }}>First-term flat fee (no students enrolled yet)</span>
-            : <span style={{ fontSize: 12 }}>{license.studentCount} students × KES 100 per term</span>
+            : <span style={{ fontSize: 12 }}>{license.studentCount} students × KES 30 per term</span>
           }
           {license.alreadyPaid > 0 && (
             <div style={{ marginTop: 8, padding: '8px 12px', background: '#f59e0b15', borderRadius: 8, border: '1px solid #f59e0b30', fontSize: 12 }}>

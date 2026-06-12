@@ -493,19 +493,57 @@ export default function App() {
     <Login
       data={data}
       externalError={loginError}
-      onStudentLogin={(admNo) => {
-        const student = (data.students || []).find(s =>
-          String(s.slc || '').trim() === String(admNo || '').trim()
+      onStudentLogin={async (slcCode) => {
+        const slcTrim = String(slcCode || '').trim();
+        if (!slcTrim) return false;
+        // First check already-loaded data
+        let student = (data.students || []).find(s =>
+          String(s.slc || '').trim() === slcTrim
         );
+        // If not found and we have a schoolId, reload from DB
+        if (!student) {
+          const schoolId = getLocalSchoolId();
+          if (schoolId) {
+            try {
+              const freshData = await loadSchoolData(schoolId);
+              if (freshData) {
+                setDataRaw(freshData);
+                student = (freshData.students || []).find(s =>
+                  String(s.slc || '').trim() === slcTrim
+                );
+              }
+            } catch(e) { console.error('SLC load error:', e); }
+          }
+        }
         if (student) { setStudentUser(student); return true; }
         return false;
       }}
-      onParentLogin={(slc) => {
-        // Parent login uses child's SLC code
-        const student = (data.students || []).find(s =>
-          String(s.slc || '').trim() === String(slc || '').trim()
+      onParentLogin={async (slcCode) => {
+        const slcTrim = String(slcCode || '').trim();
+        if (!slcTrim) return false;
+        // First check already-loaded data
+        let student = (data.students || []).find(s =>
+          String(s.slc || '').trim() === slcTrim
         );
-        if (student) { setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id }); return true; }
+        // If not found, reload from DB
+        if (!student) {
+          const schoolId = getLocalSchoolId();
+          if (schoolId) {
+            try {
+              const freshData = await loadSchoolData(schoolId);
+              if (freshData) {
+                setDataRaw(freshData);
+                student = (freshData.students || []).find(s =>
+                  String(s.slc || '').trim() === slcTrim
+                );
+              }
+            } catch(e) { console.error('SLC parent load error:', e); }
+          }
+        }
+        if (student) {
+          setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id });
+          return true;
+        }
         return false;
       }}
       onTeacherRegister={() => {

@@ -98,6 +98,24 @@ function schoolRowToData(row, related = {}) {
     subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
     subjectOverridesByLevel: row.subject_overrides_by_level || {},
     timetableRules:          row.timetable_rules             || [],
+    // Public page fields
+    schoolSlug:              row.school_slug              || '',
+    slugLocked:              row.slug_locked              || false,
+    schoolAbout:             row.school_about             || '',
+    schoolVision:            row.school_vision            || '',
+    schoolMission:           row.school_mission           || '',
+    schoolPhone:             row.school_phone             || '',
+    schoolEmail:             row.school_email             || '',
+    schoolWebsite:           row.school_website           || '',
+    schoolGallery:           row.school_gallery           || [],
+    jobVacancies:            row.job_vacancies            || [],
+    onlineApplications:      row.online_applications      || [],
+    customDocReqs:           row.custom_doc_reqs          || [],
+    // Admission & theme settings
+    admissionSetting:        row.admission_setting        || 'manual',
+    schoolCode:              row.school_code              || '',
+    schoolCodeYear:          row.school_code_year         || '',
+    darkTheme:               row.dark_theme               !== false,
     parents:           row.parents            || [],           // FIX: was never loaded
     promotionHistory:  row.promotion_history  || [],          // FIX: was never loaded
     // Related tables
@@ -353,6 +371,24 @@ export async function saveSchoolData(data) {
   schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
   schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
   schoolPayload.timetable_rules            = data.timetableRules           ?? [];
+  // Public page fields
+  schoolPayload.school_slug              = data.schoolSlug              || '';
+  schoolPayload.slug_locked              = data.slugLocked              || false;
+  schoolPayload.school_about             = data.schoolAbout             || '';
+  schoolPayload.school_vision            = data.schoolVision            || '';
+  schoolPayload.school_mission           = data.schoolMission           || '';
+  schoolPayload.school_phone             = data.schoolPhone             || '';
+  schoolPayload.school_email             = data.schoolEmail             || '';
+  schoolPayload.school_website           = data.schoolWebsite           || '';
+  schoolPayload.school_gallery           = data.schoolGallery           ?? [];
+  schoolPayload.job_vacancies            = data.jobVacancies            ?? [];
+  schoolPayload.online_applications      = data.onlineApplications      ?? [];
+  schoolPayload.custom_doc_reqs          = data.customDocReqs           ?? [];
+  // Admission & theme settings
+  schoolPayload.admission_setting        = data.admissionSetting        || 'manual';
+  schoolPayload.school_code              = data.schoolCode              || '';
+  schoolPayload.school_code_year         = data.schoolCodeYear          || '';
+  schoolPayload.dark_theme               = data.darkTheme               !== false;
 
   await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
 
@@ -603,7 +639,7 @@ export async function loginTeacher(email, password) {
   const schoolId = getLocalSchoolId();
   const hashed = await hashPassword(password);
 
-  let query = getSupabase().from('teachers').select('*, schools(*)').eq('email', email);
+  let query = getSupabase().from('teachers').select('*, schools(*)').ilike('email', email.trim());
   if (schoolId) {
     await setSchoolContext(schoolId);
     query = query.eq('school_id', schoolId);
@@ -628,7 +664,7 @@ export async function loginPrincipal(email, password) {
   const { data: schools } = await getSupabase()
     .from('schools')
     .select('*')
-    .eq('principal_email', email);
+    .ilike('principal_email', email.trim());
 
   if (!schools || !schools.length) return null;
 
