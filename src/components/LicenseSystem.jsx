@@ -35,7 +35,6 @@ function getTokenKey(schoolId) {
   const code = (schoolId || 'default').replace(/-/g, '').slice(0, 8);
   return 'edumanage_token_v1_' + code;
 }
-const TOKEN_STORAGE_KEY   = 'edumanage_token_v1';
 
 /* ═══════════════════════════════════════════════════════
    TOKEN SYSTEM
