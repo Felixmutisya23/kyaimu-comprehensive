@@ -765,16 +765,35 @@ export default function App() {
       {/* MOBILE HAMBURGER */}
       <style>{`
         @media (max-width: 768px) {
-          .edu-sidebar { position: fixed !important; left: 0; top: 0; height: 100vh; z-index: 1000; transform: translateX(-100%); transition: transform 0.25s !important; width: 240px !important; }
+          .edu-sidebar { position: fixed !important; left: 0; top: 0; height: 100vh; z-index: 1000; transform: translateX(-100%); transition: transform 0.25s !important; width: 260px !important; }
           .edu-sidebar.open { transform: translateX(0) !important; }
           .edu-overlay { display: block !important; }
-          .edu-hamburger { display: flex !important; }
-          .edu-main { margin-left: 0 !important; }
+          .edu-top-bar { display: flex !important; }
+          .edu-main { margin-left: 0 !important; padding-top: 56px !important; }
+          .edu-hamburger-btn { display: flex !important; }
         }
-        .edu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; cursor: pointer; }
-        .edu-hamburger { display: none; }
+        .edu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999; cursor: pointer; }
+        .edu-top-bar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 997; background: #171b26; border-bottom: 1px solid #2a3350; padding: 0 14px; height: 52px; align-items: center; gap: 12px; }
+        .edu-hamburger-btn { display: none; background: none; border: none; color: #e2e8f0; font-size: 22px; cursor: pointer; padding: 6px; line-height: 1; }
+        /* Make tables scroll on mobile */
+        @media (max-width: 768px) {
+          table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .edu-page-content { padding: 14px !important; }
+          /* Modals full-screen on phone */
+          .edu-modal-inner { width: 96vw !important; max-height: 92vh !important; margin: 4vh auto !important; }
+          /* Form rows stack on phone */
+          .edu-form-row { flex-direction: column !important; }
+        }
       `}</style>
       <div className="edu-overlay" style={{ pointerEvents: collapsed ? 'none' : 'auto' }} onClick={() => setCollapsed(true)} />
+
+      {/* Mobile top bar */}
+      <div className="edu-top-bar">
+        <button className="edu-hamburger-btn" onClick={() => setCollapsed(v => !v)}>☰</button>
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>E</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{PAGE_TITLES[page] || page}</div>
+        {myNotifUnread > 0 && <div style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{myNotifUnread}</div>}
+      </div>
       {/* SIDEBAR */}
       <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: '#171b26', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
         <div style={{ padding: '14px 12px', borderBottom: '1px solid #2a3350', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -847,20 +866,21 @@ export default function App() {
       </aside>
 
       {/* MAIN */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
-        <header style={{ background: '#171b26', borderBottom: '1px solid #2a3350', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="edu-hamburger" onClick={() => setCollapsed(c => !c)}
-              style={{ background: 'none', border: 'none', color: '#e2e8f0', cursor: 'pointer', fontSize: 22, padding: 4, borderRadius: 6 }}>☰</button>
+      <main className="edu-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
+        <header style={{ background: '#171b26', borderBottom: '1px solid #2a3350', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setCollapsed(c => !c)}
+              style={{ background: 'none', border: 'none', color: '#e2e8f0', cursor: 'pointer', fontSize: 20, padding: 4, borderRadius: 6 }}>☰</button>
             <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#e2e8f0' }}>{PAGE_TITLES[page] || page}</div>
-            <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {data.schoolName} · {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#e2e8f0' }}>{PAGE_TITLES[page] || page}</div>
+            <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ display: 'none' }} className="edu-desktop-label">{data.schoolName} · </span>
+              {new Date().toLocaleDateString('en-KE', { weekday: 'short', month: 'short', day: 'numeric' })}
               <TermBadge data={data} />
             </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {/* License status badge */}
             {user?.role == 'principal' && (
               license.isUnlocked
@@ -870,29 +890,29 @@ export default function App() {
                 : <span onClick={() => setPage('settings')} style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#ef444420', color: '#ef4444', border: '1px solid #ef444430', cursor: 'pointer' }}>🔒 SUBSCRIBE</span>
             )}
             {myMsgUnread > 0 && (
-              <button onClick={() => setPage('messages')} style={{ background: '#ef444415', border: '1px solid #ef444430', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              <button onClick={() => setPage('messages')} style={{ background: '#ef444415', border: '1px solid #ef444430', color: '#ef4444', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                 {myMsgUnread} unread
               </button>
             )}
             {showKitchenAlert && (
-              <button onClick={() => setPage('kitchen')} style={{ background: '#f59e0b15', border: '1px solid #f59e0b30', color: '#f59e0b', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              <button onClick={() => setPage('kitchen')} style={{ background: '#f59e0b15', border: '1px solid #f59e0b30', color: '#f59e0b', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                 ⚠ {lowInv} low stock
               </button>
             )}
             {(pendingApprovalCount > 0 || myNotifUnread > 0) && (
-              <button onClick={() => setPage('notifications')} style={{ background: '#4f8ef715', border: '1px solid #4f8ef730', color: '#4f8ef7', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                🔔 {pendingApprovalCount + myNotifUnread} alerts
+              <button onClick={() => setPage('notifications')} style={{ background: '#4f8ef715', border: '1px solid #4f8ef730', color: '#4f8ef7', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                🔔 {pendingApprovalCount + myNotifUnread}
               </button>
             )}
             {(statusAlertCount + overduePermCount) > 0 && (
-              <button onClick={() => setPage('status')} style={{ background: '#ef444415', border: '1px solid #ef444430', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                🚨 {statusAlertCount + overduePermCount} student alerts
+              <button onClick={() => setPage('status')} style={{ background: '#ef444415', border: '1px solid #ef444430', color: '#ef4444', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                🚨 {statusAlertCount + overduePermCount}
               </button>
             )}
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, border: `2px solid ${roleColor}40` }}>{initials}</div>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, border: `2px solid ${roleColor}40`, flexShrink: 0 }}>{initials}</div>
           </div>
         </header>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#0f1117' }}>
+        <div className="edu-page-content" style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#0f1117' }}>
           {renderPage()}
         </div>
       </main>
