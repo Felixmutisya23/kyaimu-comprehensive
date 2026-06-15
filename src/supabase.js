@@ -192,6 +192,7 @@ export async function loadSchoolData(schoolId) {
     subjects:       t.subjects || [],
     canSeeKitchenAlerts: t.can_see_kitchen,
     canSeeFees:     t.can_see_fees,
+    canEnterAllMarks: t.can_enter_all_marks || false,
     admin:          t.admin,
     password:       t.password,
     status:         t.status || 'active',  // 'pending' until admin approves
@@ -453,6 +454,7 @@ async function syncTeachers(schoolId, teachers, teachersLoaded) {
       subjects:         t.subjects || [],
       can_see_kitchen:  t.canSeeKitchenAlerts || false,
       can_see_fees:     t.canSeeFees || false,
+      can_enter_all_marks: t.canEnterAllMarks || false,
       admin:            t.admin || false,
       password:         hashedPw,
       status:           t.status || 'active',

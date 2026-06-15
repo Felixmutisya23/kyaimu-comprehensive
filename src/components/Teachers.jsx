@@ -28,6 +28,7 @@ const BLANK_FORM = {
   dept: 'Academics', staffType: 'teaching',
   isClassTeacher: false, classTeacherOf: '',
   canSeeKitchenAlerts: false, canSeeFees: false,
+  canEnterAllMarks: false,
   admin: false, password: '',
 };
 
@@ -193,6 +194,7 @@ export default function Teachers({ data, setData }) {
       classTeacherOf:     t.classTeacherOf || '',
       canSeeKitchenAlerts: t.canSeeKitchenAlerts || false,
       canSeeFees:         t.canSeeFees || false,
+      canEnterAllMarks:   t.canEnterAllMarks || false,
       admin:              t.admin      || false,
       password:           t.password   || t.staffId || '',
     });
@@ -242,6 +244,7 @@ export default function Teachers({ data, setData }) {
       subjects:           validSubjects,
       canSeeKitchenAlerts: form.canSeeKitchenAlerts || form.dept === 'Kitchen',
       canSeeFees:         form.canSeeFees || form.dept === 'Finance',
+      canEnterAllMarks:   form.canEnterAllMarks || false,
       admin:              form.admin,
       password:           form.password || form.staffId.trim(),
     };
@@ -338,9 +341,11 @@ export default function Teachers({ data, setData }) {
   function SubjectRows() {
     const levelGroups = Object.entries(CURRICULUM_LEVELS).map(([key, level]) => ({
       key, label: level.label,
-      classes: allClasses.filter(c =>
-        level.classes.some(lc => c.toLowerCase().startsWith(lc.toLowerCase()))
-      ),
+      classes: allClasses.filter(c => {
+        const name = c.toLowerCase();
+        // Match by startsWith against all alias names in the level
+        return level.classes.some(lc => name.startsWith(lc.toLowerCase()));
+      }),
     })).filter(g => g.classes.length > 0);
 
     return (
@@ -569,6 +574,7 @@ export default function Teachers({ data, setData }) {
             { field: 'admin',               label: 'Grant Admin / Principal Privileges (full access)' },
             { field: 'canSeeFees',          label: 'Can view fee & financial records' },
             { field: 'canSeeKitchenAlerts', label: 'Receives kitchen inventory alerts' },
+            { field: 'canEnterAllMarks',    label: 'Can enter marks for ALL subjects in ALL classes (e.g. Secretary)' },
           ].map(({ field, label }) => (
             <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
               <input type="checkbox" checked={form[field]} onChange={e => setForm({ ...form, [field]: e.target.checked })} />

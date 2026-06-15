@@ -20,7 +20,7 @@ export function getGrade(score, data) {
 export const CURRICULUM_LEVELS = {
   PRE_PRIMARY: {
     label: 'Pre-Primary',
-    classes: ['PP1', 'PP2'],
+    classes: ['PP1', 'PP2', 'Pre-Primary 1', 'Pre-Primary 2', 'Nursery', 'Baby Class', 'Playgroup', 'KG1', 'KG2', 'ECD1', 'ECD2'],
     subjects: ['Language Activities','Mathematical Activities','Environmental Activities','Psychomotor & Creative Activities','Religious Education Activities'],
   },
   LOWER_PRIMARY: {
@@ -48,6 +48,10 @@ export const CURRICULUM_LEVELS = {
 export function getCurriculumLevel(className) {
   if (!className) return null;
   const name = className.trim().toLowerCase();
+  // Extra aliases for Pre-Primary
+  if (name.startsWith('pp') || name.startsWith('pre-primary') || name.startsWith('pre primary') || name.startsWith('preprimary') || name.startsWith('nursery') || name.startsWith('baby') || name.startsWith('playgroup') || name.startsWith('ecd') || name.startsWith('kg')) {
+    return { key: 'PRE_PRIMARY', ...CURRICULUM_LEVELS.PRE_PRIMARY };
+  }
   for (const [key, level] of Object.entries(CURRICULUM_LEVELS)) {
     if (level.classes.some(c => name.startsWith(c.toLowerCase()))) return { key, ...level };
   }

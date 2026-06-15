@@ -614,6 +614,7 @@ export default function App() {
             dept:               teacherRecord?.dept            || '',
             canSeeFees:         teacherRecord?.canSeeFees      || false,
             canSeeKitchenAlerts:teacherRecord?.canSeeKitchenAlerts || false,
+            canEnterAllMarks:   teacherRecord?.canEnterAllMarks || false,
           });
           setPage('dashboard');
           // Load subscription for current term

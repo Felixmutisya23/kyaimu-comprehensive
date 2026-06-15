@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon, Avatar } from './UI';
-import { getAllClasses, getGrade, getScore, GRADES_CBC } from '../data/initialData';
+import { getAllClasses, getGrade, getScore, GRADES_CBC, getSubjectsForClass } from '../data/initialData';
 
 /* ── Teacher Portal — shown when user.role == 'teacher' ── */
 export default function TeacherPortal({ data, setData, user, onLogout }) {
@@ -62,6 +62,8 @@ export default function TeacherPortal({ data, setData, user, onLogout }) {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{user.name}</div>
               <div style={{ fontSize: 11, color: '#4f8ef7' }}>{user.staffId}</div>
               {isClassTeacher && <div style={{ fontSize: 10, color: '#10b981', marginTop: 2 }}>Class Teacher · {myClass}</div>}
+              {!isClassTeacher && user.canEnterAllMarks && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>Secretary · All Access</div>}
+              {!isClassTeacher && !user.canEnterAllMarks && user.staffType === 'teaching' && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Subject Teacher</div>}
             </div>
           </div>
         </div>
@@ -104,26 +106,36 @@ export default function TeacherPortal({ data, setData, user, onLogout }) {
 
 /* ── Home Dashboard ── */
 function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
-  const mySubjects = user.teacherSubjects || [];
-  const myClasses  = [...new Set(mySubjects.flatMap(s => s.classes))];
-  const today      = new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const mySubjects     = user.teacherSubjects || [];
+  const myClasses      = [...new Set(mySubjects.flatMap(s => s.classes))];
+  const isClassTeacher = user.isClassTeacher;
+  const myClass        = user.classTeacherOf;
+  const myStudents     = isClassTeacher ? (data.students || []).filter(s => s.class === myClass) : [];
+  const today          = new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const totalExams     = (data.exams || []).filter(e => myClasses.includes(e.class) || e.class === myClass).length;
+
+  const stats = [
+    { label: isClassTeacher ? 'My Students' : 'Classes I Teach', value: isClassTeacher ? myStudents.length : myClasses.length, color: '#4f8ef7', icon: isClassTeacher ? '👨‍🎓' : '🏫', page: isClassTeacher ? 'class' : null },
+    { label: 'Subjects', value: mySubjects.length, color: '#10b981', icon: '📚', page: 'marks' },
+    { label: "Today's Lessons", value: timetableToday.length, color: '#f59e0b', icon: '📅', page: 'lessons' },
+    { label: 'Notifications', value: myNotifs.length, color: myNotifs.length > 0 ? '#ef4444' : '#64748b', icon: '🔔', page: 'notifs' },
+  ];
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, {(user.name||"").split(' ')[0]} 👋</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{today}</div>
+        {isClassTeacher && <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>Class Teacher · {myClass}</div>}
+        {user.canEnterAllMarks && !isClassTeacher && <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>You have access to enter marks for all classes and subjects.</div>}
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Classes I Teach', value: (myClasses||[]).length, color: '#4f8ef7', icon: '🏫' },
-          { label: 'Subjects', value: (mySubjects||[]).length, color: '#10b981', icon: '📚' },
-          { label: "Today's Lessons", value: timetableToday.length, color: '#f59e0b', icon: '📅' },
-          { label: 'Notifications', value: myNotifs.length, color: myNotifs.length > 0 ? '#ef4444' : '#64748b', icon: '🔔' },
-        ].map(s => (
-          <div key={s.label} style={{ background: '#171b26', border: `1px solid ${s.color}30`, borderRadius: 12, padding: '16px 20px', cursor: 'pointer' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 24 }}>
+        {stats.map(s => (
+          <div key={s.label} onClick={() => s.page && setPage(s.page)} style={{ background: '#171b26', border: `1px solid ${s.color}30`, borderRadius: 12, padding: '16px 20px', cursor: s.page ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
+            onMouseEnter={e => { if (s.page) e.currentTarget.style.borderColor = s.color; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = `${s.color}30`; }}>
             <div style={{ fontSize: 28 }}>{s.icon}</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>{s.label}</div>
@@ -131,8 +143,20 @@ function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
         ))}
       </div>
 
+      {/* Quick Actions */}
+      <Card style={{ marginBottom: 16 }}>
+        <SectionTitle icon="star">Quick Actions</SectionTitle>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Btn onClick={() => setPage('marks')} variant="ghost"><Icon name="edit" size={13} /> Enter Marks</Btn>
+          <Btn onClick={() => setPage('results')} variant="ghost"><Icon name="chart" size={13} /> View Results</Btn>
+          {isClassTeacher && <Btn onClick={() => setPage('class')} variant="ghost">👩‍🏫 My Class</Btn>}
+          <Btn onClick={() => setPage('lessons')} variant="ghost"><Icon name="clock" size={13} /> My Timetable</Btn>
+          <Btn onClick={() => setPage('notifs')} variant="ghost"><Icon name="bell" size={13} /> Notifications {myNotifs.length > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '1px 6px', fontSize: 10, marginLeft: 4 }}>{myNotifs.length}</span>}</Btn>
+        </div>
+      </Card>
+
       {/* Today's timetable */}
-      <Card>
+      <Card style={{ marginBottom: 16 }}>
         <SectionTitle icon="clock">Today's Lessons</SectionTitle>
         {timetableToday.length == 0 ? (
           <div style={{ color: '#64748b', fontSize: 13, padding: '16px 0' }}>No lessons scheduled for today or timetable not set up yet.</div>
@@ -153,11 +177,9 @@ function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
       </Card>
 
       {/* My subject assignments */}
-      <Card style={{ marginTop: 16 }}>
-        <SectionTitle icon="book">My Subject Assignments</SectionTitle>
-        {mySubjects.length == 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>No subjects assigned yet. Contact your administrator.</div>
-        ) : (
+      {mySubjects.length > 0 && (
+        <Card>
+          <SectionTitle icon="book">My Subject Assignments</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {mySubjects.map((s, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#1e2435', borderRadius: 8 }}>
@@ -165,11 +187,18 @@ function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {(s.classes||[]).map(c => <Tag key={c} color="blue">{c}</Tag>)}
                 </div>
+                <Btn size="sm" variant="ghost" onClick={() => setPage('marks')} style={{ marginLeft: 'auto' }}>Enter Marks</Btn>
               </div>
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
+
+      {mySubjects.length === 0 && !user.canEnterAllMarks && (
+        <Card>
+          <div style={{ color: '#64748b', fontSize: 13, padding: '12px 0' }}>No subjects assigned yet. Contact your administrator to assign you subjects.</div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -256,42 +285,80 @@ function TeacherLessons({ user, data }) {
 
 /* ── Enter Marks ── */
 function TeacherMarks({ user, data, setData }) {
-  const mySubjects = user.teacherSubjects || [];
-  const [selSubjectIdx, setSelSubjectIdx] = useState(0);
-  const [selExamId, setSelExamId]         = useState('');
-  const [scores, setScores]               = useState({});
-  const [saved, setSaved]                 = useState(false);
+  const mySubjects     = user.teacherSubjects || [];
+  const isClassTeacher = user.isClassTeacher;
+  const myClass        = user.classTeacherOf;
+  const canEnterAll    = user.canEnterAllMarks || false; // secretary / admin
 
-  const selSubject = mySubjects[selSubjectIdx];
-  const selClasses = selSubject?.classes || [];
+  // Build list of classes this user can enter marks for
+  const myTeachingClasses = [...new Set(mySubjects.flatMap(s => s.classes))];
+  const allClasses         = getAllClasses(data);
 
-  // All exams that include any of my classes
-  const relevantExams = (data.exams || []).filter(e => selClasses.includes(e.class));
-  const selExam = relevantExams.find(e => String(e.id) == String(selExamId));
-  const classStudents = selExam ? (data.students || []).filter(s => s.class == selExam.class) : [];
+  // Available classes for marks entry
+  const availableClasses = canEnterAll
+    ? allClasses
+    : [...new Set([
+        ...myTeachingClasses,
+        ...(isClassTeacher && myClass ? [myClass] : []),
+      ])];
 
-  function loadExamScores(exam, subject) {
-    const init = {};
-    (data.students || []).filter(s => s.class == exam.class).forEach(st => {
-      // CRITICAL: use student.name as key — must match Exams.jsx and saveMarks
-      const cell       = exam.results?.[st.name]?.[subject];
-      const legacyCell = exam.results?.[st.id]?.[subject]; // migrate old data
-      init[st.name] = getScore(cell) ?? getScore(legacyCell) ?? '';
-    });
-    setScores(init);
+  const [selClass, setSelClass]   = useState(availableClasses[0] || '');
+  const [selExamId, setSelExamId] = useState('');
+  const [selSubject, setSelSubject] = useState('');
+  const [scores, setScores]       = useState({});
+  const [saved, setSaved]         = useState(false);
+
+  // Subjects available to enter for selected class
+  function getAvailableSubjects(cls) {
+    if (!cls) return [];
+    if (canEnterAll) {
+      // Secretary: all subjects in that class
+      return getSubjectsForClass(cls, data);
+    }
+    if (isClassTeacher && cls === myClass) {
+      // Class teacher: all subjects for their class
+      return getSubjectsForClass(cls, data);
+    }
+    // Subject teacher: only their assigned subjects for that class
+    return mySubjects.filter(s => (s.classes || []).includes(cls)).map(s => s.subject);
+  }
+
+  const classSubjects = getAvailableSubjects(selClass);
+  const classExams    = (data.exams || []).filter(e => e.class === selClass);
+  const selExam       = classExams.find(e => String(e.id) === String(selExamId));
+  const classStudents = selExam ? (data.students || []).filter(s => s.class === selClass) : [];
+
+  function handleClassChange(cls) {
+    setSelClass(cls);
+    setSelExamId('');
+    setSelSubject('');
+    setScores({});
     setSaved(false);
   }
 
-  function handleExamSelect(examId) {
+  function handleExamChange(examId) {
     setSelExamId(examId);
-    const exam = relevantExams.find(e => String(e.id) == examId);
-    if (exam && selSubject) loadExamScores(exam, selSubject.subject);
+    setScores({});
+    setSaved(false);
+    const exam = classExams.find(e => String(e.id) === examId);
+    if (exam && selSubject) loadScores(exam, selSubject);
   }
 
-  function handleSubjectChange(idx) {
-    setSelSubjectIdx(idx);
-    setSelExamId('');
+  function handleSubjectChange(sub) {
+    setSelSubject(sub);
     setScores({});
+    setSaved(false);
+    if (selExam) loadScores(selExam, sub);
+  }
+
+  function loadScores(exam, subject) {
+    const init = {};
+    (data.students || []).filter(s => s.class === exam.class).forEach(st => {
+      const cell       = exam.results?.[st.name]?.[subject];
+      const legacyCell = exam.results?.[st.id]?.[subject];
+      init[st.name] = getScore(cell) ?? getScore(legacyCell) ?? '';
+    });
+    setScores(init);
     setSaved(false);
   }
 
@@ -303,11 +370,10 @@ function TeacherMarks({ user, data, setData }) {
         if (ex.id !== selExam.id) return ex;
         const newResults = { ...ex.results };
         classStudents.forEach(st => {
-          // CRITICAL: use student.name as key — must match Exams.jsx
           if (!newResults[st.name]) newResults[st.name] = {};
           const v = Number(scores[st.name]);
           if (!isNaN(v) && String(scores[st.name]) !== '') {
-            newResults[st.name][selSubject.subject] = { score: v, submittedBy: user.staffId, locked: false };
+            newResults[st.name][selSubject] = { score: v, submittedBy: user.staffId, locked: false };
           }
         });
         return { ...ex, results: newResults };
@@ -316,48 +382,61 @@ function TeacherMarks({ user, data, setData }) {
     setSaved(true);
   }
 
-  if (mySubjects.length == 0) {
-    return <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No subjects assigned. Contact your administrator.</div></Card>;
+  if (availableClasses.length === 0) {
+    return <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No classes assigned. Contact your administrator.</div></Card>;
   }
 
   return (
     <div>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>✏️ Enter Marks</div>
 
-      {/* Subject picker */}
+      {/* Class picker */}
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase' }}>Select Your Subject</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase' }}>Select Class</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {mySubjects.map((s, i) => (
-            <button key={i} onClick={() => handleSubjectChange(i)} style={{
-              padding: '8px 16px', borderRadius: 8, border: `1px solid ${selSubjectIdx == i ? '#4f8ef7' : '#2a3350'}`,
-              background: selSubjectIdx == i ? '#4f8ef720' : '#1e2435', color: selSubjectIdx == i ? '#4f8ef7' : '#94a3b8',
-              cursor: 'pointer', fontSize: 13, fontWeight: selSubjectIdx == i ? 700 : 400,
-            }}>
-              {s.subject}
-              <span style={{ fontSize: 10, marginLeft: 6, color: '#64748b' }}>({(s.classes||[]).join(', ')})</span>
-            </button>
+          {availableClasses.map(cls => (
+            <button key={cls} onClick={() => handleClassChange(cls)} style={{
+              padding: '8px 16px', borderRadius: 8, border: `1px solid ${selClass === cls ? '#4f8ef7' : '#2a3350'}`,
+              background: selClass === cls ? '#4f8ef720' : '#1e2435', color: selClass === cls ? '#4f8ef7' : '#94a3b8',
+              cursor: 'pointer', fontSize: 13, fontWeight: selClass === cls ? 700 : 400,
+            }}>{cls}</button>
           ))}
         </div>
       </Card>
 
+      {/* Subject picker */}
+      {selClass && classSubjects.length > 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase' }}>Select Subject</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {classSubjects.map(sub => (
+              <button key={sub} onClick={() => handleSubjectChange(sub)} style={{
+                padding: '8px 16px', borderRadius: 8, border: `1px solid ${selSubject === sub ? '#10b981' : '#2a3350'}`,
+                background: selSubject === sub ? '#10b98120' : '#1e2435', color: selSubject === sub ? '#10b981' : '#94a3b8',
+                cursor: 'pointer', fontSize: 13, fontWeight: selSubject === sub ? 700 : 400,
+              }}>{sub}</button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Exam picker */}
-      {selSubject && (
+      {selClass && selSubject && (
         <Card style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase' }}>Select Exam</div>
-          {relevantExams.length == 0 ? (
-            <div style={{ color: '#64748b', fontSize: 13 }}>No exams created yet for your classes. Ask the administrator to create exams.</div>
+          {classExams.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: 13 }}>No exams created yet for {selClass}. Ask the administrator to create exams.</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {relevantExams.map(e => (
-                <button key={e.id} onClick={() => handleExamSelect(String(e.id))} style={{
-                  padding: '8px 16px', borderRadius: 8, border: `1px solid ${selExamId == String(e.id) ? '#10b981' : '#2a3350'}`,
-                  background: selExamId == String(e.id) ? '#10b98120' : '#1e2435',
-                  color: selExamId == String(e.id) ? '#10b981' : '#94a3b8',
-                  cursor: 'pointer', fontSize: 13, fontWeight: selExamId == String(e.id) ? 700 : 400,
+              {classExams.map(e => (
+                <button key={e.id} onClick={() => handleExamChange(String(e.id))} style={{
+                  padding: '8px 16px', borderRadius: 8, border: `1px solid ${selExamId === String(e.id) ? '#7c3aed' : '#2a3350'}`,
+                  background: selExamId === String(e.id) ? '#7c3aed20' : '#1e2435',
+                  color: selExamId === String(e.id) ? '#a78bfa' : '#94a3b8',
+                  cursor: 'pointer', fontSize: 13, fontWeight: selExamId === String(e.id) ? 700 : 400,
                 }}>
                   <div>{e.name}</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Term {e.term} · {e.class}</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>Term {e.term} · {e.year}</div>
                 </button>
               ))}
             </div>
@@ -370,12 +449,11 @@ function TeacherMarks({ user, data, setData }) {
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{selSubject.subject} — {selExam.class}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{selSubject} — {selClass}</div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{selExam.name} · Term {selExam.term} · {selExam.year}</div>
             </div>
             <Btn variant="success" onClick={saveMarks}>{saved ? '✅ Saved!' : '💾 Save Marks'}</Btn>
           </div>
-          <Alert type="info"><Icon name="alert" size={14} /> Only enter marks for <strong>{selSubject.subject}</strong>. You cannot enter marks for other subjects.</Alert>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
@@ -383,13 +461,13 @@ function TeacherMarks({ user, data, setData }) {
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>#</th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Student Name</th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Adm No</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#4f8ef7', fontSize: 11, fontWeight: 700 }}>{selSubject.subject} (0–100)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#4f8ef7', fontSize: 11, fontWeight: 700 }}>{selSubject} (0–100)</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Grade</th>
                 </tr>
               </thead>
               <tbody>
                 {classStudents.map((st, i) => {
-                  const score = scores[st.name]; // FIXED: use st.name not st.id
+                  const score    = scores[st.name];
                   const numScore = score !== '' && !isNaN(Number(score)) ? Number(score) : null;
                   return (
                     <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
@@ -415,18 +493,31 @@ function TeacherMarks({ user, data, setData }) {
           </div>
         </Card>
       )}
+
+      {selClass && classSubjects.length === 0 && (
+        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No subjects found for {selClass}. Contact your administrator to set up subjects.</div></Card>
+      )}
     </div>
   );
 }
 
 /* ── View Results (read-only, only my subjects) ── */
 function TeacherResults({ user, data }) {
-  const mySubjects = user.teacherSubjects || [];
+  const mySubjects     = user.teacherSubjects || [];
   const mySubjectNames = mySubjects.map(s => s.subject);
-  const myClasses = [...new Set(mySubjects.flatMap(s => s.classes))];
-  if (user.isClassTeacher && user.classTeacherOf) myClasses.push(user.classTeacherOf);
+  const canSeeAll      = user.isClassTeacher || user.canEnterAllMarks;
 
-  const [selClass, setSelClass]   = useState(myClasses[0] || '');
+  const myTeachingClasses = [...new Set(mySubjects.flatMap(s => s.classes))];
+  const allClasses         = getAllClasses(data);
+
+  const availableClasses = user.canEnterAllMarks
+    ? allClasses
+    : [...new Set([
+        ...myTeachingClasses,
+        ...(user.isClassTeacher && user.classTeacherOf ? [user.classTeacherOf] : []),
+      ])];
+
+  const [selClass, setSelClass]   = useState(availableClasses[0] || '');
   const [selExamId, setSelExamId] = useState('');
 
   const classExams = (data.exams || []).filter(e => e.class == selClass);
@@ -436,7 +527,7 @@ function TeacherResults({ user, data }) {
   // Subjects visible to this teacher in this class
   const visibleSubjects = selExam
     ? [...new Set(Object.values(selExam.results || {}).flatMap(r => Object.keys(r)))]
-        .filter(sub => user.isClassTeacher ? true : mySubjectNames.includes(sub))
+        .filter(sub => canSeeAll ? true : mySubjectNames.includes(sub))
     : [];
 
   return (
@@ -444,9 +535,10 @@ function TeacherResults({ user, data }) {
       <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>📊 View Results</div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(''); }} style={{ minWidth: 150 }}>
-          {[...new Set(myClasses)].map(c => <option key={c} value={c}>{c}</option>)}
+          <option value="">— Select class —</option>
+          {[...new Set(availableClasses)].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {classExams.length > 0 && (
+        {selClass && classExams.length > 0 && (
           <select value={selExamId} onChange={e => setSelExamId(e.target.value)} style={{ minWidth: 200 }}>
             <option value="">— Select exam —</option>
             {classExams.map(e => <option key={e.id} value={e.id}>{e.name} (Term {e.term})</option>)}
@@ -454,11 +546,14 @@ function TeacherResults({ user, data }) {
         )}
       </div>
 
-      {!user.isClassTeacher && (
+      {!canSeeAll && mySubjectNames.length > 0 && (
         <Alert type="info"><Icon name="alert" size={14} /> You can only see results for your subjects: <strong>{mySubjectNames.join(', ')}</strong></Alert>
       )}
 
       {selExam ? (
+        visibleSubjects.length === 0 ? (
+          <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No marks entered yet for this exam.</div></Card>
+        ) : (
         <Card noPad>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a3350', fontWeight: 600, color: '#e2e8f0' }}>
             {selExam.name} — {selClass} · Term {selExam.term} · {selExam.year}
@@ -467,31 +562,41 @@ function TeacherResults({ user, data }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#1e2435' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>#</th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Name</th>
                   {visibleSubjects.map(s => <th key={s} style={{ padding: '10px 12px', textAlign: 'center', color: '#64748b', fontSize: 11, fontWeight: 600 }}>{s}</th>)}
+                  {canSeeAll && <th style={{ padding: '10px 12px', textAlign: 'center', color: '#10b981', fontSize: 11, fontWeight: 600 }}>Total</th>}
                 </tr>
               </thead>
               <tbody>
-                {students.map(st => (
-                  <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 500, color: '#e2e8f0' }}>{st.name}</td>
-                    {visibleSubjects.map(sub => {
-                      const cell  = selExam.results?.[st.name]?.[sub];
-                      const score = getScore(cell);
-                      return (
-                        <td key={sub} style={{ padding: '10px 12px', textAlign: 'center' }}>
+                {students.map((st, idx) => {
+                  const scores = visibleSubjects.map(sub => {
+                    const cell = selExam.results?.[st.name]?.[sub];
+                    return getScore(cell);
+                  });
+                  const total = scores.reduce((a, v) => a + (v ?? 0), 0);
+                  return (
+                    <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
+                      <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 11 }}>{idx + 1}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 500, color: '#e2e8f0' }}>{st.name}</td>
+                      {scores.map((score, si) => (
+                        <td key={si} style={{ padding: '10px 12px', textAlign: 'center' }}>
                           {score !== null ? (
                             <span style={{ fontWeight: 700, color: score >= 60 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444' }}>{score}</span>
                           ) : <span style={{ color: '#2a3350' }}>—</span>}
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                      ))}
+                      {canSeeAll && (
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#4f8ef7' }}>{total}</td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </Card>
+        )
       ) : (
         <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>Select a class and exam to view results.</div></Card>
       )}
@@ -502,30 +607,116 @@ function TeacherResults({ user, data }) {
 /* ── My Class (class teachers only) ── */
 function TeacherClass({ user, data, setData }) {
   const myStudents = (data.students || []).filter(s => s.class == user.classTeacherOf);
+  const [showModal, setShowModal] = useState(false);
+  const [editStudent, setEditStudent] = useState(null); // null = add new
+  const [form, setForm] = useState({});
+  const [search, setSearch] = useState('');
+
+  const BLANK = { name: '', admNo: '', gender: 'Male', dob: '', parentName: '', parentPhone: '', status: 'active' };
+
+  function openAdd() {
+    setEditStudent(null);
+    setForm({ ...BLANK, class: user.classTeacherOf });
+    setShowModal(true);
+  }
+
+  function openEdit(st) {
+    setEditStudent(st);
+    setForm({ ...st });
+    setShowModal(true);
+  }
+
+  function save() {
+    if (!form.name?.trim()) { alert('Student name is required.'); return; }
+    if (editStudent) {
+      setData(d => ({ ...d, students: d.students.map(s => s.id === editStudent.id ? { ...s, ...form } : s) }));
+    } else {
+      const newId = Date.now();
+      setData(d => ({ ...d, students: [...d.students, { id: newId, ...form, class: user.classTeacherOf }] }));
+    }
+    setShowModal(false);
+  }
+
+  const filtered = myStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.admNo || '').toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>👩‍🏫 My Class — {user.classTeacherOf}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>👩‍🏫 My Class — {user.classTeacherOf}</div>
+        <Btn onClick={openAdd}><Icon name="add" size={14} /> Add Student</Btn>
+      </div>
+
       <Card>
-        <SectionTitle icon="students">{(myStudents||[]).length} Students</SectionTitle>
-        {myStudents.length == 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>No students in this class yet.</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <SectionTitle icon="students">{myStudents.length} Students</SectionTitle>
+          <input placeholder="Search students..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 200, fontSize: 12 }} />
+        </div>
+        {filtered.length == 0 ? (
+          <div style={{ color: '#64748b', fontSize: 13 }}>{search ? 'No students match your search.' : 'No students in this class yet. Click "Add Student" to add one.'}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {myStudents.map((st, i) => (
+            {filtered.map((st, i) => (
               <div key={st.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350' }}>
                 <div style={{ fontSize: 13, color: '#64748b', minWidth: 24, textAlign: 'right' }}>{i + 1}</div>
                 <Avatar name={st.name} size={32} color="#4f8ef7" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{st.name}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>Adm: {st.admNo} · {st.gender}</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>
+                    Adm: {st.admNo} · {st.gender}
+                    {st.parentName && <span> · Parent: {st.parentName}</span>}
+                    {st.parentPhone && <span> · 📱 {st.parentPhone}</span>}
+                  </div>
                 </div>
                 <Tag color={!st.status || st.status == 'active' ? 'green' : 'red'}>{st.status || 'active'}</Tag>
+                <Btn size="sm" variant="ghost" onClick={() => openEdit(st)} title="Edit student"><Icon name="edit" size={13} /></Btn>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      {/* Add / Edit Student Modal */}
+      <Modal show={showModal} onClose={() => setShowModal(false)} title={editStudent ? `Edit: ${editStudent.name}` : 'Add New Student'}>
+        <FormRow>
+          <FormGroup label="Full Name *">
+            <input value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. John Kamau Mwangi" autoFocus />
+          </FormGroup>
+          <FormGroup label="Admission No">
+            <input value={form.admNo || ''} onChange={e => setForm({ ...form, admNo: e.target.value })} placeholder="e.g. KCS/001/2026" />
+          </FormGroup>
+        </FormRow>
+        <FormRow>
+          <FormGroup label="Gender">
+            <select value={form.gender || 'Male'} onChange={e => setForm({ ...form, gender: e.target.value })}>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </FormGroup>
+          <FormGroup label="Date of Birth">
+            <input type="date" value={form.dob || ''} onChange={e => setForm({ ...form, dob: e.target.value })} />
+          </FormGroup>
+        </FormRow>
+        <FormRow>
+          <FormGroup label="Parent / Guardian Name">
+            <input value={form.parentName || ''} onChange={e => setForm({ ...form, parentName: e.target.value })} placeholder="e.g. Mary Kamau" />
+          </FormGroup>
+          <FormGroup label="Parent Phone">
+            <input value={form.parentPhone || ''} onChange={e => setForm({ ...form, parentPhone: e.target.value })} placeholder="0712345678" />
+          </FormGroup>
+        </FormRow>
+        <FormGroup label="Status">
+          <select value={form.status || 'active'} onChange={e => setForm({ ...form, status: e.target.value })}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="transferred">Transferred</option>
+            <option value="completed">Completed</option>
+          </select>
+        </FormGroup>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+          <Btn variant="ghost" onClick={() => setShowModal(false)}>Cancel</Btn>
+          <Btn onClick={save}><Icon name={editStudent ? 'check' : 'add'} size={14} /> {editStudent ? 'Save Changes' : 'Add Student'}</Btn>
+        </div>
+      </Modal>
     </div>
   );
 }
