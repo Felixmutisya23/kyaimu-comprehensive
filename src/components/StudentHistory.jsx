@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Btn, Tag, SectionTitle, GradeBadge, Avatar, Icon } from './UI';
 import { getGrade, getScore, GRADES_CBC, getSiblingStreams } from '../data/initialData';
 import { computeRankings } from '../utils/print';
+import { getStudentFeeSummary, getTotalPaidAllTime } from './FeesModule';
 
 /* ─────────────────────────────────────────────────────────────────
    LIGHT THEME TOKENS
@@ -27,6 +28,44 @@ function StatCard({ icon, label, value, color }) {
       <div style={{ fontSize: 11, color: L.sub, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
     </div>
   );
+}
+
+/* ── Inject responsive CSS once (mobile-first overrides) ──────── */
+let _portalCssInjected = false;
+function injectPortalCSS() {
+  if (_portalCssInjected) return;
+  _portalCssInjected = true;
+  const el = document.createElement('style');
+  el.textContent = `
+    .sp-header-inner { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+    .sp-content      { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .sp-tabs         { display: flex; gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .sp-tabs::-webkit-scrollbar { display: none; }
+    .sp-tab-btn      { flex-shrink: 0; white-space: nowrap; }
+    .sp-banner       { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .sp-stat-grid    { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 12px; }
+    .sp-fee-grid     { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .sp-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sp-top-row      { display: flex; justify-content: space-between; align-items: center; height: auto; min-height: 64px; padding: 10px 0; flex-wrap: wrap; gap: 8px; }
+    .sp-child-row    { display: flex; gap: 8px; padding-bottom: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 640px) {
+      .sp-header-inner { padding: 0 12px; }
+      .sp-content      { padding: 12px; }
+      .sp-fee-grid     { grid-template-columns: 1fr; }
+      .sp-profile-grid { grid-template-columns: 1fr; }
+      .sp-banner       { padding: 22px 18px !important; }
+      .sp-banner-title { font-size: 18px !important; }
+      .sp-stat-grid    { grid-template-columns: repeat(2,1fr) !important; gap: 10px !important; }
+      .sp-tab-btn      { padding: 10px 14px !important; font-size: 12px !important; }
+      .sp-school-name  { font-size: 13px !important; }
+      .sp-welcome-row  { flex-direction: column; align-items: flex-start !important; }
+      .sp-login-box    { width: 100%; }
+    }
+    @media (max-width: 420px) {
+      .sp-stat-grid    { grid-template-columns: 1fr 1fr !important; }
+    }
+  `;
+  document.head.appendChild(el);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -200,6 +239,7 @@ function buildStudentHistory(student, data) {
    STUDENT PORTAL — light theme, rich dashboard
 ───────────────────────────────────────────────────────────────── */
 export function StudentPortal({ student, data, onLogout }) {
+  injectPortalCSS();
   const [tab, setTab] = useState('dashboard');
   const exams = (data.exams||[]).filter(e=>e.class===student.class&&e.results?.[student.name]);
   const latestExam = exams[exams.length-1];
@@ -216,30 +256,30 @@ export function StudentPortal({ student, data, onLogout }) {
   return (
     <div style={{ minHeight:'100vh', background:L.bg, fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       {/* Header */}
-      <div style={{ background:L.gradient, padding:'0 24px', boxShadow:'0 4px 20px #1e40af30' }}>
-        <div style={{ maxWidth:1000, margin:'0 auto' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', height:64 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:38,height:38,borderRadius:10,background:'#ffffff30',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:18,color:'#fff' }}>E</div>
-              <div>
-                <div style={{ fontSize:15,fontWeight:800,color:'#fff' }}>{data.schoolName}</div>
+      <div style={{ background:L.gradient, boxShadow:'0 4px 20px #1e40af30' }}>
+        <div className="sp-header-inner">
+          <div className="sp-top-row">
+            <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+              <div style={{ width:38,height:38,borderRadius:10,background:'#ffffff30',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:18,color:'#fff',flexShrink:0 }}>E</div>
+              <div style={{ minWidth:0 }}>
+                <div className="sp-school-name" style={{ fontSize:15,fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{data.schoolName}</div>
                 <div style={{ fontSize:11,color:'#bfdbfe' }}>Student Portal</div>
               </div>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:14,fontWeight:700,color:'#fff' }}>{student.name}</div>
+                <div style={{ fontSize:13,fontWeight:700,color:'#fff' }}>{student.name}</div>
                 <div style={{ fontSize:11,color:'#bfdbfe' }}>{student.class} {student.admNo?`· ${student.admNo}`:''}</div>
               </div>
-              <button onClick={onLogout} style={{ padding:'7px 16px',borderRadius:8,border:'1px solid #ffffff40',background:'transparent',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer' }}>
+              <button onClick={onLogout} style={{ padding:'7px 14px',borderRadius:8,border:'1px solid #ffffff40',background:'transparent',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',flexShrink:0 }}>
                 Logout
               </button>
             </div>
           </div>
           {/* Tabs */}
-          <div style={{ display:'flex', gap:0 }}>
+          <div className="sp-tabs">
             {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              <button key={t.id} className="sp-tab-btn" onClick={()=>setTab(t.id)} style={{
                 padding:'12px 20px',border:'none',background:'transparent',cursor:'pointer',fontSize:13,fontWeight:tab===t.id?800:500,
                 color:tab===t.id?'#fff':'#93c5fd',borderBottom:`3px solid ${tab===t.id?'#fff':'transparent'}`,transition:'all 0.15s',
               }}>{t.label}</button>
@@ -249,26 +289,28 @@ export function StudentPortal({ student, data, onLogout }) {
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth:1000, margin:'0 auto', padding:24 }}>
+      <div className="sp-content">
 
         {/* ── DASHBOARD ── */}
         {tab==='dashboard' && (
           <div>
             {/* Welcome banner */}
-            <div style={{ background:L.gradient, borderRadius:18, padding:'28px 32px', marginBottom:24, color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:16 }}>
-              <div>
-                <div style={{ fontSize:24,fontWeight:900,marginBottom:4 }}>Welcome back, {student.firstName||student.name.split(' ')[0]}! 👋</div>
-                <div style={{ fontSize:14,opacity:0.85 }}>{student.class} · {new Date().toLocaleDateString('en-KE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
-              </div>
-              <div style={{ background:'#ffffff20', borderRadius:12, padding:'14px 20px', textAlign:'center' }}>
-                <div style={{ fontSize:12, color:'#bfdbfe', fontWeight:600, marginBottom:4 }}>YOUR LOGIN CODE</div>
-                <div style={{ fontSize:22, fontWeight:900, letterSpacing:2 }}>{student.slc||'—'}</div>
-                <div style={{ fontSize:10, color:'#bfdbfe', marginTop:2 }}>Keep this safe — use it to login</div>
+            <div className="sp-banner" style={{ background:L.gradient, borderRadius:18, padding:'28px 32px', marginBottom:24, color:'#fff' }}>
+              <div className="sp-welcome-row" style={{ display:'flex', flexWrap:'wrap', gap:16, width:'100%', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <div className="sp-banner-title" style={{ fontSize:22,fontWeight:900,marginBottom:4 }}>Welcome back, {student.firstName||student.name.split(' ')[0]}! 👋</div>
+                  <div style={{ fontSize:13,opacity:0.85 }}>{student.class} · {new Date().toLocaleDateString('en-KE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+                </div>
+                <div className="sp-login-box" style={{ background:'#ffffff20', borderRadius:12, padding:'14px 20px', textAlign:'center' }}>
+                  <div style={{ fontSize:12, color:'#bfdbfe', fontWeight:600, marginBottom:4 }}>YOUR LOGIN CODE</div>
+                  <div style={{ fontSize:20, fontWeight:900, letterSpacing:2 }}>{student.slc||'—'}</div>
+                  <div style={{ fontSize:10, color:'#bfdbfe', marginTop:2 }}>Keep this safe — use it to login</div>
+                </div>
               </div>
             </div>
 
             {/* Quick stats */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:24 }}>
+            <div className="sp-stat-grid" style={{ marginBottom:24 }}>
               <StatCard icon="📝" label="Exams Taken" value={exams.length} color={L.primary} />
               {latestMean!==null && <StatCard icon="📊" label="Latest Mean" value={`${latestMean}%`} color={latestMean>=60?L.accent:latestMean>=40?L.warning:L.danger} />}
               <StatCard icon="🏫" label="Current Class" value={student.class} color={L.primary} />
@@ -283,7 +325,7 @@ export function StudentPortal({ student, data, onLogout }) {
                   {Object.entries(latestResults).map(([sub,val])=>{
                     const score = getScore(val);
                     return (
-                      <div key={sub} style={{ background:L.bg, border:`1px solid ${L.border}`, borderRadius:10, padding:'12px 16px', textAlign:'center', minWidth:100 }}>
+                      <div key={sub} style={{ background:L.bg, border:`1px solid ${L.border}`, borderRadius:10, padding:'12px 16px', textAlign:'center', minWidth:100, flex:'1 1 100px' }}>
                         <div style={{ fontSize:11, color:L.sub, marginBottom:6, fontWeight:600 }}>{sub}</div>
                         <div style={{ fontSize:22, fontWeight:900, color:score!==null?(score>=60?L.accent:score>=40?L.warning:L.danger):L.sub }}>{score!==null?score:'—'}</div>
                       </div>
@@ -296,16 +338,16 @@ export function StudentPortal({ student, data, onLogout }) {
             {/* School info */}
             <div style={{ background:L.card, border:`1.5px solid ${L.border}`, borderRadius:16, padding:24, boxShadow:'0 2px 8px #0000000a' }}>
               <div style={{ fontSize:14, fontWeight:800, color:L.text, marginBottom:16 }}>🏫 School Information</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div className="sp-profile-grid">
                 {[
                   ['School',   data.schoolName],
                   ['Location', [data.schoolLocation,data.schoolCounty].filter(Boolean).join(', ')],
                   ['Phone',    data.schoolPhone],
                   ['Email',    data.schoolEmail],
                 ].filter(([,v])=>v).map(([l,v])=>(
-                  <div key={l} style={{ padding:'10px 14px', background:L.bg, borderRadius:10 }}>
+                  <div key={l} style={{ padding:'10px 14px', background:L.bg, borderRadius:10, overflow:'hidden' }}>
                     <div style={{ fontSize:11, color:L.sub, marginBottom:3, fontWeight:600 }}>{l}</div>
-                    <div style={{ fontSize:13, fontWeight:600, color:L.text }}>{v}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:L.text, overflowWrap:'break-word' }}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -316,20 +358,20 @@ export function StudentPortal({ student, data, onLogout }) {
         {/* ── RESULTS ── */}
         {tab==='history' && (
           <>
-            <div style={{ fontSize:22,fontWeight:900,color:L.text,marginBottom:20 }}>📚 Academic History</div>
+            <div style={{ fontSize:20,fontWeight:900,color:L.text,marginBottom:20 }}>📚 Academic History</div>
             <StudentHistory student={student} data={data} />
           </>
         )}
 
         {/* ── PROFILE ── */}
         {tab==='profile' && (
-          <div style={{ background:L.card, border:`1.5px solid ${L.border}`, borderRadius:16, padding:28, boxShadow:'0 2px 8px #0000000a' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:20, marginBottom:28 }}>
-              <div style={{ width:72,height:72,borderRadius:20,background:L.gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,color:'#fff' }}>
+          <div style={{ background:L.card, border:`1.5px solid ${L.border}`, borderRadius:16, padding:24, boxShadow:'0 2px 8px #0000000a' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:18, marginBottom:24, flexWrap:'wrap' }}>
+              <div style={{ width:64,height:64,borderRadius:18,background:L.gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:900,color:'#fff',flexShrink:0 }}>
                 {(student.firstName||student.name||'?')[0].toUpperCase()}
               </div>
-              <div>
-                <div style={{ fontSize:22,fontWeight:900,color:L.text }}>{student.name}</div>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:19,fontWeight:900,color:L.text }}>{student.name}</div>
                 <div style={{ fontSize:13,color:L.sub }}>{student.class}</div>
                 <div style={{ fontSize:12,marginTop:4 }}>
                   <span style={{ background:'#dcfce7',color:'#16a34a',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700 }}>
@@ -338,7 +380,7 @@ export function StudentPortal({ student, data, onLogout }) {
                 </div>
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div className="sp-profile-grid">
               {[
                 ['First Name',    student.firstName],
                 ['Last Name',     student.lastName],
@@ -349,9 +391,9 @@ export function StudentPortal({ student, data, onLogout }) {
                 ['Parent/Guardian', student.parentName],
                 ['Parent Phone',  student.parentPhone],
               ].map(([l,v])=>(
-                <div key={l} style={{ padding:'12px 16px',background:L.bg,borderRadius:10,border:`1px solid ${L.border}` }}>
+                <div key={l} style={{ padding:'12px 16px',background:L.bg,borderRadius:10,border:`1px solid ${L.border}`,overflow:'hidden' }}>
                   <div style={{ fontSize:11,color:L.sub,marginBottom:3,fontWeight:600 }}>{l}</div>
-                  <div style={{ fontSize:14,fontWeight:700,color:L.text }}>{v||'—'}</div>
+                  <div style={{ fontSize:14,fontWeight:700,color:L.text,overflowWrap:'break-word' }}>{v||'—'}</div>
                 </div>
               ))}
             </div>
@@ -366,6 +408,7 @@ export function StudentPortal({ student, data, onLogout }) {
    PARENT PORTAL — light theme, rich dashboard
 ───────────────────────────────────────────────────────────────── */
 export function ParentPortal({ parent, data, onLogout }) {
+  injectPortalCSS();
   const myChildren = (data.students||[]).filter(s=>
     (s.parentEmail && parent.email && s.parentEmail.toLowerCase()===parent.email.toLowerCase()) ||
     (s.parentPhone  && parent.phone  && s.parentPhone===parent.phone) ||
@@ -380,8 +423,12 @@ export function ParentPortal({ parent, data, onLogout }) {
   const latestResults = latestExam?.results?.[selChild?.name]||{};
   const latestScores  = Object.values(latestResults).map(v=>getScore(v)).filter(v=>v!==null);
   const latestMean    = latestScores.length ? Math.round(latestScores.reduce((a,b)=>a+b,0)/latestScores.length) : null;
-  const fees = selChild?.fees || { paid:0, total:0 };
-  const feePct = fees.total>0 ? Math.round(fees.paid/fees.total*100) : 0;
+
+  // ── Real fee data, computed from feeSchedule + feePayments ──
+  const feeSummary   = selChild ? getStudentFeeSummary(selChild, data) : [];
+  const currentRow    = feeSummary[0] || null; // most recent term/year with data
+  const totalPaidAll  = selChild ? getTotalPaidAllTime(selChild.id, data) : 0;
+  const currentBalance = currentRow ? currentRow.balance : null;
 
   const TABS = [
     { id:'dashboard', label:'🏠 Home' },
@@ -393,33 +440,33 @@ export function ParentPortal({ parent, data, onLogout }) {
   return (
     <div style={{ minHeight:'100vh', background:L.bg, fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       {/* Header */}
-      <div style={{ background:'linear-gradient(135deg,#065f46,#10b981)', padding:'0 24px', boxShadow:'0 4px 20px #10b98130' }}>
-        <div style={{ maxWidth:1000, margin:'0 auto' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', height:64 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:38,height:38,borderRadius:10,background:'#ffffff30',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:18,color:'#fff' }}>E</div>
-              <div>
-                <div style={{ fontSize:15,fontWeight:800,color:'#fff' }}>{data.schoolName}</div>
+      <div style={{ background:'linear-gradient(135deg,#065f46,#10b981)', boxShadow:'0 4px 20px #10b98130' }}>
+        <div className="sp-header-inner">
+          <div className="sp-top-row">
+            <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+              <div style={{ width:38,height:38,borderRadius:10,background:'#ffffff30',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:18,color:'#fff',flexShrink:0 }}>E</div>
+              <div style={{ minWidth:0 }}>
+                <div className="sp-school-name" style={{ fontSize:15,fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{data.schoolName}</div>
                 <div style={{ fontSize:11,color:'#a7f3d0' }}>Parent Portal</div>
               </div>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:14,fontWeight:700,color:'#fff' }}>{parent.name||'Parent'}</div>
+                <div style={{ fontSize:13,fontWeight:700,color:'#fff' }}>{parent.name||'Parent'}</div>
                 <div style={{ fontSize:11,color:'#a7f3d0' }}>Parent / Guardian</div>
               </div>
-              <button onClick={onLogout} style={{ padding:'7px 16px',borderRadius:8,border:'1px solid #ffffff40',background:'transparent',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer' }}>
+              <button onClick={onLogout} style={{ padding:'7px 14px',borderRadius:8,border:'1px solid #ffffff40',background:'transparent',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',flexShrink:0 }}>
                 Logout
               </button>
             </div>
           </div>
           {/* Child selector if multiple */}
           {myChildren.length>1 && (
-            <div style={{ display:'flex', gap:8, paddingBottom:12 }}>
+            <div className="sp-child-row">
               {myChildren.map(child=>(
                 <button key={child.id} onClick={()=>setSelChildId(child.id)} style={{
                   padding:'6px 16px',borderRadius:8,border:`1px solid ${selChildId===child.id?'#fff':'#ffffff40'}`,
-                  background:selChildId===child.id?'#ffffff30':'transparent',color:'#fff',fontSize:12,fontWeight:selChildId===child.id?700:400,cursor:'pointer',
+                  background:selChildId===child.id?'#ffffff30':'transparent',color:'#fff',fontSize:12,fontWeight:selChildId===child.id?700:400,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap',
                 }}>
                   {child.name} — {child.class}
                 </button>
@@ -427,9 +474,9 @@ export function ParentPortal({ parent, data, onLogout }) {
             </div>
           )}
           {/* Tabs */}
-          <div style={{ display:'flex', gap:0 }}>
+          <div className="sp-tabs">
             {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              <button key={t.id} className="sp-tab-btn" onClick={()=>setTab(t.id)} style={{
                 padding:'12px 20px',border:'none',background:'transparent',cursor:'pointer',fontSize:13,fontWeight:tab===t.id?800:500,
                 color:tab===t.id?'#fff':'#6ee7b7',borderBottom:`3px solid ${tab===t.id?'#fff':'transparent'}`,transition:'all 0.15s',
               }}>{t.label}</button>
@@ -438,11 +485,11 @@ export function ParentPortal({ parent, data, onLogout }) {
         </div>
       </div>
 
-      <div style={{ maxWidth:1000, margin:'0 auto', padding:24 }}>
+      <div className="sp-content">
         {myChildren.length===0 ? (
-          <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:48,textAlign:'center' }}>
+          <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:'48px 24px',textAlign:'center' }}>
             <div style={{ fontSize:48,marginBottom:16 }}>🔍</div>
-            <div style={{ fontSize:18,fontWeight:800,color:L.text,marginBottom:8 }}>No children found</div>
+            <div style={{ fontSize:17,fontWeight:800,color:L.text,marginBottom:8 }}>No children found</div>
             <div style={{ fontSize:14,color:L.sub }}>Your login code doesn't match any student records. Please contact the school office.</div>
           </div>
         ) : selChild && (
@@ -450,23 +497,25 @@ export function ParentPortal({ parent, data, onLogout }) {
             {/* ── DASHBOARD ── */}
             {tab==='dashboard' && (
               <div>
-                <div style={{ background:'linear-gradient(135deg,#065f46,#10b981)', borderRadius:18, padding:'28px 32px', marginBottom:24, color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:16 }}>
-                  <div>
-                    <div style={{ fontSize:22,fontWeight:900,marginBottom:4 }}>{selChild.name}</div>
-                    <div style={{ fontSize:14,opacity:0.85 }}>{selChild.class} · Enrolled {selChild.joined}</div>
-                  </div>
-                  {selChild.admNo && (
-                    <div style={{ background:'#ffffff20',borderRadius:12,padding:'12px 20px',textAlign:'center' }}>
-                      <div style={{ fontSize:11,color:'#a7f3d0',fontWeight:600,marginBottom:2 }}>ADMISSION NO</div>
-                      <div style={{ fontSize:18,fontWeight:900 }}>{selChild.admNo}</div>
+                <div className="sp-banner" style={{ background:'linear-gradient(135deg,#065f46,#10b981)', borderRadius:18, padding:'28px 32px', marginBottom:24, color:'#fff' }}>
+                  <div className="sp-welcome-row" style={{ display:'flex', flexWrap:'wrap', gap:16, width:'100%', justifyContent:'space-between', alignItems:'center' }}>
+                    <div>
+                      <div className="sp-banner-title" style={{ fontSize:20,fontWeight:900,marginBottom:4 }}>{selChild.name}</div>
+                      <div style={{ fontSize:13,opacity:0.85 }}>{selChild.class} · Enrolled {selChild.joined}</div>
                     </div>
-                  )}
+                    {selChild.admNo && (
+                      <div className="sp-login-box" style={{ background:'#ffffff20',borderRadius:12,padding:'12px 20px',textAlign:'center' }}>
+                        <div style={{ fontSize:11,color:'#a7f3d0',fontWeight:600,marginBottom:2 }}>ADMISSION NO</div>
+                        <div style={{ fontSize:16,fontWeight:900 }}>{selChild.admNo}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:24 }}>
+                <div className="sp-stat-grid" style={{ marginBottom:24 }}>
                   <StatCard icon="📝" label="Exams Taken" value={exams.length} color={L.primary} />
                   {latestMean!==null && <StatCard icon="📊" label="Latest Mean" value={`${latestMean}%`} color={latestMean>=60?L.accent:latestMean>=40?L.warning:L.danger} />}
-                  <StatCard icon="💰" label="Fee Balance" value={fees.total>0?`KES ${(fees.total-fees.paid).toLocaleString()}`:'N/A'} color={feePct>=100?L.accent:L.danger} />
+                  <StatCard icon="💰" label="Fee Balance" value={currentBalance!==null?`KES ${currentBalance.toLocaleString()}`:'N/A'} color={currentBalance!==null&&currentBalance<=0?L.accent:L.danger} />
                   <StatCard icon="📋" label="Cases" value={selChild.cases?.length||0} color={selChild.cases?.length?L.danger:L.accent} />
                 </div>
 
@@ -477,7 +526,7 @@ export function ParentPortal({ parent, data, onLogout }) {
                       {Object.entries(latestResults).map(([sub,val])=>{
                         const score=getScore(val);
                         return (
-                          <div key={sub} style={{ background:L.bg,border:`1px solid ${L.border}`,borderRadius:10,padding:'12px 16px',textAlign:'center',minWidth:100 }}>
+                          <div key={sub} style={{ background:L.bg,border:`1px solid ${L.border}`,borderRadius:10,padding:'12px 16px',textAlign:'center',minWidth:100,flex:'1 1 100px' }}>
                             <div style={{ fontSize:11,color:L.sub,marginBottom:6,fontWeight:600 }}>{sub}</div>
                             <div style={{ fontSize:22,fontWeight:900,color:score!==null?(score>=60?L.accent:score>=40?L.warning:L.danger):L.sub }}>{score!==null?score:'—'}</div>
                           </div>
@@ -492,51 +541,78 @@ export function ParentPortal({ parent, data, onLogout }) {
             {/* ── RESULTS ── */}
             {tab==='history' && (
               <>
-                <div style={{ fontSize:22,fontWeight:900,color:L.text,marginBottom:20 }}>📚 {selChild.name}'s Academic History</div>
+                <div style={{ fontSize:20,fontWeight:900,color:L.text,marginBottom:20 }}>📚 {selChild.name}'s Academic History</div>
                 <StudentHistory student={selChild} data={data} />
               </>
             )}
 
             {/* ── FEES ── */}
             {tab==='fees' && (
-              <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:28,boxShadow:'0 2px 8px #0000000a' }}>
-                <div style={{ fontSize:16,fontWeight:800,color:L.text,marginBottom:20 }}>💰 Fee Account — {selChild.name}</div>
-                {fees.total===0 ? (
-                  <div style={{ color:L.sub,fontSize:14 }}>No fee record set for this student yet.</div>
-                ) : (
-                  <>
-                    <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:20 }}>
-                      <div style={{ background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,padding:'18px',textAlign:'center' }}>
-                        <div style={{ fontSize:10,color:L.accent,fontWeight:700,textTransform:'uppercase',marginBottom:4 }}>Total Fee</div>
-                        <div style={{ fontSize:22,fontWeight:900,color:L.text }}>KES {fees.total.toLocaleString()}</div>
+              <div>
+                <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:24,boxShadow:'0 2px 8px #0000000a',marginBottom:16 }}>
+                  <div style={{ fontSize:15,fontWeight:800,color:L.text,marginBottom:18 }}>💰 Fee Account — {selChild.name}</div>
+                  {feeSummary.length===0 ? (
+                    <div style={{ color:L.sub,fontSize:14 }}>No fee record set for this student yet. Please contact the school office.</div>
+                  ) : (
+                    <>
+                      {/* Lifetime total paid */}
+                      <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:12, padding:'14px 18px', marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                        <span style={{ fontSize:12, color:L.accent, fontWeight:700 }}>Total Paid (All Time)</span>
+                        <span style={{ fontSize:18, fontWeight:900, color:L.text }}>KES {totalPaidAll.toLocaleString()}</span>
                       </div>
-                      <div style={{ background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:12,padding:'18px',textAlign:'center' }}>
-                        <div style={{ fontSize:10,color:L.primary,fontWeight:700,textTransform:'uppercase',marginBottom:4 }}>Paid</div>
-                        <div style={{ fontSize:22,fontWeight:900,color:L.text }}>KES {fees.paid.toLocaleString()}</div>
+
+                      {/* Per-term breakdown */}
+                      <div style={{ fontSize:12, fontWeight:700, color:L.sub, textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>Term-by-Term Breakdown</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {feeSummary.map((row,i) => {
+                          const pct = row.expected>0 ? Math.min(100, Math.round(row.paid/row.expected*100)) : 0;
+                          return (
+                            <div key={i} style={{ border:`1.5px solid ${L.border}`, borderRadius:12, padding:'14px 16px' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, flexWrap:'wrap', gap:6 }}>
+                                <span style={{ fontSize:13, fontWeight:800, color:L.text }}>Term {row.term} · {row.year}</span>
+                                <span style={{
+                                  fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:100,
+                                  background: row.balance<=0 ? '#dcfce7' : '#fef2f2',
+                                  color: row.balance<=0 ? '#16a34a' : L.danger,
+                                }}>{row.balance<=0 ? 'Fully Paid' : 'Balance Due'}</span>
+                              </div>
+                              <div className="sp-fee-grid">
+                                <div style={{ background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'12px',textAlign:'center' }}>
+                                  <div style={{ fontSize:9,color:L.accent,fontWeight:700,textTransform:'uppercase',marginBottom:3 }}>Expected</div>
+                                  <div style={{ fontSize:16,fontWeight:900,color:L.text }}>KES {row.expected.toLocaleString()}</div>
+                                </div>
+                                <div style={{ background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px',textAlign:'center' }}>
+                                  <div style={{ fontSize:9,color:L.primary,fontWeight:700,textTransform:'uppercase',marginBottom:3 }}>Paid</div>
+                                  <div style={{ fontSize:16,fontWeight:900,color:L.text }}>KES {row.paid.toLocaleString()}</div>
+                                </div>
+                                <div style={{ background: row.balance>0 ? '#fef2f2' : '#f0fdf4', border:`1px solid ${row.balance>0?'#fecaca':'#bbf7d0'}`, borderRadius:10, padding:'12px', textAlign:'center' }}>
+                                  <div style={{ fontSize:9, color: row.balance>0?L.danger:L.accent, fontWeight:700, textTransform:'uppercase', marginBottom:3 }}>Balance</div>
+                                  <div style={{ fontSize:16,fontWeight:900,color: row.balance>0?L.danger:L.accent }}>KES {Math.abs(row.balance).toLocaleString()}{row.balance<0?' CR':''}</div>
+                                </div>
+                              </div>
+                              <div style={{ background:L.bg,borderRadius:10,padding:'10px 4px',marginTop:10 }}>
+                                <div style={{ display:'flex',justifyContent:'space-between',fontSize:11,color:L.sub,marginBottom:5,padding:'0 4px' }}>
+                                  <span>Payment Progress</span><span>{pct}%</span>
+                                </div>
+                                <div style={{ background:L.border,borderRadius:100,height:8,overflow:'hidden',margin:'0 4px' }}>
+                                  <div style={{ width:`${pct}%`,height:'100%',background:pct>=100?L.accent:pct>50?L.warning:L.danger,borderRadius:100,transition:'width 0.5s' }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div style={{ background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,padding:'18px',textAlign:'center' }}>
-                        <div style={{ fontSize:10,color:L.danger,fontWeight:700,textTransform:'uppercase',marginBottom:4 }}>Balance</div>
-                        <div style={{ fontSize:22,fontWeight:900,color:L.danger }}>KES {(fees.total-fees.paid).toLocaleString()}</div>
-                      </div>
-                    </div>
-                    <div style={{ background:L.bg,borderRadius:10,padding:'14px',marginBottom:20 }}>
-                      <div style={{ display:'flex',justifyContent:'space-between',fontSize:12,color:L.sub,marginBottom:6 }}>
-                        <span>Payment Progress</span><span>{feePct}%</span>
-                      </div>
-                      <div style={{ background:L.border,borderRadius:100,height:10,overflow:'hidden' }}>
-                        <div style={{ width:`${feePct}%`,height:'100%',background:feePct>=100?L.accent:feePct>50?L.warning:L.danger,borderRadius:100,transition:'width 0.5s' }} />
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
             {/* ── PROFILE ── */}
             {tab==='profile' && (
-              <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:28,boxShadow:'0 2px 8px #0000000a' }}>
-                <div style={{ fontSize:16,fontWeight:800,color:L.text,marginBottom:20 }}>👤 {selChild.name}</div>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
+              <div style={{ background:L.card,border:`1.5px solid ${L.border}`,borderRadius:16,padding:24,boxShadow:'0 2px 8px #0000000a' }}>
+                <div style={{ fontSize:15,fontWeight:800,color:L.text,marginBottom:18 }}>👤 {selChild.name}</div>
+                <div className="sp-profile-grid">
                   {[
                     ['Full Name',    selChild.name],
                     ['Class',        selChild.class],
@@ -545,9 +621,9 @@ export function ParentPortal({ parent, data, onLogout }) {
                     ['Year Joined',  selChild.joined],
                     ['Parent Phone', selChild.parentPhone],
                   ].map(([l,v])=>(
-                    <div key={l} style={{ padding:'12px 16px',background:L.bg,borderRadius:10,border:`1px solid ${L.border}` }}>
+                    <div key={l} style={{ padding:'12px 16px',background:L.bg,borderRadius:10,border:`1px solid ${L.border}`,overflow:'hidden' }}>
                       <div style={{ fontSize:11,color:L.sub,marginBottom:3,fontWeight:600 }}>{l}</div>
-                      <div style={{ fontSize:14,fontWeight:700,color:L.text }}>{v||'—'}</div>
+                      <div style={{ fontSize:14,fontWeight:700,color:L.text,overflowWrap:'break-word' }}>{v||'—'}</div>
                     </div>
                   ))}
                 </div>

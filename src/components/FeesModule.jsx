@@ -38,12 +38,12 @@ function curYear()  { return new Date().getFullYear(); }
 function curTerm()  { const m = new Date().getMonth(); return m < 4 ? '1' : m < 8 ? '2' : '3'; }
 
 /* ── Resolve a student's effective category ── */
-function studentCategory(student) {
+export function studentCategory(student) {
   return student?.category || 'day';
 }
 
 /* ── Does a fee type apply to a given student category? ── */
-function feeTypeAppliesTo(ft, cat) {
+export function feeTypeAppliesTo(ft, cat) {
   if (!ft) return false;
   const cats = ft.applicableCategories;
   if (!cats || cats.length === 0) return true; // applies to all
@@ -53,7 +53,7 @@ function feeTypeAppliesTo(ft, cat) {
 /* ── Find the best schedule entry for student+feeType+term+year ──
    Priority: category-specific entry > ALL entry
 ── */
-function findSchedule(student, feeTypeId, term, year, data) {
+export function findSchedule(student, feeTypeId, term, year, data) {
   const cat = studentCategory(student);
   const all = (data.feeSchedule || []).filter(s =>
     s.feeTypeId == feeTypeId &&
@@ -68,7 +68,7 @@ function findSchedule(student, feeTypeId, term, year, data) {
 }
 
 /* ── Compute what a student owes for one fee type in one term/year ── */
-function getExpected(student, feeTypeId, term, year, data) {
+export function getExpected(student, feeTypeId, term, year, data) {
   const ft = (data.feeTypes || []).find(f => f.id == feeTypeId);
   if (!ft) return 0;
   const cat = studentCategory(student);
@@ -80,7 +80,7 @@ function getExpected(student, feeTypeId, term, year, data) {
 }
 
 /* ── Sum all expected fees for a student in a term/year ── */
-function getTotalExpected(student, term, year, data, feeTypeId = null) {
+export function getTotalExpected(student, term, year, data, feeTypeId = null) {
   const types = feeTypeId
     ? [(data.feeTypes || []).find(f => f.id == feeTypeId)].filter(Boolean)
     : (data.feeTypes || []);
@@ -88,7 +88,7 @@ function getTotalExpected(student, term, year, data, feeTypeId = null) {
 }
 
 /* ── Sum what a student paid ── */
-function getPaid(studentId, term, year, data, feeTypeId = null) {
+export function getPaid(studentId, term, year, data, feeTypeId = null) {
   return (data.feePayments || [])
     .filter(p =>
       String(p.studentId) == String(studentId) &&
@@ -97,6 +97,46 @@ function getPaid(studentId, term, year, data, feeTypeId = null) {
       (feeTypeId ? String(p.feeTypeId) == String(feeTypeId) : true)
     )
     .reduce((s, p) => s + Number(p.amount || 0), 0);
+}
+
+/* ── Total paid by a student across ALL terms/years (lifetime) ── */
+export function getTotalPaidAllTime(studentId, data) {
+  return (data.feePayments || [])
+    .filter(p => String(p.studentId) == String(studentId))
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+}
+
+/* ── Total expected across ALL terms the school currently has set up
+   for this student (used for an overall "lifetime" summary) ── */
+export function getTotalExpectedAllTime(student, data) {
+  const years = new Set();
+  (data.feeSchedule || []).forEach(s => years.add(s.year));
+  let total = 0;
+  years.forEach(year => {
+    [1, 2, 3].forEach(term => { total += getTotalExpected(student, term, year, data); });
+  });
+  return total;
+}
+
+/* ── Per-term fee summary for a student (used in Parent/Student portal) ──
+   Returns an array of { term, year, expected, paid, balance } for every
+   (term, year) where either a schedule or a payment exists, newest first */
+export function getStudentFeeSummary(student, data) {
+  const keys = new Set();
+  (data.feeSchedule || []).forEach(s => {
+    if (s.class === student.class || s.class === 'ALL') keys.add(`${s.term}-${s.year}`);
+  });
+  (data.feePayments || []).forEach(p => {
+    if (String(p.studentId) === String(student.id)) keys.add(`${p.term}-${p.year}`);
+  });
+  const rows = [...keys].map(k => {
+    const [term, year] = k.split('-').map(Number);
+    const expected = getTotalExpected(student, term, year, data);
+    const paid     = getPaid(student.id, term, year, data);
+    return { term, year, expected, paid, balance: expected - paid };
+  });
+  rows.sort((a, b) => (b.year - a.year) || (b.term - a.term));
+  return rows;
 }
 
 /* ── Does this school use boarding? ── */
@@ -683,6 +723,11 @@ function PaymentHistory({ data, setData, user, canManage }) {
       (!filterTerm|| p.term == Number(filterTerm))
     );
 
+  function deletePayment(id) {
+    if (!window.confirm('Delete this payment record? This cannot be undone.')) return;
+    setData(d => ({ ...d, feePayments: (d.feePayments || []).filter(p => p.id !== id) }));
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -705,7 +750,7 @@ function PaymentHistory({ data, setData, user, canManage }) {
             <div style={{ overflowX: 'auto' }}>
               <table style={TS.table}>
                 <thead><tr>
-                  {['Date','Student','Class','Term','Year','Fee Type','Method','Reference','Amount','Receipt'].map(h =>
+                  {['Date','Student','Class','Term','Year','Fee Type','Method','Reference','Amount','Receipt',...(canManage?['']:[])].map(h =>
                     <th key={h} style={TS.th}>{h}</th>)}
                 </tr></thead>
                 <tbody>
@@ -715,11 +760,11 @@ function PaymentHistory({ data, setData, user, canManage }) {
                     return (
                       <tr key={p.id}>
                         <td style={TS.td}>{p.date}</td>
-                        <td style={{ ...TS.td, fontWeight: 500 }}>{p.studentName}</td>
+                        <td style={{ ...TS.td, fontWeight: 500 }}>{p.studentName || (student ? student.name : <span style={{ color: '#ef4444' }}>Deleted student</span>)}</td>
                         <td style={TS.td}>{p.studentClass || student?.class || '—'}</td>
                         <td style={TS.td}>Term {p.term}</td>
                         <td style={TS.td}>{p.year}</td>
-                        <td style={TS.td}>{ft?.name || 'General'}</td>
+                        <td style={TS.td}>{ft?.name || p.feeTypeName || 'General'}</td>
                         <td style={TS.td}><Tag color={p.method=='Mpesa'?'green':p.method=='Bank'?'blue':'gray'}>{p.method}</Tag></td>
                         <td style={{ ...TS.td, fontFamily: 'monospace', fontSize: 11 }}>{p.reference}</td>
                         <td style={{ ...TS.td, color: '#10b981', fontWeight: 700 }}>KES {p.amount.toLocaleString()}</td>
@@ -730,6 +775,13 @@ function PaymentHistory({ data, setData, user, canManage }) {
                             </Btn>
                           )}
                         </td>
+                        {canManage && (
+                          <td style={TS.td}>
+                            <Btn size="sm" variant="danger" onClick={() => deletePayment(p.id)}>
+                              <Icon name="trash" size={12} />
+                            </Btn>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

@@ -53,12 +53,28 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
 
   const myNotifs = (data.notifications || []).filter(n => n.to == user.staffId && !n.read);
 
+  /* ── Pending score-edit approvals this user must act on ──
+     Mirrors the same logic used in the admin Notifications page:
+     - Principal must approve every pending request
+     - Class teacher must approve requests for exams in their own class
+  ── */
+  const pendingApprovals = (data.editRequests || []).filter(r => {
+    if (r.status !== 'pending') return false;
+    if (user.role === 'principal' && r.approvals?.principal == null) return true;
+    if (isClassTeacher && myClass) {
+      const exam = (data.exams || []).find(e => e.id == r.examId);
+      if (exam?.class === myClass && r.approvals?.classTeacher == null) return true;
+    }
+    return false;
+  });
+
   const NAV = [
     { id: 'home',    icon: '🏠', label: 'Home'        },
     { id: 'lessons', icon: '📅', label: 'My Lessons'  },
     { id: 'marks',   icon: '✏️',  label: 'Enter Marks' },
     { id: 'results', icon: '📊', label: 'View Results' },
     ...(isClassTeacher ? [{ id: 'class', icon: '👩‍🏫', label: 'My Class' }] : []),
+    ...(pendingApprovals.length > 0 ? [{ id: 'approvals', icon: '✅', label: `Approve Marks (${pendingApprovals.length})` }] : []),
     { id: 'notifs',  icon: '🔔', label: `Notifications${myNotifs.length > 0 ? ` (${myNotifs.length})` : ''}` },
   ];
 
@@ -135,6 +151,11 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
               {isClassTeacher && <div style={{ fontSize: 10, color: '#10b981', marginTop: 2 }}>Class Teacher · {myClass}</div>}
               {!isClassTeacher && user.canEnterAllMarks && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>Secretary · All Access</div>}
               {!isClassTeacher && !user.canEnterAllMarks && user.staffType === 'teaching' && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Subject Teacher</div>}
+              {pendingApprovals.length > 0 && (
+                <div onClick={() => navigate('approvals')} style={{ fontSize: 10, color: '#fff', background: '#ef4444', borderRadius: 6, padding: '2px 6px', marginTop: 4, display: 'inline-block', cursor: 'pointer', fontWeight: 700 }}>
+                  ✅ {pendingApprovals.length} mark{pendingApprovals.length > 1 ? 's' : ''} to approve
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -161,29 +182,36 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
 
       {/* Main content */}
       <main className="tp-main">
-        {page === 'home'    && <TeacherHome user={user} data={data} timetableToday={myTimetableToday} myNotifs={myNotifs} setPage={navigate} />}
-        {page === 'lessons' && <TeacherLessons user={user} data={data} />}
-        {page === 'marks'   && <TeacherMarks user={user} data={data} setData={setData} />}
-        {page === 'results' && <TeacherResults user={user} data={data} />}
-        {page === 'class'   && isClassTeacher && <TeacherClass user={user} data={data} setData={setData} />}
-        {page === 'notifs'  && <TeacherNotifs user={user} data={data} setData={setData} />}
+        {page === 'home'      && <TeacherHome user={user} data={data} timetableToday={myTimetableToday} myNotifs={myNotifs} pendingApprovals={pendingApprovals} setPage={navigate} />}
+        {page === 'lessons'   && <TeacherLessons user={user} data={data} />}
+        {page === 'marks'     && <TeacherMarks user={user} data={data} setData={setData} />}
+        {page === 'results'   && <TeacherResults user={user} data={data} />}
+        {page === 'class'     && isClassTeacher && <TeacherClass user={user} data={data} setData={setData} />}
+        {page === 'approvals' && <TeacherApprovals user={user} data={data} setData={setData} />}
+        {page === 'notifs'    && <TeacherNotifs user={user} data={data} setData={setData} />}
       </main>
 
       {/* Bottom nav (phones only) */}
       <nav className="tp-bottom-nav">
-        {NAV.slice(0, 5).map(n => (
-          <button key={n.id} className={page === n.id ? 'active' : ''} onClick={() => navigate(n.id)}>
-            <span className="ico">{n.icon}</span>
-            <span>{n.label.replace(/ \(\d+\)/, '')}</span>
-          </button>
-        ))}
+        {(() => {
+          // Always show Home + Approve Marks (if any) + up to 3 more, max 5 total
+          const priority = NAV.filter(n => n.id === 'home' || n.id === 'approvals');
+          const rest = NAV.filter(n => n.id !== 'home' && n.id !== 'approvals');
+          const bottomItems = [...priority, ...rest].slice(0, 5);
+          return bottomItems.map(n => (
+            <button key={n.id} className={page === n.id ? 'active' : ''} onClick={() => navigate(n.id)}>
+              <span className="ico">{n.icon}</span>
+              <span>{n.label.replace(/ \(\d+\)/, '')}</span>
+            </button>
+          ));
+        })()}
       </nav>
     </div>
   );
 }
 
 /* ══════════════════ HOME DASHBOARD ══════════════════ */
-function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
+function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = [], setPage }) {
   const mySubjects     = user.teacherSubjects || [];
   const myClasses      = [...new Set(mySubjects.flatMap(s => s.classes))];
   const isClassTeacher = user.isClassTeacher;
@@ -208,6 +236,13 @@ function TeacherHome({ user, data, timetableToday, myNotifs, setPage }) {
         {isClassTeacher && <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>Class Teacher · {myClass}</div>}
         {user.canEnterAllMarks && !isClassTeacher && <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>You have access to enter marks for all classes and subjects.</div>}
       </div>
+
+      {pendingApprovals.length > 0 && (
+        <Alert type="warning" style={{ marginBottom: 16, cursor: 'pointer' }} onClick={() => setPage('approvals')}>
+          <Icon name="alert" size={14} />
+          <span>You have <strong>{pendingApprovals.length} score edit request{pendingApprovals.length > 1 ? 's' : ''}</strong> awaiting your approval. <strong style={{ textDecoration: 'underline' }}>Tap to review →</strong></span>
+        </Alert>
+      )}
 
       <div className="tp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 20 }}>
         {stats.map(s => (
@@ -327,6 +362,7 @@ function TeacherMarks({ user, data, setData }) {
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
   const canEnterAll    = user.canEnterAllMarks || false;
+  const isPrincipal    = user.role === 'principal';
 
   const myTeachingClasses = [...new Set(mySubjects.flatMap(s => s.classes))];
   const allClasses        = getAllClasses(data);
@@ -339,7 +375,9 @@ function TeacherMarks({ user, data, setData }) {
   const [selExamId,  setSelExamId]  = useState('');
   const [selSubject, setSelSubject] = useState('');
   const [scores,     setScores]     = useState({});
+  const [original,   setOriginal]   = useState({}); // scores as they were when loaded (to detect edits)
   const [saved,      setSaved]      = useState(false);
+  const [pendingNote, setPendingNote] = useState(''); // feedback after save
 
   function getClassSubjects(cls) {
     if (!cls) return [];
@@ -352,13 +390,13 @@ function TeacherMarks({ user, data, setData }) {
   const selExam       = classExams.find(e => String(e.id) === String(selExamId));
   const classStudents = selExam ? (data.students || []).filter(s => s.class === selClass) : [];
 
-  function changeClass(cls) { setSelClass(cls); setSelExamId(''); setSelSubject(''); setScores({}); setSaved(false); }
+  function changeClass(cls) { setSelClass(cls); setSelExamId(''); setSelSubject(''); setScores({}); setOriginal({}); setSaved(false); setPendingNote(''); }
   function changeSubject(sub) {
-    setSelSubject(sub); setScores({}); setSaved(false);
+    setSelSubject(sub); setScores({}); setOriginal({}); setSaved(false); setPendingNote('');
     if (selExam) loadScores(selExam, sub);
   }
   function changeExam(examId) {
-    setSelExamId(examId); setScores({}); setSaved(false);
+    setSelExamId(examId); setScores({}); setOriginal({}); setSaved(false); setPendingNote('');
     const exam = classExams.find(e => String(e.id) === examId);
     if (exam && selSubject) loadScores(exam, selSubject);
   }
@@ -368,26 +406,116 @@ function TeacherMarks({ user, data, setData }) {
       const cell = exam.results?.[st.name]?.[subject] ?? exam.results?.[st.id]?.[subject];
       init[st.name] = getScore(cell) ?? '';
     });
-    setScores(init); setSaved(false);
+    setScores(init);
+    setOriginal(init); // snapshot — used to detect which scores already existed
+    setSaved(false);
+    setPendingNote('');
   }
+
+  /* ── Does this user get to apply edits immediately, bypassing approval? ──
+     Principal: always. Class teacher: only for their own class. Anyone
+     entering a brand-new score (no prior value) never needs approval —
+     only CHANGING an already-submitted score does. ── */
+  function autoApproved() {
+    return isPrincipal || (isClassTeacher && myClass === selClass);
+  }
+
+  function getClassTeacherStaffId() {
+    const ct = (data.teachers || []).find(t => t.isClassTeacher && t.classTeacherOf === selClass);
+    return ct?.staffId || null;
+  }
+
   function saveMarks() {
     if (!selExam || !selSubject) return;
-    setData(d => ({
-      ...d,
-      exams: d.exams.map(ex => {
+
+    const ctStaffId = getClassTeacherStaffId();
+    const bypass = autoApproved();
+    const newEditRequests = [];
+    const newNotifications = [];
+    let editedCount = 0;
+
+    setData(d => {
+      const exams = d.exams.map(ex => {
         if (ex.id !== selExam.id) return ex;
         const res = { ...ex.results };
         classStudents.forEach(st => {
-          if (!res[st.name]) res[st.name] = {};
-          const v = Number(scores[st.name]);
-          if (!isNaN(v) && String(scores[st.name]) !== '') {
+          const raw = scores[st.name];
+          if (raw === '' || raw === undefined) return;
+          const v = Number(raw);
+          if (isNaN(v)) return;
+
+          const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
+          const isChange = hadPrior && Number(original[st.name]) !== v;
+
+          if (!hadPrior) {
+            // First-time entry — always saved directly, no approval needed
+            if (!res[st.name]) res[st.name] = {};
             res[st.name][selSubject] = { score: v, submittedBy: user.staffId, locked: false };
+          } else if (isChange) {
+            editedCount++;
+            if (bypass) {
+              // Principal or this class's own class teacher — apply immediately
+              if (!res[st.name]) res[st.name] = {};
+              res[st.name][selSubject] = { ...res[st.name][selSubject], score: v };
+            } else {
+              // Needs approval — queue an edit request, leave the score untouched for now
+              const req = {
+                id: Date.now() + Math.floor(Math.random() * 10000),
+                examId: selExam.id,
+                studentName: st.name,
+                subject: selSubject,
+                oldScore: Number(original[st.name]),
+                newScore: v,
+                requestedBy: user.staffId,
+                requestedByName: user.name,
+                approvals: { classTeacher: null, principal: null },
+                status: 'pending',
+                date: new Date().toISOString().split('T')[0],
+              };
+              newEditRequests.push(req);
+              if (ctStaffId && ctStaffId !== user.staffId) {
+                newNotifications.push({ id: Date.now() + Math.floor(Math.random()*10000), to: ctStaffId, from: user.name, message: `Edit request: ${st.name} — ${selSubject} (${req.oldScore}→${v}). Requested by ${user.name}. Your approval needed.`, date: req.date, read: false });
+              }
+              const principalId = (d.teachers || []).find(t => t.admin)?.staffId;
+              if (principalId) {
+                newNotifications.push({ id: Date.now() + Math.floor(Math.random()*10000), to: principalId, from: user.name, message: `Edit request: ${st.name} — ${selSubject} (${req.oldScore}→${v}). Requested by ${user.name}. Your approval needed.`, date: req.date, read: false });
+              }
+            }
           }
         });
         return { ...ex, results: res };
-      }),
-    }));
+      });
+
+      return {
+        ...d,
+        exams,
+        editRequests: [...(d.editRequests || []), ...newEditRequests],
+        notifications: [...(d.notifications || []), ...newNotifications],
+      };
+    });
+
     setSaved(true);
+    if (!bypass && editedCount > 0) {
+      setPendingNote(`${editedCount} changed score${editedCount>1?'s':''} sent for approval (class teacher + principal). New entries were saved directly.`);
+      // Revert on-screen values for queued (not-yet-applied) edits back to their original score
+      setScores(prev => {
+        const reverted = { ...prev };
+        classStudents.forEach(st => {
+          const raw = prev[st.name];
+          if (raw === '' || raw === undefined) return;
+          const v = Number(raw);
+          if (isNaN(v)) return;
+          const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
+          const isChange = hadPrior && Number(original[st.name]) !== v;
+          if (isChange) reverted[st.name] = original[st.name];
+        });
+        return reverted;
+      });
+    } else {
+      setPendingNote('');
+      // New/auto-approved entries become the new "original" baseline
+      setOriginal(scores);
+    }
   }
 
   if (availableClasses.length === 0) {
@@ -475,6 +603,18 @@ function TeacherMarks({ user, data, setData }) {
             <Btn variant="success" onClick={saveMarks} style={{ minHeight: 44, fontSize: 15 }}>{saved ? '✅ Saved!' : '💾 Save Marks'}</Btn>
           </div>
 
+          {!autoApproved() && (
+            <Alert type="info" style={{ marginBottom: 14 }}>
+              <Icon name="alert" size={14} />
+              <span>New scores save instantly. Changing a score that's already submitted will be sent to the class teacher and principal for approval.</span>
+            </Alert>
+          )}
+          {saved && pendingNote && (
+            <Alert type="warning" style={{ marginBottom: 14 }}>
+              <Icon name="alert" size={14} /> <span>{pendingNote}</span>
+            </Alert>
+          )}
+
           {/* Desktop: table | Mobile: card list (via CSS) */}
           <table className="marks-table">
             <thead>
@@ -490,6 +630,9 @@ function TeacherMarks({ user, data, setData }) {
               {classStudents.map((st, i) => {
                 const score    = scores[st.name];
                 const numScore = score !== '' && score !== undefined && !isNaN(Number(score)) ? Number(score) : null;
+                const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
+                const isChanged = hadPrior && numScore !== null && Number(original[st.name]) !== numScore;
+                const needsApproval = isChanged && !autoApproved();
                 return (
                   <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
                     <td data-label="#" style={{ padding: '8px 10px', color: '#64748b' }}>{i + 1}</td>
@@ -502,8 +645,9 @@ function TeacherMarks({ user, data, setData }) {
                         inputMode="numeric"
                         onChange={e => { setScores(p => ({ ...p, [st.name]: e.target.value })); setSaved(false); }}
                         className="score-input"
-                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: '#0f1117', border: '2px solid #2a3350', color: '#e2e8f0' }}
+                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: '#0f1117', border: `2px solid ${needsApproval ? '#f59e0b' : '#2a3350'}`, color: '#e2e8f0' }}
                       />
+                      {needsApproval && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 3 }}>needs approval</div>}
                     </td>
                     <td data-label="Grade" style={{ padding: '8px 10px', textAlign: 'center' }}>
                       {numScore !== null ? <GradeBadge score={numScore} /> : <span style={{ color: '#2a3350' }}>—</span>}
@@ -712,7 +856,133 @@ function TeacherClass({ user, data, setData }) {
   );
 }
 
-/* ══════════════════ NOTIFICATIONS ══════════════════ */
+/* ══════════════════ APPROVE MARK EDITS ══════════════════
+   Mirrors the approval logic used in the admin Notifications page:
+   - Class teacher approves requests for exams in their own class
+   - Principal approves everything (handled in admin portal, but this
+     component works for any role that has a pending approval, in case
+     a principal ever logs in through this portal too)
+═══════════════════════════════════════════════════════ */
+function TeacherApprovals({ user, data, setData }) {
+  const isClassTeacher = user.isClassTeacher;
+  const myClass         = user.classTeacherOf;
+
+  const pending = (data.editRequests || []).filter(r => {
+    if (r.status !== 'pending') return false;
+    if (user.role === 'principal' && r.approvals?.principal == null) return true;
+    if (isClassTeacher && myClass) {
+      const exam = (data.exams || []).find(e => e.id == r.examId);
+      if (exam?.class === myClass && r.approvals?.classTeacher == null) return true;
+    }
+    return false;
+  }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const history = (data.editRequests || []).filter(r => {
+    if (r.status === 'pending') return false;
+    // Show requests this user was involved in approving, or for their class
+    if (user.role === 'principal') return true;
+    if (isClassTeacher && myClass) {
+      const exam = (data.exams || []).find(e => e.id == r.examId);
+      return exam?.class === myClass;
+    }
+    return r.requestedBy === user.staffId;
+  }).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 15);
+
+  function applyEditRequest(d, req) {
+    return {
+      ...d,
+      exams: d.exams.map(ex => {
+        if (ex.id !== req.examId) return ex;
+        const r = { ...ex.results };
+        if (r[req.studentName]?.[req.subject]) {
+          r[req.studentName] = { ...r[req.studentName], [req.subject]: { ...r[req.studentName][req.subject], score: req.newScore } };
+        }
+        return { ...ex, results: r };
+      }),
+    };
+  }
+
+  function handleDecision(reqId, decision) {
+    setData(d => {
+      const req = (d.editRequests || []).find(r => r.id === reqId);
+      if (!req) return d;
+
+      const updated = { ...req, approvals: { ...req.approvals } };
+      if (user.role === 'principal') updated.approvals.principal = decision;
+      else if (isClassTeacher) updated.approvals.classTeacher = decision;
+
+      const { classTeacher, principal } = updated.approvals;
+      let nextData = { ...d, editRequests: d.editRequests.map(r => r.id === reqId ? updated : r) };
+      const notifications = [...(nextData.notifications || [])];
+
+      if (classTeacher === 'approved' && principal === 'approved') {
+        updated.status = 'approved';
+        nextData = applyEditRequest(nextData, updated);
+        notifications.push(
+          { id: Date.now() + 1, to: req.requestedBy, from: 'System', message: `✅ Your edit request for ${req.studentName} — ${req.subject} (${req.oldScore}→${req.newScore}) has been APPROVED.`, date: new Date().toISOString().split('T')[0], read: false },
+        );
+      } else if (classTeacher === 'rejected' || principal === 'rejected') {
+        updated.status = 'rejected';
+        notifications.push(
+          { id: Date.now() + 1, to: req.requestedBy, from: 'System', message: `❌ Your edit request for ${req.studentName} — ${req.subject} (${req.oldScore}→${req.newScore}) was REJECTED.`, date: new Date().toISOString().split('T')[0], read: false },
+        );
+      }
+
+      return { ...nextData, notifications };
+    });
+  }
+
+  return (
+    <div>
+      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>
+        ✅ Approve Mark Edits
+      </div>
+
+      {pending.length === 0 ? (
+        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No pending mark edit requests right now.</div></Card>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+          {pending.map(r => (
+            <Card key={r.id} style={{ borderColor: '#f59e0b40', background: '#f59e0b08' }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#e2e8f0', marginBottom: 6 }}>{r.studentName}</div>
+              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>Subject: <strong style={{ color: '#e2e8f0' }}>{r.subject}</strong></div>
+              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>
+                Score change: <span style={{ color: '#ef4444', fontWeight: 700 }}>{r.oldScore}</span> → <span style={{ color: '#10b981', fontWeight: 700 }}>{r.newScore}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>Requested by {r.requestedByName} · {r.date}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <span>Class Teacher: <strong style={{ color: r.approvals?.classTeacher === 'approved' ? '#10b981' : r.approvals?.classTeacher === 'rejected' ? '#ef4444' : '#f59e0b' }}>{r.approvals?.classTeacher || 'Pending'}</strong></span>
+                <span>Principal: <strong style={{ color: r.approvals?.principal === 'approved' ? '#10b981' : r.approvals?.principal === 'rejected' ? '#ef4444' : '#f59e0b' }}>{r.approvals?.principal || 'Pending'}</strong></span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Btn variant="success" onClick={() => handleDecision(r.id, 'approved')} style={{ minHeight: 42 }}>✓ Approve</Btn>
+                <Btn variant="danger" onClick={() => handleDecision(r.id, 'rejected')} style={{ minHeight: 42 }}>✕ Reject</Btn>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Recent History</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {history.map(r => (
+              <div key={r.id} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>{r.studentName} — {r.subject}</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>{r.oldScore} → {r.newScore} · by {r.requestedByName} · {r.date}</div>
+                </div>
+                <Tag color={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Tag>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TeacherNotifs({ user, data, setData }) {
   function markRead(id)  { setData(d => ({ ...d, notifications: (d.notifications||[]).map(n => n.id === id ? {...n,read:true} : n) })); }
   function markAllRead() { setData(d => ({ ...d, notifications: (d.notifications||[]).map(n => n.to === user.staffId ? {...n,read:true} : n) })); }

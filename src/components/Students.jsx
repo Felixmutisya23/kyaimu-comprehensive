@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Avatar, GradeBadge, Icon } from './UI';
 import { getGrade, getAllClasses, getScore, getStreamFromClass, generateSLC, generateAdmNo, buildStudentName } from '../data/initialData';
+import { getTotalExpected, getPaid } from './FeesModule';
 import * as XLSX from 'xlsx';
 import { printLeavingCert, printReportForm, printStudentIntakeForm, printStudentRegister } from '../utils/print';
+
+function curTermYear() {
+  const m = new Date().getMonth();
+  const term = m < 4 ? '1' : m < 8 ? '2' : '3';
+  return { term, year: new Date().getFullYear() };
+}
 
 export default function Students({ data, setData, user, isUnlocked = true }) {
   const isPrincipal    = user.role === 'principal';
@@ -534,7 +541,10 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             </thead>
             <tbody>
               {filtered.map(s => {
-                const pct = s.fees?.total > 0 ? Math.round(s.fees.paid/s.fees.total*100) : 0;
+                const { term: curT, year: curY } = curTermYear();
+                const exp = getTotalExpected(s, curT, curY, data);
+                const pd  = getPaid(s.id, curT, curY, data);
+                const pct = exp > 0 ? Math.round(pd / exp * 100) : 0;
                 return (
                   <tr key={s.id}>
                     <td style={TS.td}>
@@ -547,7 +557,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                     </td>
                     {(user.canSeeFees||isPrincipal)&&(
                       <td style={TS.td}>
-                        {s.fees?.total>0
+                        {exp>0
                           ?<div style={{display:'flex',alignItems:'center',gap:8}}><ProgressBar pct={pct}/><span style={{fontSize:11,color:'#64748b'}}>{pct}%</span></div>
                           :<span style={{fontSize:11,color:'#64748b'}}>Not set</span>}
                       </td>

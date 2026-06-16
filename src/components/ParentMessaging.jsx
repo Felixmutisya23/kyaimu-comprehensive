@@ -64,12 +64,12 @@ export default function ParentMessaging({ data, setData, user }) {
   // Gather phones for selected class
   function getTargetStudents() {
     const students = data.students || [];
-    if (selClass === 'ALL') return students.filter(s => s.phone);
-    return students.filter(s => s.class === selClass && s.phone);
+    if (selClass === 'ALL') return students.filter(s => s.parentPhone);
+    return students.filter(s => s.class === selClass && s.parentPhone);
   }
 
   const targets = getTargetStudents();
-  const uniquePhones = [...new Set(targets.map(s => s.phone).filter(Boolean))];
+  const uniquePhones = [...new Set(targets.map(s => s.parentPhone).filter(Boolean))];
 
   function buildResultMessage(student, exam) {
     if (!exam) return '';
@@ -119,7 +119,7 @@ export default function ParentMessaging({ data, setData, user }) {
     const exam = (data.exams || []).find(e => e.id === Number(selExam));
     if (!exam) { alert('Select an exam first.'); return; }
     const students = data.students.filter(s =>
-      exam.results[s.name] && s.phone &&
+      exam.results[s.name] && s.parentPhone &&
       (selClass === 'ALL' || s.class === selClass)
     );
     if (!students.length) { alert('No students with results and phone numbers found.'); return; }
@@ -131,7 +131,7 @@ export default function ParentMessaging({ data, setData, user }) {
       const msg = buildResultMessage(student, exam);
       if (!msg) continue;
       if (conf.provider !== 'manual' && conf.apiKey) {
-        const phone = `+254${student.phone.replace(/^0/, '')}`;
+        const phone = `+254${student.parentPhone.replace(/^0/, '')}`;
         await sendSMSViaSenderId([phone], msg, conf);
       }
       sentCount++;
@@ -154,8 +154,8 @@ export default function ParentMessaging({ data, setData, user }) {
     const rows = students.map(s =>
       `<tr><td style="padding:5px 8px;border:1px solid #ddd">${s.admNo}</td>
        <td style="padding:5px 8px;border:1px solid #ddd">${s.name}</td>
-       <td style="padding:5px 8px;border:1px solid #ddd">${s.phone}</td>
-       <td style="padding:5px 8px;border:1px solid #ddd">${s.parent || '-'}</td></tr>`
+       <td style="padding:5px 8px;border:1px solid #ddd">${s.parentPhone}</td>
+       <td style="padding:5px 8px;border:1px solid #ddd">${s.parentName || '-'}</td></tr>`
     ).join('');
     const w = window.open('', '_blank');
     w.document.write(`<!DOCTYPE html><html><head><title>Broadcast SMS</title>
@@ -176,7 +176,7 @@ export default function ParentMessaging({ data, setData, user }) {
     const rows = students.map(s => {
       const msg = buildResultMessage(s, exam);
       return `<tr><td style="padding:5px 8px;border:1px solid #ddd;vertical-align:top">${s.name}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd">${s.phone}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd">${s.parentPhone}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;white-space:pre-line;font-size:11px">${msg}</td></tr>`;
     }).join('');
     const w = window.open('', '_blank');
@@ -203,6 +203,14 @@ export default function ParentMessaging({ data, setData, user }) {
     <div>
       <SectionTitle>📱 Parent Messaging</SectionTitle>
 
+      <Alert type="info" style={{ marginBottom: 16 }}>
+        <Icon name="alert" size={14} />
+        This sends real <strong>SMS text messages</strong> to parents' phones — it is not an in-app chat.
+        Parents do not see these in the Parent Portal. If no SMS gateway is configured below (SMS Setup tab),
+        clicking "Send" will instead open a printable list of messages + phone numbers for you to send manually
+        (e.g. via your own phone or WhatsApp).
+      </Alert>
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {[['broadcast','📢 Broadcast Message'],['results','📊 Send Results'],['logs','📋 Message Logs'],['config','⚙ SMS Setup']].map(([t,l]) => (
@@ -221,9 +229,9 @@ export default function ParentMessaging({ data, setData, user }) {
           <FormGroup label="Target Class">
             <select value={selClass} onChange={e => setSel(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
-              <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.phone).length} parents with phones)</option>
+              <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.parentPhone).length} parents with phones)</option>
               {classes.map(c => {
-                const count = (data.students||[]).filter(s=>s.class===c&&s.phone).length;
+                const count = (data.students||[]).filter(s=>s.class===c&&s.parentPhone).length;
                 return <option key={c} value={c}>{c} ({count} parents)</option>;
               })}
             </select>
@@ -275,7 +283,7 @@ export default function ParentMessaging({ data, setData, user }) {
             const exam = exams.find(e => e.id === Number(selExam));
             if (!exam) return null;
             const count = (data.students||[]).filter(s =>
-              exam.results[s.name] && s.phone && (selClass === 'ALL' || s.class === selClass)
+              exam.results[s.name] && s.parentPhone && (selClass === 'ALL' || s.class === selClass)
             ).length;
             return (
               <div style={{ padding: 12, background: '#10b98115', borderRadius: 8, border: '1px solid #10b98130', fontSize: 13, color: '#10b981', marginBottom: 12 }}>

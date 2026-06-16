@@ -76,7 +76,7 @@ function buildNav(user, data) {
     isPrincipal
       ? { id: 'terms',     label: 'Term Calendar',     icon: 'timetable', section: 'System'        } : null,
     (isPrincipal || (teaching && !!(data.teachers||[]).find(t => t.staffId == user.staffId)?.classTeacherOf))
-      ? { id: 'parentmsg', label: 'Parent Messages',   icon: 'messages',  section: 'Communication' } : null,
+      ? { id: 'parentmsg', label: 'Parent SMS',         icon: 'messages',  section: 'Communication' } : null,
     isPrincipal
       ? { id: 'settings',  label: 'Settings',          icon: 'settings',  section: 'System'        } : null,
   ].filter(Boolean);
@@ -87,7 +87,7 @@ const PAGE_TITLES = {
   teachers:'Staff Management', fees:'Fee Management', exams:'Exams & CBC Reports',
   timetable:'Timetable', status:'Student Status & Roll Call', messages:'Messages',
   departments:'Departments', kitchen:'Kitchen & Inventory', settings:'Settings',
-  terms:'Term Calendar', parentmsg:'Parent Messaging',
+  terms:'Term Calendar', parentmsg:'Parent SMS Broadcasting',
 };
 
 const ROLE_COLORS = { principal:'#7c3aed', class_teacher:'#4f8ef7', subject_teacher:'#4f8ef7', non_teaching:'#10b981' };
@@ -348,6 +348,43 @@ export default function App() {
   const [subscription, setSubscription] = React.useState(null);
   const [saveError, setSaveError] = React.useState(null);
   const [loginError, setLoginError] = React.useState('');
+
+  /* ── THEME: inject CSS variables whenever darkTheme changes ── */
+  const isDark = data.darkTheme !== false;
+  React.useEffect(() => {
+    const dark = {
+      '--bg':          '#0f1117',
+      '--surface':     '#171b26',
+      '--surface2':    '#1e2435',
+      '--border':      '#2a3350',
+      '--text':        '#e2e8f0',
+      '--text-sub':    '#94a3b8',
+      '--text-muted':  '#64748b',
+      '--input-bg':    '#1e2435',
+      '--input-color': '#e2e8f0',
+      '--accent':      '#4f8ef7',
+      '--card-shadow': 'none',
+    };
+    const light = {
+      '--bg':          '#f0f4f8',
+      '--surface':     '#ffffff',
+      '--surface2':    '#f8fafc',
+      '--border':      '#d1dbe8',
+      '--text':        '#0f172a',
+      '--text-sub':    '#334155',
+      '--text-muted':  '#64748b',
+      '--input-bg':    '#ffffff',
+      '--input-color': '#0f172a',
+      '--accent':      '#2563eb',
+      '--card-shadow': '0 1px 4px rgba(0,0,0,0.08)',
+    };
+    const vars = isDark ? dark : light;
+    const root = document.documentElement;
+    Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.body.style.background = vars['--bg'];
+    document.body.style.color      = vars['--text'];
+  }, [isDark]);
 
 
 
