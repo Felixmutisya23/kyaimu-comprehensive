@@ -21,7 +21,14 @@ export default function Exams({ data, setData, user }) {
 
   const [selClass, setSelClass] = useState(accessibleClasses[0] || getAllClasses(data)[0] || '');
   const [showSetupSubjects, setShowSetupSubjects] = useState(false);
-  const [setupSubjectInput, setSetupSubjectInput] = useState('');
+  // Row-based editor: each row remembers its ORIGINAL name (what's already
+  // saved, and what any existing exam marks are keyed by) plus its CURRENT
+  // (possibly edited) name. This is what makes renaming safe — we always
+  // know exactly which old subject a new name replaces, so we can carry
+  // forward every student's existing score under the new name instead of
+  // orphaning it. A row with no original (newly added) is just inserted.
+  const [setupSubjectRows, setSetupSubjectRows] = useState([]); // [{ original, current }]
+  const [newSubjectName, setNewSubjectName] = useState('');
   const classSubjects = getSubjectsForClass(selClass, data);
   const [selExamId, setSelExamId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
@@ -402,7 +409,12 @@ export default function Exams({ data, setData, user }) {
             </Btn>
           )}
           {isPrincipal && (
-            <Btn variant="ghost" onClick={() => { setSetupSubjectInput((getSubjectsForClass(selClass, data) || []).join('\n')); setShowSetupSubjects(true); }}>
+            <Btn variant="ghost" onClick={() => {
+              const subs = getSubjectsForClass(selClass, data) || [];
+              setSetupSubjectRows(subs.map(s => ({ original: s, current: s })));
+              setNewSubjectName('');
+              setShowSetupSubjects(true);
+            }}>
               📚 Setup Subjects
             </Btn>
           )}
@@ -568,26 +580,86 @@ export default function Exams({ data, setData, user }) {
       <Modal show={showSetupSubjects} onClose={() => setShowSetupSubjects(false)} title={`Setup Subjects — ${selClass}`}>
         <Alert type="info">
           <Icon name="alert" size={14} />
-          Enter one subject per line for <strong>{selClass}</strong>. These will be used when entering marks for this class.
+          These are the subjects used for entering marks in <strong>{selClass}</strong>. You can rename a subject
+          at any time, even after marks have been entered for it — existing scores move with it automatically.
         </Alert>
-        <FormGroup label="Subjects (one per line)">
-          <textarea
-            rows={8}
-            value={setupSubjectInput}
-            onChange={e => setSetupSubjectInput(e.target.value)}
-            placeholder="e.g.&#10;Mathematics&#10;English&#10;Kiswahili&#10;Science"
-            style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
-          />
+
+        <FormGroup label={`Subjects (${setupSubjectRows.length})`}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {setupSubjectRows.map((row, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  value={row.current}
+                  onChange={e => setSetupSubjectRows(rows => rows.map((r, ri) => ri === i ? { ...r, current: e.target.value } : r))}
+                  style={{ flex: 1 }}
+                />
+                <Btn size="sm" variant="danger" onClick={() => {
+                  if (row.original && !window.confirm(`Remove "${row.original}" from ${selClass}? Any marks already entered for this subject will be KEPT in the exam data but it will no longer appear in the subject list or in new mark entry.`)) return;
+                  setSetupSubjectRows(rows => rows.filter((_, ri) => ri !== i));
+                }}>
+                  <Icon name="trash" size={12} />
+                </Btn>
+              </div>
+            ))}
+          </div>
         </FormGroup>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-          {setupSubjectInput.split('\n').filter(s => s.trim()).length} subjects configured
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+          <input
+            value={newSubjectName}
+            onChange={e => setNewSubjectName(e.target.value)}
+            placeholder="New subject name…"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newSubjectName.trim()) {
+                setSetupSubjectRows(rows => [...rows, { original: '', current: newSubjectName.trim() }]);
+                setNewSubjectName('');
+              }
+            }}
+          />
+          <Btn variant="ghost" onClick={() => {
+            if (!newSubjectName.trim()) return;
+            setSetupSubjectRows(rows => [...rows, { original: '', current: newSubjectName.trim() }]);
+            setNewSubjectName('');
+          }}>+ Add</Btn>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
           <Btn variant="ghost" onClick={() => setShowSetupSubjects(false)}>Cancel</Btn>
           <Btn variant="success" onClick={() => {
-            const subs = setupSubjectInput.split('\n').map(s => s.trim()).filter(Boolean);
-            setData(d => ({ ...d, subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: subs } }));
+            const finalSubs = setupSubjectRows.map(r => r.current.trim()).filter(Boolean);
+
+            // Detect renames: rows where the name actually changed
+            const renames = setupSubjectRows
+              .filter(r => r.original && r.current.trim() && r.original !== r.current.trim())
+              .map(r => ({ from: r.original, to: r.current.trim() }));
+
+            setData(d => {
+              let next = { ...d, subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: finalSubs } };
+              if (renames.length > 0) {
+                // Migrate every exam for this class: for every student, move
+                // their score from the old subject key to the new one so
+                // nothing is lost when a subject is renamed.
+                next = {
+                  ...next,
+                  exams: (d.exams || []).map(ex => {
+                    if (ex.class !== selClass) return ex;
+                    const newResults = {};
+                    Object.entries(ex.results || {}).forEach(([studentName, subjectScores]) => {
+                      const updated = { ...subjectScores };
+                      renames.forEach(({ from, to }) => {
+                        if (updated[from] !== undefined && updated[to] === undefined) {
+                          updated[to] = updated[from];
+                          delete updated[from];
+                        }
+                      });
+                      newResults[studentName] = updated;
+                    });
+                    return { ...ex, results: newResults };
+                  }),
+                };
+              }
+              return next;
+            });
             setShowSetupSubjects(false);
           }}>Save Subjects</Btn>
         </div>

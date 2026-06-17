@@ -347,6 +347,7 @@ export default function App() {
   const [licenseRefreshKey, setLicenseRefreshKey] = React.useState(0);
   const [subscription, setSubscription] = React.useState(null);
   const [saveError, setSaveError] = React.useState(null);
+  const [saveStatus, setSaveStatus] = React.useState('idle'); // idle | pending | saving | saved | error
   const [loginError, setLoginError] = React.useState('');
 
   /* ── THEME: inject CSS variables whenever darkTheme changes ── */
@@ -442,9 +443,20 @@ export default function App() {
       clearTimeout(saveTimer.current);
       const toSave = pendingDataRef.current;
       pendingDataRef.current = null;
-      // Fire and forget — best effort synchronous-ish flush before logout/unload
-      saveSchoolData(toSave).catch(e => console.error('Flush save error:', e));
+      setSaveStatus('saving');
+      // Return the promise so callers (like logout) can actually AWAIT it —
+      // this is what makes the logout button itself reliable: unlike
+      // beforeunload (which the browser can cut off mid-request), an
+      // explicit await inside a click handler is guaranteed to run to
+      // completion before the function continues to wipe local state.
+      return saveSchoolData(toSave)
+        .then(() => setSaveStatus('saved'))
+        .catch(e => {
+          console.error('Flush save error:', e);
+          setSaveStatus('error');
+        });
     }
+    return Promise.resolve();
   }
 
   React.useEffect(() => {
@@ -463,24 +475,72 @@ export default function App() {
       if (next._schoolId && next._loadedFromDB) {
         pendingDataRef.current = next;
         clearTimeout(saveTimer.current);
-        // FIX: 2000ms debounce (was 800ms) — reduces Supabase query load at scale
+        setSaveStatus('pending');
+        // FIX: shortened from 2000ms to 600ms. The longer window meant any
+        // change followed quickly by logout/refresh/tab-close had a real
+        // chance of being lost — beforeunload cannot reliably wait for an
+        // in-flight network request to finish, so the only real protection
+        // is keeping that window as short as practical. 600ms still batches
+        // rapid-fire changes (e.g. typing) without hammering Supabase on
+        // every keystroke, but cuts the loss window by 70%.
         saveTimer.current = setTimeout(() => {
           setSaveError(null);
+          setSaveStatus('saving');
           const toSave = pendingDataRef.current;
           pendingDataRef.current = null;
-          saveSchoolData(toSave).catch(e => {
-            console.error('Save error:', e);
-            setSaveError('⚠ Changes could not be saved — check your connection.');
-          });
-        }, 2000);
+          saveSchoolData(toSave)
+            .then(() => {
+              setSaveStatus('saved');
+              setTimeout(() => setSaveStatus(s => s === 'saved' ? 'idle' : s), 2500);
+            })
+            .catch(e => {
+              console.error('Save error:', e);
+              setSaveError('⚠ Changes could not be saved — check your connection.');
+              setSaveStatus('error');
+            });
+        }, 600);
       }
       return next;
     });
   }
 
+  // ── Manual "refresh from server" — lets the principal force-reload the
+  // latest saved data at any time, in case they ever suspect what they're
+  // seeing locally is stale (e.g. right after a change on another device).
+  // Flushes any pending local save first so nothing in-flight gets
+  // overwritten by the reload.
+  const [reloading, setReloading] = React.useState(false);
+  async function reloadFromServer() {
+    if (!data._schoolId) return;
+    setReloading(true);
+    await flushPendingSave();
+    try {
+      const fresh = await loadSchoolData(data._schoolId);
+      if (fresh) {
+        setDataRaw(fresh);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(s => s === 'saved' ? 'idle' : s), 1500);
+      }
+    } catch (e) {
+      console.error('Reload error:', e);
+      setSaveError('⚠ Could not refresh — check your connection.');
+    }
+    setReloading(false);
+  }
+
   // ── Safe logout: flush any unsaved change BEFORE wiping local state ──
-  function logoutPrincipal() {
-    flushPendingSave();
+  // CRITICAL: this is now `async` and genuinely `await`s the save. Unlike
+  // the beforeunload listener (which the browser can abandon mid-request on
+  // tab close/refresh), an explicit await inside this click handler is
+  // guaranteed to let the save finish before we wipe local state and show
+  // the login screen — this is what actually stops "I issued a token /
+  // changed a subject, then logged out, and it was gone when I logged back
+  // in" from happening via the logout button specifically.
+  const [loggingOut, setLoggingOut] = React.useState(false);
+  async function logoutPrincipal() {
+    setLoggingOut(true);
+    await flushPendingSave();
+    setLoggingOut(false);
     setUser(null);
     setDataRaw({ ...INITIAL_DATA });
     clearLocalSchoolId();
@@ -822,6 +882,27 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* SAVE STATUS PILL — lets you SEE that your change reached the database */}
+      {(saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'pending') && !saveError && (
+        <div style={{
+          position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+          background: saveStatus === 'saved' ? '#10b981' : '#171b26',
+          border: saveStatus === 'saved' ? 'none' : '1px solid #2a3350',
+          color: saveStatus === 'saved' ? '#fff' : '#94a3b8',
+          padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+          boxShadow: '0 4px 20px #0006', display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          {saveStatus === 'saved' ? '✓ All changes saved' : (saveStatus === 'saving' ? '⏳ Saving…' : '● Unsaved change')}
+        </div>
+      )}
+      {/* LOGGING OUT OVERLAY — guarantees the pending save finishes before the screen changes */}
+      {loggingOut && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15,17,23,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+          <div style={{ width: 36, height: 36, border: '3px solid #2a3350', borderTopColor: '#4f8ef7', borderRadius: '50%', animation: 'edu-spin 0.8s linear infinite' }} />
+          <div style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 600 }}>Saving your changes…</div>
+          <style>{`@keyframes edu-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
       {/* SAVE ERROR BANNER */}
       {saveError && (
         <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, background: '#ef4444', color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, boxShadow: '0 4px 20px #0006', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -956,6 +1037,14 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* Manual refresh — force-reload the latest saved data from the server */}
+            {user?.role == 'principal' && (
+              <button onClick={reloadFromServer} disabled={reloading} title="Reload the latest saved data from the server"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: '#1e2435', border: '1px solid #2a3350', color: '#94a3b8', cursor: reloading ? 'default' : 'pointer', opacity: reloading ? 0.6 : 1 }}>
+                <span style={{ display: 'inline-block', transform: reloading ? 'rotate(360deg)' : 'none', transition: reloading ? 'transform 0.8s linear' : 'none' }}>⟳</span>
+                {reloading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            )}
             {/* License status badge */}
             {user?.role == 'principal' && (
               license.isUnlocked

@@ -33,14 +33,14 @@ export const CURRICULUM_LEVELS = {
     label: 'Lower Primary (Grades 1–3)',
     classes: ['Grade 1', 'Grade 2', 'Grade 3'],
     subjects: [
-      'English',
-      'Kiswahili',
-      'Mathematics',
+      'Kiswahili Language Activities',
+      'English Language Activities',
+      'Mathematical Activities',
+      'Religious Education',
       'Literacy',
       'Hygiene and Nutrition',
       'Creative Arts',
       'Environmental Activities',
-      'Religious Education',
     ],
   },
   UPPER_PRIMARY: {
