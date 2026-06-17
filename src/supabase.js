@@ -613,16 +613,21 @@ export async function loadLicenseFromCloud(schoolId) {
       .eq('id', schoolId)
       .single();
     if (data?.license_data) {
-      const { lic, token, installation } = data.license_data;
-      if (lic) localStorage.setItem('edumanage_license_v1', JSON.stringify(lic));
+      const { lic, token } = data.license_data;
+      // CRITICAL FIX: write into THIS school's own localStorage key, never the
+      // shared legacy key. Previously this wrote into 'edumanage_license_v1'
+      // and 'edumanage_token_v1' (no school suffix) — on a browser used for
+      // multiple schools, the first paid school's token would "leak" into
+      // every other school's session that didn't have its own token yet,
+      // silently unlocking schools that had never paid.
+      const code = (schoolId || '').replace(/-/g, '').slice(0, 8);
+      if (lic) localStorage.setItem('edumanage_license_v1_' + code, JSON.stringify(lic));
       if (token && token.expiry && new Date(token.expiry) > new Date()) {
-        localStorage.setItem('edumanage_token_v1', JSON.stringify(token));
-      }
-      // Restore installation-paid status — critical for cross-device access
-      // Only write if cloud says paid; never downgrade a device that already has it
-      // FIX 11: cloud is always the source of truth — always overwrite localStorage
-      if (installation?.paid) {
-        localStorage.setItem('edumanage_installation_v1', JSON.stringify(installation));
+        localStorage.setItem('edumanage_token_v1_' + code, JSON.stringify(token));
+      } else {
+        // Cloud has no active token for this school — make sure no stale
+        // token lingers locally for it either.
+        localStorage.removeItem('edumanage_token_v1_' + code);
       }
       return data.license_data;
     }

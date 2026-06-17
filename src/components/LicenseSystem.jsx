@@ -88,9 +88,14 @@ function parseToken(token) {
 ═══════════════════════════════════════════════════════ */
 function loadLicense(schoolId) {
   try {
-    // Try school-specific key first, fall back to legacy
-    const raw = localStorage.getItem(getLicenseKey(schoolId)) 
-             || localStorage.getItem(LICENSE_STORAGE_KEY);
+    // CRITICAL FIX: only ever read THIS school's own key. The previous
+    // fallback to a shared legacy key ('edumanage_license_v1') meant any
+    // school with no license record of its own would silently inherit
+    // whichever school's data happened to be sitting in that shared key —
+    // i.e. a paid school's status leaking into an unpaid school's session
+    // on the same browser. There is no safe fallback here: no record for
+    // this school MUST mean "not paid", never "borrow someone else's".
+    const raw = localStorage.getItem(getLicenseKey(schoolId));
     if (raw) return JSON.parse(raw);
   } catch {}
   return { paid: false, paidUntil: null, term: null, year: null, txRef: null, studentCount: 0 };
@@ -106,8 +111,12 @@ function saveLicense(lic, schoolId) {
 
 function loadTokenState(schoolId) {
   try {
-    const raw = localStorage.getItem(getTokenKey(schoolId))
-             || localStorage.getItem(TOKEN_STORAGE_KEY);
+    // CRITICAL FIX: only ever read THIS school's own token key — see the
+    // matching note in loadLicense above. No fallback to the shared legacy
+    // key, ever; that fallback was the actual cause of schools without a
+    // token getting free access by inheriting another school's token from
+    // the same browser.
+    const raw = localStorage.getItem(getTokenKey(schoolId));
     if (raw) {
       const t = JSON.parse(raw);
       if (t.expiry && new Date(t.expiry) > new Date()) return t;

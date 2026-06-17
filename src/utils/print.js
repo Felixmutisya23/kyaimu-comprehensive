@@ -1,4 +1,4 @@
-import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, stampHash } from '../data/initialData';
+import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass } from '../data/initialData';
 
 /* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
 function getFeeExpected(student, term, year, data) {
@@ -98,90 +98,85 @@ function schoolHeader(data, { logoUrl } = {}) {
 
 /* ═══════════════════════════════════════════════════════
    OFFICIAL SCHOOL STAMP / SEAL
-   — Deterministically generated from the school's own seedCode,
-     so the pattern (ring notches, micro-dot ring, star count,
-     inner pattern) is unique per school and can't be copy-pasted
-     onto another school's documents and look "correct" — the
-     visible code embedded in the ring won't match.
+   — Classic double-ring rubber-stamp style: school name curves along
+     the top inside the outer ring, address/location curves along the
+     bottom, a 5-point star sits on each side, a small center icon sits
+     above today's date (always live — recalculated every render, so
+     the stamp shows the real current date whenever a document is
+     printed, never a stale one).
+   — All text is driven entirely by editable Settings fields (school
+     name, P.O. Box, location, colors) — nothing here is randomly
+     generated, so saved settings can never be "lost" by this function;
+     it only ever reads what's in `data`.
    — Pure inline SVG: stays crisp at any print size, no raster image.
 ═══════════════════════════════════════════════════════ */
 export function renderSchoolStamp(data, { size = 130 } = {}) {
   const cfg = data.schoolStamp || {};
   if (cfg.enabled === false) return '';
 
-  const seed   = cfg.seedCode || 'DEFAULT-00000';
-  const h      = stampHash(seed);
-  const pri    = cfg.primaryColor || '#003399';
+  const pri    = cfg.primaryColor || '#0d3fa8';
   const acc    = cfg.accentColor  || '#cc0000';
-  const topTxt = (cfg.text    || `${data.schoolName || 'SCHOOL'}`).toUpperCase();
-  const subTxt = (cfg.subtext || [data.schoolCounty, 'KENYA'].filter(Boolean).join(' · ') || 'OFFICIAL SEAL').toUpperCase();
-  const shape  = cfg.shape || 'circle';
+  const topTxt = (cfg.text    || data.schoolName || 'SCHOOL NAME').toUpperCase();
+  const botTxt = (cfg.subtext || [data.schoolPOBox, data.schoolLocation || data.schoolCounty].filter(Boolean).join(', ') || 'KENYA').toUpperCase();
 
-  // Derive a few "unique fingerprint" values from the hash so every
-  // school's seal has a structurally different inner pattern, not
-  // just different text.
-  const notches   = 8 + (h % 5);              // 8–12 notches around inner ring
-  const dotCount  = 16 + (h % 9);              // 16–24 micro dots
-  const starPts   = 5 + (h % 3);               // 5,6,7-point center star
-  const rotation  = h % 360;
+  // Always today's real date — recomputed on every render/print, never stored/stale
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase().replace(/ /g, '  ');
 
   const cx = size / 2, cy = size / 2;
-  const rOuter = size * 0.48, rRing1 = size * 0.40, rRing2 = size * 0.33, rInner = size * 0.20;
+  const rOuter  = size * 0.49;
+  const rOuter2 = size * 0.44;   // inner edge of the outer double-ring
+  const rText   = size * 0.355;  // radius the curved text sits on
+  const rStar   = size * 0.40;
 
-  // Micro-dot security ring (tamper-evident pattern unique to this school)
-  let dots = '';
-  for (let i = 0; i < dotCount; i++) {
-    const a = (i / dotCount) * 2 * Math.PI;
-    const dx = cx + Math.cos(a) * (rOuter - 3);
-    const dy = cy + Math.sin(a) * (rOuter - 3);
-    dots += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="0.9" fill="${pri}" opacity="0.85"/>`;
-  }
-
-  // Notch pattern on ring 1 (varies per-school via `notches`)
-  let notchMarks = '';
-  for (let i = 0; i < notches; i++) {
-    const a = (i / notches) * 2 * Math.PI + (rotation * Math.PI / 180);
-    const x1 = cx + Math.cos(a) * (rRing1 - 4), y1 = cy + Math.sin(a) * (rRing1 - 4);
-    const x2 = cx + Math.cos(a) * (rRing1 + 2), y2 = cy + Math.sin(a) * (rRing1 + 2);
-    notchMarks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${acc}" stroke-width="1.1"/>`;
-  }
-
-  // Center star (point-count varies per-school)
-  function starPath(points, outerR, innerR) {
+  function star5(x0, y0, outerR, innerR) {
     let d = '';
-    for (let i = 0; i < points * 2; i++) {
+    for (let i = 0; i < 10; i++) {
       const r = i % 2 === 0 ? outerR : innerR;
-      const a = (i / (points * 2)) * 2 * Math.PI - Math.PI / 2;
-      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const a = (i / 10) * 2 * Math.PI - Math.PI / 2;
+      const x = x0 + Math.cos(a) * r, y = y0 + Math.sin(a) * r;
       d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
     }
     return d + 'Z';
   }
 
-  const textId = `stamptext${h}`;
-  const textId2 = `stamptext2${h}`;
+  const uid = Math.random().toString(36).slice(2, 8);
+  const topPathId = `stamptop${uid}`;
+  const botPathId = `stampbot${uid}`;
 
   return `
   <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
     <defs>
-      <path id="${textId}"  d="M ${cx - rRing1 + 2},${cy} A ${rRing1 - 2},${rRing1 - 2} 0 1 1 ${cx + rRing1 - 2},${cy}" />
-      <path id="${textId2}" d="M ${cx + rRing1 - 2},${cy} A ${rRing1 - 2},${rRing1 - 2} 0 1 1 ${cx - rRing1 + 2},${cy}" />
+      <path id="${topPathId}" d="M ${cx - rText},${cy} A ${rText},${rText} 0 1 1 ${cx + rText},${cy}" />
+      <path id="${botPathId}" d="M ${cx - rText},${cy} A ${rText},${rText} 0 0 0 ${cx + rText},${cy}" />
     </defs>
-    <circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="none" stroke="${pri}" stroke-width="1.6"/>
-    <circle cx="${cx}" cy="${cy}" r="${rRing1}" fill="none" stroke="${pri}" stroke-width="1"/>
-    <circle cx="${cx}" cy="${cy}" r="${rRing2}" fill="none" stroke="${acc}" stroke-width="0.8"/>
-    ${dots}
-    ${notchMarks}
-    <text font-size="${size * 0.082}" font-weight="700" fill="${pri}" letter-spacing="1.5" font-family="Georgia, serif">
-      <textPath href="#${textId}" startOffset="50%" text-anchor="middle">${topTxt}</textPath>
+
+    <!-- Outer double ring -->
+    <circle cx="${cx}" cy="${cy}" r="${rOuter}"  fill="none" stroke="${pri}" stroke-width="${size*0.018}"/>
+    <circle cx="${cx}" cy="${cy}" r="${rOuter2}" fill="none" stroke="${pri}" stroke-width="${size*0.012}"/>
+
+    <!-- Stars left/right -->
+    <path d="${star5(cx - rStar, cy, size*0.045, size*0.018)}" fill="${pri}"/>
+    <path d="${star5(cx + rStar, cy, size*0.045, size*0.018)}" fill="${pri}"/>
+
+    <!-- School name curving along the top -->
+    <text font-size="${size * 0.082}" font-weight="700" fill="${pri}" letter-spacing="1" font-family="Georgia, 'Times New Roman', serif">
+      <textPath href="#${topPathId}" startOffset="50%" text-anchor="middle">${topTxt}</textPath>
     </text>
-    <text font-size="${size * 0.062}" font-weight="600" fill="${acc}" letter-spacing="1.2" font-family="Georgia, serif">
-      <textPath href="#${textId2}" startOffset="50%" text-anchor="middle">${subTxt}</textPath>
+
+    <!-- Address / location curving along the bottom -->
+    <text font-size="${size * 0.058}" font-weight="600" fill="${pri}" letter-spacing="0.5" font-family="Georgia, 'Times New Roman', serif">
+      <textPath href="#${botPathId}" startOffset="50%" text-anchor="middle">${botTxt}</textPath>
     </text>
-    <path d="${starPath(starPts, rInner * 0.9, rInner * 0.4)}" fill="${pri}" opacity="0.13"/>
-    <circle cx="${cx}" cy="${cy}" r="${rInner * 0.55}" fill="none" stroke="${pri}" stroke-width="0.8"/>
-    <text x="${cx}" y="${cy - size*0.01}" font-size="${size*0.07}" font-weight="900" fill="${pri}" text-anchor="middle" font-family="Georgia, serif">CBC</text>
-    <text x="${cx}" y="${cy + size*0.085}" font-size="${size*0.04}" fill="${acc}" text-anchor="middle" font-family="monospace" letter-spacing="0.5">${seed}</text>
+
+    <!-- Center icon (simple open book / mortarboard mark) -->
+    <g transform="translate(${cx},${cy - size*0.10})">
+      <path d="M ${-size*0.07},0 L 0,${-size*0.045} L ${size*0.07},0 L 0,${size*0.045} Z" fill="${pri}"/>
+      <line x1="0" y1="${-size*0.045}" x2="0" y2="${size*0.045}" stroke="#fff" stroke-width="${size*0.006}"/>
+    </g>
+
+    <!-- Today's date — always live, recalculated every print -->
+    <text x="${cx}" y="${cy + size*0.075}" font-size="${size * 0.072}" font-weight="700" fill="${acc}" text-anchor="middle" font-family="Arial, sans-serif" letter-spacing="0.5">${dateStr}</text>
   </svg>`;
 }
 

@@ -23,7 +23,7 @@ import { logAction } from './components/AuditLog';
 import {
   loadSchoolData, saveSchoolData, createSchool,
   loginPrincipal, loginTeacher,
-  getLocalSchoolId, setLocalSchoolId,
+  getLocalSchoolId, setLocalSchoolId, clearLocalSchoolId,
   checkAnySchoolExists,
   loadLicenseFromCloud,
   getSubscription, upsertSubscription,
@@ -427,18 +427,48 @@ export default function App() {
   }, []);
 
   // ── Save to Supabase on every data change ────────────────────
+  // FIX: previously, logging out or closing the tab within the 2s debounce
+  // window silently discarded the pending save — any change made in the
+  // last 2 seconds (e.g. clearing a subject override) was lost forever,
+  // because the next login re-loads from Supabase and the save never
+  // actually reached it. We now track the latest unsaved snapshot and the
+  // pending timer, and provide flushPendingSave() to force it through
+  // immediately before logout, plus a beforeunload listener for tab close.
   const saveTimer = React.useRef(null);
+  const pendingDataRef = React.useRef(null);
+
+  function flushPendingSave() {
+    if (pendingDataRef.current) {
+      clearTimeout(saveTimer.current);
+      const toSave = pendingDataRef.current;
+      pendingDataRef.current = null;
+      // Fire and forget — best effort synchronous-ish flush before logout/unload
+      saveSchoolData(toSave).catch(e => console.error('Flush save error:', e));
+    }
+  }
+
+  React.useEffect(() => {
+    function handleBeforeUnload() {
+      flushPendingSave();
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   function setData(updater) {
     setDataRaw(prev => {
       const next = typeof updater == 'function' ? updater(prev) : updater;
       // Only save if data was loaded from DB (_loadedFromDB flag set by loadSchoolData)
       // This prevents wiping DB when state is still at INITIAL_DATA
       if (next._schoolId && next._loadedFromDB) {
+        pendingDataRef.current = next;
         clearTimeout(saveTimer.current);
         // FIX: 2000ms debounce (was 800ms) — reduces Supabase query load at scale
         saveTimer.current = setTimeout(() => {
           setSaveError(null);
-          saveSchoolData(next).catch(e => {
+          const toSave = pendingDataRef.current;
+          pendingDataRef.current = null;
+          saveSchoolData(toSave).catch(e => {
             console.error('Save error:', e);
             setSaveError('⚠ Changes could not be saved — check your connection.');
           });
@@ -446,6 +476,14 @@ export default function App() {
       }
       return next;
     });
+  }
+
+  // ── Safe logout: flush any unsaved change BEFORE wiping local state ──
+  function logoutPrincipal() {
+    flushPendingSave();
+    setUser(null);
+    setDataRaw({ ...INITIAL_DATA });
+    clearLocalSchoolId();
   }
 
   const isConfigured = !!(data.schoolName && data.schoolName.trim()) || setupDone;
@@ -669,7 +707,7 @@ export default function App() {
   }
   // Redirect teachers to their dedicated portal
   if (user && user.role !== 'principal') {
-    return <TeacherPortal data={data} setData={setData} user={user} onLogout={() => { setUser(null); setDataRaw({...INITIAL_DATA}); clearLocalSchoolId(); }} />;
+    return <TeacherPortal data={data} setData={setData} user={user} onLogout={logoutPrincipal} />;
   }
 
   if (user.role == 'principal' && !isConfigured && !setupDone) {
@@ -889,14 +927,14 @@ export default function App() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
                 <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
               </div>
-              <button onClick={() => { setUser(null); setDataRaw({...INITIAL_DATA}); clearLocalSchoolId(); }} title="Sign out"
+              <button onClick={logoutPrincipal} title="Sign out"
                 style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, fontSize: 13, fontWeight: 700, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#ef444420'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>⏻ {!collapsed && 'Logout'}</button>
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-              <button onClick={() => { setUser(null); setDataRaw({...INITIAL_DATA}); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>⏻</button>
+              <button onClick={logoutPrincipal} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>⏻</button>
             </div>
           )}
         </div>

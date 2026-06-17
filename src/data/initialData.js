@@ -36,7 +36,11 @@ export const CURRICULUM_LEVELS = {
       'English',
       'Kiswahili',
       'Mathematics',
-      'Integrated Learning Activities',
+      'Literacy',
+      'Hygiene and Nutrition',
+      'Creative Arts',
+      'Environmental Activities',
+      'Religious Education',
     ],
   },
   UPPER_PRIMARY: {
@@ -206,17 +210,14 @@ export const INITIAL_DATA = {
   principalPassword: 'admin123',
 
   // Official digital stamp/seal — appears on report forms, fee receipts, certificates.
-  // seedCode is generated once at school setup and never changes; it's derived from
-  // the school's own identity, making the resulting seal unique to this school and
-  // not reusable/copyable for any other school's documents.
+  // Always reads live from this same config; the date shown inside it is computed
+  // fresh every time it's rendered (today's real date), it is never stored.
   schoolStamp: {
     enabled:     true,
-    seedCode:    '',          // set once at setup — e.g. "KMT-7Q2F9X"
-    primaryColor:'#003399',
+    primaryColor:'#0d3fa8',
     accentColor: '#cc0000',
-    text:        '',          // defaults to schoolName + "OFFICIAL SEAL" if blank
-    subtext:     '',          // defaults to county/location if blank
-    shape:       'circle',    // 'circle' | 'shield'
+    text:        '',          // defaults to schoolName if blank
+    subtext:     '',          // defaults to P.O. Box + location if blank
   },
 
   // Public page

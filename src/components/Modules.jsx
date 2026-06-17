@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
-import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug, generateStampSeedCode } from '../data/initialData';
+import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug } from '../data/initialData';
 import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
 import { printFeeReceipt, renderSchoolStamp } from '../utils/print';
 
@@ -824,22 +824,17 @@ export function Settings({ data, setData }) {
 
   const [stamp, setStamp] = useState({
     enabled:      data.schoolStamp?.enabled      ?? true,
-    seedCode:     data.schoolStamp?.seedCode     || '',
-    primaryColor: data.schoolStamp?.primaryColor || '#003399',
+    primaryColor: data.schoolStamp?.primaryColor || '#0d3fa8',
     accentColor:  data.schoolStamp?.accentColor  || '#cc0000',
     text:         data.schoolStamp?.text         || '',
     subtext:      data.schoolStamp?.subtext      || '',
-    shape:        data.schoolStamp?.shape        || 'circle',
   });
 
   function saveStamp() {
-    // Generate the permanent seed code once, the very first time this is saved.
-    // It never changes afterwards — that permanence is what makes the resulting
-    // seal pattern uniquely and verifiably tied to this one school.
-    const seed = stamp.seedCode || generateStampSeedCode(data.schoolName);
-    const next = { ...stamp, seedCode: seed };
-    setStamp(next);
-    setData(d => ({ ...d, schoolStamp: next }));
+    // Merge into whatever is already saved rather than replacing it outright —
+    // this guarantees that any field this version of the UI doesn't know about
+    // (e.g. from a future or older version) is preserved, never silently wiped.
+    setData(d => ({ ...d, schoolStamp: { ...(d.schoolStamp || {}), ...stamp } }));
   }
 
   const [showBell, setShowBell]   = useState(false);
@@ -1223,8 +1218,8 @@ export function Settings({ data, setData }) {
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
               This seal appears automatically on student report forms, fee receipts, and leaving certificates.
-              Its pattern is generated from a one-time code unique to your school ({stamp.seedCode ? <code style={{ color: '#10b981' }}>{stamp.seedCode}</code> : 'will be created on first save'}) —
-              another school's stamp can never look identical to yours.
+              The date inside it always shows today's actual date — it updates itself automatically every time a
+              document is printed, you never need to change it.
             </div>
 
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -1233,21 +1228,15 @@ export function Settings({ data, setData }) {
                   <FormGroup label="Primary Color">
                     <input type="color" value={stamp.primaryColor} onChange={e => setStamp({ ...stamp, primaryColor: e.target.value })} style={{ height: 36, padding: 2 }} />
                   </FormGroup>
-                  <FormGroup label="Accent Color">
+                  <FormGroup label="Date Color">
                     <input type="color" value={stamp.accentColor} onChange={e => setStamp({ ...stamp, accentColor: e.target.value })} style={{ height: 36, padding: 2 }} />
                   </FormGroup>
                 </FormRow>
-                <FormGroup label="Main Text (outer ring)" hint="Defaults to your school name if left blank">
+                <FormGroup label="School Name (top arc)" hint="Defaults to your school name if left blank">
                   <input value={stamp.text} onChange={e => setStamp({ ...stamp, text: e.target.value })} placeholder={data.schoolName ? data.schoolName.toUpperCase() : 'SCHOOL NAME'} />
                 </FormGroup>
-                <FormGroup label="Sub Text (inner ring)" hint="Defaults to county + Kenya if left blank">
-                  <input value={stamp.subtext} onChange={e => setStamp({ ...stamp, subtext: e.target.value })} placeholder="e.g. THARAKA NITHI · KENYA" />
-                </FormGroup>
-                <FormGroup label="Shape">
-                  <select value={stamp.shape} onChange={e => setStamp({ ...stamp, shape: e.target.value })}>
-                    <option value="circle">Circular Seal</option>
-                    <option value="shield">Shield Seal</option>
-                  </select>
+                <FormGroup label="P.O. Box / Location (bottom arc)" hint="Defaults to your P.O. Box + location if left blank">
+                  <input value={stamp.subtext} onChange={e => setStamp({ ...stamp, subtext: e.target.value })} placeholder="e.g. P.O. BOX 123, MACHAKOS" />
                 </FormGroup>
                 <Btn variant="success" size="sm" onClick={saveStamp}><Icon name="check" size={13} /> Save Stamp</Btn>
               </div>
@@ -1256,7 +1245,7 @@ export function Settings({ data, setData }) {
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
                 <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Live Preview</div>
                 <div style={{ background: '#fff', borderRadius: 12, padding: 14, display: 'inline-block' }}
-                  dangerouslySetInnerHTML={{ __html: renderSchoolStamp({ ...data, schoolStamp: { ...stamp, seedCode: stamp.seedCode || 'PREVIEW-00000' } }, { size: 130 }) }} />
+                  dangerouslySetInnerHTML={{ __html: renderSchoolStamp({ ...data, schoolStamp: stamp }, { size: 130 }) }} />
               </div>
             </div>
           </Card>
