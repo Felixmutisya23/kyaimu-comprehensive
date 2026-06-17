@@ -1373,43 +1373,6 @@ export function Settings({ data, setData }) {
               );
             })}
           </Card>
-
-          {/* Per-class subject overrides — these silently override the curriculum
-              defaults above for one specific class. Usually created by accident via
-              the old "Setup Subjects" tool inside Exams & Reports. */}
-          {(() => {
-            const overrides = Object.entries(data.subjectsByClass || {}).filter(([, subs]) => subs && subs.length > 0);
-            if (overrides.length === 0) return null;
-            return (
-              <Card style={{ borderColor: '#f59e0b40', background: '#f59e0b08' }}>
-                <SectionTitle icon="alert">⚠️ Per-Class Subject Overrides Found</SectionTitle>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
-                  These classes have a custom subject list that completely replaces the curriculum
-                  subjects above — usually set accidentally via the old "Setup Subjects" tool. If a class's
-                  subject list looks wrong anywhere in the app (e.g. when assigning teachers), clear it here
-                  to make that class use the curriculum subjects above again.
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {overrides.map(([cls, subs]) => (
-                    <div key={cls} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350', flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{cls}</div>
-                        <div style={{ fontSize: 11, color: '#f59e0b' }}>{subs.join(', ')}</div>
-                      </div>
-                      <Btn size="sm" variant="danger" onClick={() => {
-                        if (!window.confirm(`Clear the custom subject list for ${cls}? It will go back to using the curriculum subjects defined above.`)) return;
-                        setData(d => {
-                          const next = { ...(d.subjectsByClass || {}) };
-                          delete next[cls];
-                          return { ...d, subjectsByClass: next };
-                        });
-                      }}>Clear Override</Btn>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            );
-          })()}
         </div>
 
         {/* RIGHT COLUMN */}

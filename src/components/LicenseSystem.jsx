@@ -160,9 +160,37 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   const [lic, setLicRaw]     = useState(() => loadLicense(schoolId));
   const [tokenState, setTok] = useState(() => loadTokenState(schoolId));
 
-  // Re-read localStorage whenever refreshKey changes (triggered after cloud sync on login)
+  // ── Extra safety net ───────────────────────────────────────────
+  // data.licenseData is loaded straight from Supabase as part of the normal
+  // school-data load on login (schoolRowToData), independent of the
+  // localStorage cache this hook otherwise relies on. If localStorage ever
+  // comes up empty for this school (e.g. a brand-new browser, or any future
+  // timing edge case), fall back to this in-memory cloud value instead of
+  // incorrectly reporting "no token / not paid" when the school actually
+  // has a valid token or payment on record.
+  const cloudLic   = data.licenseData?.lic;
+  const cloudToken = data.licenseData?.token;
+  const effectiveLic = (lic && lic.paid) ? lic : (cloudLic && cloudLic.paid ? cloudLic : lic);
+  const effectiveTokenState = (tokenState && new Date(tokenState.expiry) > new Date())
+    ? tokenState
+    : (cloudToken && cloudToken.expiry && new Date(cloudToken.expiry) > new Date() ? cloudToken : tokenState);
+
+  // Re-read localStorage ONLY when refreshKey actually increments (i.e. right
+  // after a login has finished syncing from the cloud for the CURRENT school).
+  // CRITICAL FIX: this previously also re-ran whenever `schoolId` changed on
+  // its own — which happens on every logout (schoolId briefly becomes '' when
+  // local state resets to INITIAL_DATA) and on every login (schoolId changes
+  // from '' to the real id). Each of those schoolId-only changes re-read
+  // localStorage immediately, often BEFORE the async loadLicenseFromCloud()
+  // call for the new school had finished writing its result — so the freshly
+  // synced token could be raced and overwritten by a stale/empty read,
+  // making a perfectly valid token appear to "disappear" after logout+login.
+  // We now track the previous refreshKey ourselves and only act when it has
+  // truly incremented, regardless of how many times schoolId itself changes.
+  const lastRefreshKeyRef = React.useRef(0);
   React.useEffect(() => {
-    if (refreshKey > 0) {
+    if (refreshKey > 0 && refreshKey !== lastRefreshKeyRef.current) {
+      lastRefreshKeyRef.current = refreshKey;
       setLicRaw(loadLicense(schoolId));
       setTok(loadTokenState(schoolId));
     }
@@ -172,8 +200,8 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   const _openTerm    = (data.terms || []).find(t => t.opened && !t.closed);
   const _currentTerm = _openTerm?.term || data.currentTerm || (new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3);
   const _currentYear = _openTerm?.year || data.currentYear || new Date().getFullYear();
-  const alreadyPaid  = (lic.term === _currentTerm && lic.year === _currentYear)
-    ? (lic.amountPaid || 0) : 0;
+  const alreadyPaid  = (effectiveLic.term === _currentTerm && effectiveLic.year === _currentYear)
+    ? (effectiveLic.amountPaid || 0) : 0;
   const amountDue    = Math.max(0, totalDue - alreadyPaid);
   const [checking, setChecking] = useState(false);
 
@@ -205,14 +233,14 @@ export function useLicense(data, refreshKey = 0, setData = null) {
     }
   }
 
-  const tokenActive  = tokenState && new Date(tokenState.expiry) > new Date();
-  const licenseValid = amountDue === 0 && lic.paid &&
-    lic.term === currentTerm &&
-    lic.year === currentYear;
+  const tokenActive  = effectiveTokenState && new Date(effectiveTokenState.expiry) > new Date();
+  const licenseValid = amountDue === 0 && effectiveLic.paid &&
+    effectiveLic.term === currentTerm &&
+    effectiveLic.year === currentYear;
 
   const isUnlocked = tokenActive || licenseValid;
   const daysLeft   = tokenActive
-    ? Math.ceil((new Date(tokenState.expiry) - new Date()) / 86400000)
+    ? Math.ceil((new Date(effectiveTokenState.expiry) - new Date()) / 86400000)
     : null;
 
   // FIX: school code uses first 8 chars of UUID — globally unique, no name collisions
