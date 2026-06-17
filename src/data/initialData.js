@@ -166,7 +166,30 @@ export function generateSlug(schoolName) {
     .substring(0, 60);
 }
 
-/* ── Full student name from name parts ─────────────────────── */
+/* ── Generate a one-time, permanent stamp seed code for a school ──
+   Format: 3 letters from the school name + 5 random base36 chars,
+   e.g. "KAM-7Q2F9". Called once when the school is first set up;
+   stored in schoolStamp.seedCode and never regenerated, so the
+   resulting seal pattern is permanently tied to this one school. ── */
+export function generateStampSeedCode(schoolName) {
+  const letters = (schoolName || 'SCH').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 3).padEnd(3, 'X');
+  const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${letters}-${rand}`;
+}
+
+/* ── Deterministic hash from a seed code — used to derive the seal's
+   inner pattern (ring count, notch positions, micro-pattern) so the
+   same seed always draws the exact same unique pattern. ── */
+export function stampHash(seedCode) {
+  let h = 0;
+  const str = seedCode || 'DEFAULT';
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+
 export function buildStudentName(firstName, lastName, otherName) {
   return [firstName, otherName, lastName].filter(Boolean).join(' ').trim();
 }
@@ -181,6 +204,20 @@ export const INITIAL_DATA = {
   principalName:     '',
   principalEmail:    'principal@school.ac.ke',
   principalPassword: 'admin123',
+
+  // Official digital stamp/seal — appears on report forms, fee receipts, certificates.
+  // seedCode is generated once at school setup and never changes; it's derived from
+  // the school's own identity, making the resulting seal unique to this school and
+  // not reusable/copyable for any other school's documents.
+  schoolStamp: {
+    enabled:     true,
+    seedCode:    '',          // set once at setup — e.g. "KMT-7Q2F9X"
+    primaryColor:'#003399',
+    accentColor: '#cc0000',
+    text:        '',          // defaults to schoolName + "OFFICIAL SEAL" if blank
+    subtext:     '',          // defaults to county/location if blank
+    shape:       'circle',    // 'circle' | 'shield'
+  },
 
   // Public page
   schoolSlug:        '',   // e.g. 'kiriene-day-primary' — set on setup, editable once

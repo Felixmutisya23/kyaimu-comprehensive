@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
-import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug } from '../data/initialData';
+import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug, generateStampSeedCode } from '../data/initialData';
 import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
-import { printFeeReceipt } from '../utils/print';
+import { printFeeReceipt, renderSchoolStamp } from '../utils/print';
 
 /* ══════════════════════════════════════════════════════
    KITCHEN
@@ -822,6 +822,26 @@ export function Settings({ data, setData }) {
     email:          data.principalEmail || '',
   });
 
+  const [stamp, setStamp] = useState({
+    enabled:      data.schoolStamp?.enabled      ?? true,
+    seedCode:     data.schoolStamp?.seedCode     || '',
+    primaryColor: data.schoolStamp?.primaryColor || '#003399',
+    accentColor:  data.schoolStamp?.accentColor  || '#cc0000',
+    text:         data.schoolStamp?.text         || '',
+    subtext:      data.schoolStamp?.subtext      || '',
+    shape:        data.schoolStamp?.shape        || 'circle',
+  });
+
+  function saveStamp() {
+    // Generate the permanent seed code once, the very first time this is saved.
+    // It never changes afterwards — that permanence is what makes the resulting
+    // seal pattern uniquely and verifiably tied to this one school.
+    const seed = stamp.seedCode || generateStampSeedCode(data.schoolName);
+    const next = { ...stamp, seedCode: seed };
+    setStamp(next);
+    setData(d => ({ ...d, schoolStamp: next }));
+  }
+
   const [showBell, setShowBell]   = useState(false);
   const [bellForm, setBellForm]   = useState({ time: '', label: '', type: 'lesson', duration: 40 });
   const [subForm, setSubForm]     = useState('');
@@ -1192,6 +1212,55 @@ export function Settings({ data, setData }) {
             <Btn variant="success" size="sm" onClick={saveProfile}><Icon name="check" size={13} /> Save School Profile</Btn>
           </Card>
 
+          {/* Official School Stamp */}
+          <Card style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <SectionTitle icon="settings">🏛️ Official School Stamp</SectionTitle>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
+                <input type="checkbox" checked={stamp.enabled} onChange={e => setStamp({ ...stamp, enabled: e.target.checked })} />
+                Show on documents
+              </label>
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+              This seal appears automatically on student report forms, fee receipts, and leaving certificates.
+              Its pattern is generated from a one-time code unique to your school ({stamp.seedCode ? <code style={{ color: '#10b981' }}>{stamp.seedCode}</code> : 'will be created on first save'}) —
+              another school's stamp can never look identical to yours.
+            </div>
+
+            <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <FormRow>
+                  <FormGroup label="Primary Color">
+                    <input type="color" value={stamp.primaryColor} onChange={e => setStamp({ ...stamp, primaryColor: e.target.value })} style={{ height: 36, padding: 2 }} />
+                  </FormGroup>
+                  <FormGroup label="Accent Color">
+                    <input type="color" value={stamp.accentColor} onChange={e => setStamp({ ...stamp, accentColor: e.target.value })} style={{ height: 36, padding: 2 }} />
+                  </FormGroup>
+                </FormRow>
+                <FormGroup label="Main Text (outer ring)" hint="Defaults to your school name if left blank">
+                  <input value={stamp.text} onChange={e => setStamp({ ...stamp, text: e.target.value })} placeholder={data.schoolName ? data.schoolName.toUpperCase() : 'SCHOOL NAME'} />
+                </FormGroup>
+                <FormGroup label="Sub Text (inner ring)" hint="Defaults to county + Kenya if left blank">
+                  <input value={stamp.subtext} onChange={e => setStamp({ ...stamp, subtext: e.target.value })} placeholder="e.g. THARAKA NITHI · KENYA" />
+                </FormGroup>
+                <FormGroup label="Shape">
+                  <select value={stamp.shape} onChange={e => setStamp({ ...stamp, shape: e.target.value })}>
+                    <option value="circle">Circular Seal</option>
+                    <option value="shield">Shield Seal</option>
+                  </select>
+                </FormGroup>
+                <Btn variant="success" size="sm" onClick={saveStamp}><Icon name="check" size={13} /> Save Stamp</Btn>
+              </div>
+
+              {/* Live preview */}
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Live Preview</div>
+                <div style={{ background: '#fff', borderRadius: 12, padding: 14, display: 'inline-block' }}
+                  dangerouslySetInnerHTML={{ __html: renderSchoolStamp({ ...data, schoolStamp: { ...stamp, seedCode: stamp.seedCode || 'PREVIEW-00000' } }, { size: 130 }) }} />
+              </div>
+            </div>
+          </Card>
+
           {/* Subjects — per curriculum level */}
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -1315,6 +1384,43 @@ export function Settings({ data, setData }) {
               );
             })}
           </Card>
+
+          {/* Per-class subject overrides — these silently override the curriculum
+              defaults above for one specific class. Usually created by accident via
+              the old "Setup Subjects" tool inside Exams & Reports. */}
+          {(() => {
+            const overrides = Object.entries(data.subjectsByClass || {}).filter(([, subs]) => subs && subs.length > 0);
+            if (overrides.length === 0) return null;
+            return (
+              <Card style={{ borderColor: '#f59e0b40', background: '#f59e0b08' }}>
+                <SectionTitle icon="alert">⚠️ Per-Class Subject Overrides Found</SectionTitle>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
+                  These classes have a custom subject list that completely replaces the curriculum
+                  subjects above — usually set accidentally via the old "Setup Subjects" tool. If a class's
+                  subject list looks wrong anywhere in the app (e.g. when assigning teachers), clear it here
+                  to make that class use the curriculum subjects above again.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {overrides.map(([cls, subs]) => (
+                    <div key={cls} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350', flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{cls}</div>
+                        <div style={{ fontSize: 11, color: '#f59e0b' }}>{subs.join(', ')}</div>
+                      </div>
+                      <Btn size="sm" variant="danger" onClick={() => {
+                        if (!window.confirm(`Clear the custom subject list for ${cls}? It will go back to using the curriculum subjects defined above.`)) return;
+                        setData(d => {
+                          const next = { ...(d.subjectsByClass || {}) };
+                          delete next[cls];
+                          return { ...d, subjectsByClass: next };
+                        });
+                      }}>Clear Override</Btn>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })()}
         </div>
 
         {/* RIGHT COLUMN */}

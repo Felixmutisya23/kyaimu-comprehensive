@@ -1,4 +1,4 @@
-import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass } from '../data/initialData';
+import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, stampHash } from '../data/initialData';
 
 /* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
 function getFeeExpected(student, term, year, data) {
@@ -94,6 +94,95 @@ function schoolHeader(data, { logoUrl } = {}) {
       ${data.schoolCounty ? `<div style="font-size:12px;color:#555;margin-top:2px">${data.schoolCounty} County</div>` : ''}
     </div>
   `;
+}
+
+/* ═══════════════════════════════════════════════════════
+   OFFICIAL SCHOOL STAMP / SEAL
+   — Deterministically generated from the school's own seedCode,
+     so the pattern (ring notches, micro-dot ring, star count,
+     inner pattern) is unique per school and can't be copy-pasted
+     onto another school's documents and look "correct" — the
+     visible code embedded in the ring won't match.
+   — Pure inline SVG: stays crisp at any print size, no raster image.
+═══════════════════════════════════════════════════════ */
+export function renderSchoolStamp(data, { size = 130 } = {}) {
+  const cfg = data.schoolStamp || {};
+  if (cfg.enabled === false) return '';
+
+  const seed   = cfg.seedCode || 'DEFAULT-00000';
+  const h      = stampHash(seed);
+  const pri    = cfg.primaryColor || '#003399';
+  const acc    = cfg.accentColor  || '#cc0000';
+  const topTxt = (cfg.text    || `${data.schoolName || 'SCHOOL'}`).toUpperCase();
+  const subTxt = (cfg.subtext || [data.schoolCounty, 'KENYA'].filter(Boolean).join(' · ') || 'OFFICIAL SEAL').toUpperCase();
+  const shape  = cfg.shape || 'circle';
+
+  // Derive a few "unique fingerprint" values from the hash so every
+  // school's seal has a structurally different inner pattern, not
+  // just different text.
+  const notches   = 8 + (h % 5);              // 8–12 notches around inner ring
+  const dotCount  = 16 + (h % 9);              // 16–24 micro dots
+  const starPts   = 5 + (h % 3);               // 5,6,7-point center star
+  const rotation  = h % 360;
+
+  const cx = size / 2, cy = size / 2;
+  const rOuter = size * 0.48, rRing1 = size * 0.40, rRing2 = size * 0.33, rInner = size * 0.20;
+
+  // Micro-dot security ring (tamper-evident pattern unique to this school)
+  let dots = '';
+  for (let i = 0; i < dotCount; i++) {
+    const a = (i / dotCount) * 2 * Math.PI;
+    const dx = cx + Math.cos(a) * (rOuter - 3);
+    const dy = cy + Math.sin(a) * (rOuter - 3);
+    dots += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="0.9" fill="${pri}" opacity="0.85"/>`;
+  }
+
+  // Notch pattern on ring 1 (varies per-school via `notches`)
+  let notchMarks = '';
+  for (let i = 0; i < notches; i++) {
+    const a = (i / notches) * 2 * Math.PI + (rotation * Math.PI / 180);
+    const x1 = cx + Math.cos(a) * (rRing1 - 4), y1 = cy + Math.sin(a) * (rRing1 - 4);
+    const x2 = cx + Math.cos(a) * (rRing1 + 2), y2 = cy + Math.sin(a) * (rRing1 + 2);
+    notchMarks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${acc}" stroke-width="1.1"/>`;
+  }
+
+  // Center star (point-count varies per-school)
+  function starPath(points, outerR, innerR) {
+    let d = '';
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const a = (i / (points * 2)) * 2 * Math.PI - Math.PI / 2;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d + 'Z';
+  }
+
+  const textId = `stamptext${h}`;
+  const textId2 = `stamptext2${h}`;
+
+  return `
+  <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <defs>
+      <path id="${textId}"  d="M ${cx - rRing1 + 2},${cy} A ${rRing1 - 2},${rRing1 - 2} 0 1 1 ${cx + rRing1 - 2},${cy}" />
+      <path id="${textId2}" d="M ${cx + rRing1 - 2},${cy} A ${rRing1 - 2},${rRing1 - 2} 0 1 1 ${cx - rRing1 + 2},${cy}" />
+    </defs>
+    <circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="none" stroke="${pri}" stroke-width="1.6"/>
+    <circle cx="${cx}" cy="${cy}" r="${rRing1}" fill="none" stroke="${pri}" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy}" r="${rRing2}" fill="none" stroke="${acc}" stroke-width="0.8"/>
+    ${dots}
+    ${notchMarks}
+    <text font-size="${size * 0.082}" font-weight="700" fill="${pri}" letter-spacing="1.5" font-family="Georgia, serif">
+      <textPath href="#${textId}" startOffset="50%" text-anchor="middle">${topTxt}</textPath>
+    </text>
+    <text font-size="${size * 0.062}" font-weight="600" fill="${acc}" letter-spacing="1.2" font-family="Georgia, serif">
+      <textPath href="#${textId2}" startOffset="50%" text-anchor="middle">${subTxt}</textPath>
+    </text>
+    <path d="${starPath(starPts, rInner * 0.9, rInner * 0.4)}" fill="${pri}" opacity="0.13"/>
+    <circle cx="${cx}" cy="${cy}" r="${rInner * 0.55}" fill="none" stroke="${pri}" stroke-width="0.8"/>
+    <text x="${cx}" y="${cy - size*0.01}" font-size="${size*0.07}" font-weight="900" fill="${pri}" text-anchor="middle" font-family="Georgia, serif">CBC</text>
+    <text x="${cx}" y="${cy + size*0.085}" font-size="${size*0.04}" fill="${acc}" text-anchor="middle" font-family="monospace" letter-spacing="0.5">${seed}</text>
+  </svg>`;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -334,7 +423,6 @@ export function printReportForm(student, exam, data) {
     const cell    = res[sub];
     const score   = getScore(cell);
     const g       = getGrade(score ?? 0);
-    const teacher = cell?.submittedBy ? data.teachers?.find(t => t.staffId === cell.submittedBy) : null;
     const remark  = g.points >= 7 ? 'Excellent' : g.points >= 5 ? 'Good' : g.points >= 3 ? 'Average' : 'Below Average';
     const subComment = autoSubjectComment(sub, score, g);
     return `
@@ -345,8 +433,6 @@ export function printReportForm(student, exam, data) {
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:center">${g.points}</td>
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#555">${remark}</td>
         <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#444;font-style:italic">${subComment}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#777">${teacher?.name || '_______________'}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-size:10px;color:#999">_______</td>
       </tr>`;
   }).join('');
 
@@ -410,8 +496,6 @@ export function printReportForm(student, exam, data) {
           <th style="padding:7px 10px;border:1px solid #003399">Points</th>
           <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Remarks</th>
           <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
-          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Teacher</th>
-          <th style="padding:7px 10px;border:1px solid #003399">Sign</th>
         </tr>
       </thead>
       <tbody>
@@ -421,7 +505,7 @@ export function printReportForm(student, exam, data) {
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:15px;font-weight:900">${total}</td>
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:14px;font-weight:900;color:#cc0000">${grade.label}</td>
           <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-weight:900">${totalPoints}</td>
-          <td colspan="4" style="padding:7px 10px;border:1px solid #ddd;font-size:11px;color:#555">
+          <td colspan="2" style="padding:7px 10px;border:1px solid #ddd;font-size:11px;color:#555">
             Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)
           </td>
         </tr>
@@ -439,27 +523,15 @@ export function printReportForm(student, exam, data) {
       <tr>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
           <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Class Teacher's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
-          <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
-            Name: ___________________________ &nbsp; Sign: _______________
-          </div>
+          <div style="min-height:48px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
         </td>
         <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
-          <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Principal's Comment</div>
-          <div style="min-height:48px;margin-bottom:16px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
-          <div style="border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
-            Sign: ___________________________ &nbsp; Stamp: 
-            <span style="border:1px solid #ccc;display:inline-block;width:60px;height:24px"></span>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:10px;border:1px solid #ccc;vertical-align:top">
-          <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Parent / Guardian Comment &amp; Acknowledgement</div>
-          <div style="min-height:36px;margin-bottom:12px"></div>
-          <div style="display:flex;justify-content:space-between;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#555">
-            <span>Sign: ___________________________</span>
-            <span>Date: ___________________________</span>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Principal's Comment</div>
+              <div style="min-height:48px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
+            </div>
+            ${data.schoolStamp?.enabled !== false ? `<div style="flex-shrink:0">${renderSchoolStamp(data, { size: 78 })}</div>` : ''}
           </div>
         </td>
       </tr>
@@ -530,7 +602,6 @@ export function printAllReportForms(exam, data) {
     const rows = subs.map(sub => {
       const score = getScore(res[sub]);
       const g     = getGrade(score ?? 0);
-      const t     = res[sub]?.submittedBy ? data.teachers?.find(x => x.staffId === res[sub].submittedBy) : null;
       const subComment = autoSubjectComment(sub, score, g);
       return `<tr>
         <td style="padding:5px 8px;border:1px solid #ddd;font-weight:600">${sub}</td>
@@ -538,8 +609,6 @@ export function printAllReportForms(exam, data) {
         <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:900;color:#cc0000">${g.label}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${g.points}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#444;font-style:italic">${subComment}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#777">${t?.name || '_______________'}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-size:10px;color:#999">_______</td>
       </tr>`;
     }).join('');
 
@@ -574,8 +643,6 @@ export function printAllReportForms(exam, data) {
             <th style="padding:6px 8px;border:1px solid #003399">Grade</th>
             <th style="padding:6px 8px;border:1px solid #003399">Points</th>
             <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
-            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Teacher</th>
-            <th style="padding:6px 8px;border:1px solid #003399">Sign</th>
           </tr></thead>
           <tbody>${rows}
             <tr style="background:#e8eeff;font-weight:900">
@@ -583,7 +650,7 @@ export function printAllReportForms(exam, data) {
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;font-size:14px">${total}</td>
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#cc0000;font-size:13px">${grade.label}</td>
               <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${grade.points}</td>
-              <td colspan="3" style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#555">Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)</td>
+              <td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#555">Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)</td>
             </tr>
           </tbody>
         </table>
@@ -591,22 +658,15 @@ export function printAllReportForms(exam, data) {
           <tr>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
               <strong style="color:#003399;font-size:11px;text-transform:uppercase">Class Teacher's Comment</strong>
-              <div style="margin:6px 0 12px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
-              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Name: _____________________ &nbsp; Sign: _______________ &nbsp; Date: ____________</div>
+              <div style="margin:6px 0;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
             </td>
             <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Principal's Comment</strong>
-              <div style="margin:6px 0 12px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
-              <div style="border-top:1px solid #ccc;padding-top:4px;font-size:10px">Sign: ___________________ &nbsp; Stamp: <span style="border:1px solid #ccc;display:inline-block;width:40px;height:18px"></span></div>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:8px;border:1px solid #ccc;vertical-align:top">
-              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Parent / Guardian Comment &amp; Acknowledgement</strong>
-              <div style="min-height:28px;margin:4px 0 10px"></div>
-              <div style="display:flex;justify-content:space-between;border-top:1px solid #ccc;padding-top:4px;font-size:10px;color:#555">
-                <span>Sign: ___________________________</span>
-                <span>Date: ___________________________</span>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="flex:1">
+                  <strong style="color:#003399;font-size:11px;text-transform:uppercase">Principal's Comment</strong>
+                  <div style="margin:6px 0;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
+                </div>
+                ${data.schoolStamp?.enabled !== false ? `<div style="flex-shrink:0">${renderSchoolStamp(data, { size: 64 })}</div>` : ''}
               </div>
             </td>
           </tr>
@@ -774,6 +834,10 @@ export function printSubjectPerformance(exam, data) {
 
 
 export function printFeeReceipt(payment, student, data) {
+  const expected = getFeeExpected(student, payment.term, payment.year, data);
+  const paid     = getFeePaid(student.id, payment.term, payment.year, data);
+  const balance  = expected - paid;
+
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
@@ -792,32 +856,34 @@ export function printFeeReceipt(payment, student, data) {
         <tr><td style="padding:7px 0;color:#555">Student Name:</td><td style="font-weight:700">${student.name}</td></tr>
         <tr><td style="padding:7px 0;color:#555">Admission No:</td><td>${student.admNo}</td></tr>
         <tr><td style="padding:7px 0;color:#555">Class:</td><td>${student.class}</td></tr>
-        <tr><td style="padding:7px 0;color:#555">Term:</td><td>Term ${payment.term}</td></tr>
+        <tr><td style="padding:7px 0;color:#555">Term:</td><td>Term ${payment.term} · ${payment.year}</td></tr>
+        <tr><td style="padding:7px 0;color:#555">Fee Type:</td><td>${payment.feeTypeName || 'General'}</td></tr>
         <tr><td style="padding:7px 0;color:#555">Payment Method:</td><td>${payment.method}</td></tr>
         <tr style="border-top:2px solid #003399">
           <td style="padding:12px 0;font-weight:700;font-size:14px;color:#003399">Amount Paid:</td>
           <td style="font-weight:900;font-size:20px;color:#10b981">KES ${Number(payment.amount).toLocaleString()}</td>
         </tr>
         <tr>
-          <td style="padding:7px 0;color:#555">Total Fee:</td>
-          <td>KES ${student.fees.total.toLocaleString()}</td>
+          <td style="padding:7px 0;color:#555">Total Fee (this term):</td>
+          <td>KES ${expected.toLocaleString()}</td>
         </tr>
         <tr>
           <td style="padding:7px 0;color:#555">Balance:</td>
-          <td style="font-weight:700;color:${student.fees.paid >= student.fees.total ? '#10b981' : '#ef4444'}">
-            KES ${(student.fees.total - student.fees.paid).toLocaleString()}
-            ${student.fees.paid >= student.fees.total ? ' ✓ FULLY PAID' : ''}
+          <td style="font-weight:700;color:${balance > 0 ? '#ef4444' : '#10b981'}">
+            KES ${Math.abs(balance).toLocaleString()}${balance < 0 ? ' CR (Overpaid)' : ''}
+            ${balance <= 0 && expected > 0 ? ' ✓ FULLY PAID' : ''}
           </td>
         </tr>
       </table>
     </div>
-    <div style="display:flex;justify-content:space-between;margin-top:40px;font-size:12px;color:#555">
-      <div style="text-align:center">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px">
+      <div style="text-align:center;font-size:12px;color:#555">
         <div style="border-top:1px solid #333;padding-top:6px;width:160px">Received By</div>
       </div>
-      <div style="text-align:center">
+      ${data.schoolStamp?.enabled !== false ? renderSchoolStamp(data, { size: 88 }) : `
+      <div style="text-align:center;font-size:12px;color:#555">
         <div style="border-top:1px solid #333;padding-top:6px;width:160px">Accounts / Bursar</div>
-      </div>
+      </div>`}
     </div>
     <p style="text-align:center;font-size:10px;color:#aaa;margin-top:20px">
       This is an official receipt — ${data.schoolName} · ${new Date().toLocaleDateString('en-KE', {day:'numeric',month:'long',year:'numeric'})}
@@ -868,12 +934,13 @@ export function printLeavingCert(student, data) {
         during their period of study. We wish them every success in their future endeavours.
       </p>
     </div>
-    <div style="display:flex;justify-content:space-between;margin-top:60px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:60px">
       <div style="text-align:center">
         <div style="border-top:1px solid #333;padding-top:8px;width:200px;font-size:12px;color:#555">Class Teacher</div>
       </div>
       <div style="text-align:center">
-        <div style="border-top:1px solid #333;padding-top:8px;width:200px;font-size:12px;color:#555">
+        ${data.schoolStamp?.enabled !== false ? renderSchoolStamp(data, { size: 100 }) : ''}
+        <div style="border-top:1px solid #333;padding-top:8px;width:200px;font-size:12px;color:#555;margin-top:6px">
           Principal &amp; Official Stamp
         </div>
       </div>

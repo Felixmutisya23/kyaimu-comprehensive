@@ -97,6 +97,8 @@ function schoolRowToData(row, related = {}) {
     gradesConfig:      row.grades_config      || INITIAL_DATA.gradesConfig,
     subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
     subjectOverridesByLevel: row.subject_overrides_by_level || {},
+    extraSubjectsByLevel:    row.extra_subjects_by_level    || {},
+    schoolStamp:             row.school_stamp               || INITIAL_DATA.schoolStamp,
     timetableRules:          row.timetable_rules             || [],
     // Public page fields
     schoolSlug:              row.school_slug              || '',
@@ -371,6 +373,8 @@ export async function saveSchoolData(data) {
   if (data.gradesConfig) schoolPayload.grades_config = data.gradesConfig;
   schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
   schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
+  schoolPayload.extra_subjects_by_level    = data.extraSubjectsByLevel    ?? {};
+  schoolPayload.school_stamp               = data.schoolStamp            ?? {};
   schoolPayload.timetable_rules            = data.timetableRules           ?? [];
   // Public page fields
   schoolPayload.school_slug              = data.schoolSlug              || '';

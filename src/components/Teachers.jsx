@@ -522,12 +522,12 @@ export default function Teachers({ data, setData }) {
               {depts.map(d => <option key={d} value={d}>{DEPT_ICONS[d] || '🏢'} {d}</option>)}
             </select>
           </FormGroup>
-          <FormGroup label="Staff Type">
-            <select value={form.staffType} onChange={e => setForm({ ...form, staffType: e.target.value })}>
-              {STAFF_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </FormGroup>
         </FormRow>
+        <FormGroup label="Staff Type">
+          <select value={form.staffType} onChange={e => setForm({ ...form, staffType: e.target.value })}>
+            {STAFF_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </FormGroup>
 
         {isEditing && (
           <FormGroup label="Password (leave blank to keep current)">
