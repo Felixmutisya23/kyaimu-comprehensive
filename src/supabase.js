@@ -280,10 +280,11 @@ export async function createSchool(setupData) {
     { school_id: data.id, local_id: 2, term: 2, year: yr, start_date: yr + '-04-16', end_date: yr + '-08-15', label: 'Term 2' },
     { school_id: data.id, local_id: 3, term: 3, year: yr, start_date: yr + '-08-16', end_date: yr + '-11-30', label: 'Term 3' },
   ];
-  await getSupabase().from('terms').insert(defaultTerms);
+  const { error: termsErr } = await getSupabase().from('terms').insert(defaultTerms);
+  if (termsErr) console.error('[EduManage] createSchool: terms insert FAILED:', termsErr.message, termsErr);
 
   // Insert default admin teacher (hashed password)
-  await getSupabase().from('teachers').insert({
+  const { error: teacherErr } = await getSupabase().from('teachers').insert({
     school_id:      data.id,
     local_id:       1,
     name:           'Administrator',
@@ -298,6 +299,7 @@ export async function createSchool(setupData) {
     admin:          true,
     password:       hashedPw,
   });
+  if (teacherErr) console.error('[EduManage] createSchool: default teacher insert FAILED:', teacherErr.message, teacherErr);
 
   return data.id;
 }
@@ -395,7 +397,20 @@ export async function saveSchoolData(data) {
   schoolPayload.school_code_year         = data.schoolCodeYear          || '';
   schoolPayload.dark_theme               = data.darkTheme               !== false;
 
-  await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
+  // CRITICAL FIX: Supabase's client does NOT throw on a failed request — it
+  // returns { data, error } and silently continues unless you check `error`
+  // yourself. This call was discarding that result entirely, so ANY failed
+  // save (bad value, constraint violation, schema mismatch, RLS rejection,
+  // etc.) was invisible: the UI would still show "✓ All changes saved"
+  // while nothing actually reached the database. This is the most likely
+  // explanation for tokens, subjects, and other changes "disappearing" —
+  // they were never silently lost after being saved; the save itself was
+  // silently failing in the first place, before this fix could ever know.
+  const { error: schoolUpdateError } = await getSupabase().from('schools').update(schoolPayload).eq('id', schoolId);
+  if (schoolUpdateError) {
+    console.error('[EduManage] schools.update FAILED:', schoolUpdateError.message, schoolUpdateError);
+    throw new Error('Save failed: ' + schoolUpdateError.message);
+  }
 
   // FIX 6: only sync tables that changed (dirty flag) — reduces Supabase load significantly
   if (isDirty(schoolId, 'teachers', data.teachers)) {
@@ -464,13 +479,15 @@ async function syncTeachers(schoolId, teachers, teachersLoaded) {
       status:           t.status || 'active',
     };
   }));
-  await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] teachers.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (teachers): ' + upsertErr.message); }
   // Step 2: delete only teachers that were explicitly removed
   const currentIds = teachers.map(t => String(t.id || t.staffId));
   const { data: existing } = await getSupabase().from('teachers').select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from('teachers').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from('teachers').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error('[EduManage] teachers.delete FAILED:', delErr.message, delErr);
   }
 }
 
@@ -496,20 +513,23 @@ async function syncStudents(schoolId, students, studentsLoaded) {
       extra,
     };
   });
-  await getSupabase().from('students').upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from('students').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] students.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (students): ' + upsertErr.message); }
   // Delete only students that were explicitly removed
   const currentIds = students.map(s => String(s.id));
   const { data: existing } = await getSupabase().from('students').select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from('students').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from('students').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error('[EduManage] students.delete FAILED:', delErr.message, delErr);
   }
 }
 
 async function syncJsonTable(table, schoolId, items) {
   // If items is empty, delete everything in this table for this school
   if (!items || items.length == 0) {
-    await getSupabase().from(table).delete().eq('school_id', schoolId);
+    const { error: delAllErr } = await getSupabase().from(table).delete().eq('school_id', schoolId);
+    if (delAllErr) console.error(`[EduManage] ${table}.delete-all FAILED:`, delAllErr.message, delAllErr);
     return;
   }
   // Safe upsert: update existing records, insert new ones
@@ -519,19 +539,22 @@ async function syncJsonTable(table, schoolId, items) {
     local_id:  String(item.id || item._uuid || generateId()),
     data:      item,
   }));
-  await getSupabase().from(table).upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from(table).upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error(`[EduManage] ${table}.upsert FAILED:`, upsertErr.message, upsertErr); throw new Error(`Save failed (${table}): ` + upsertErr.message); }
   // Delete only items that were explicitly removed
   const currentIds = new Set(rows.map(r => r.local_id));
   const { data: existing } = await getSupabase().from(table).select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.has(e.local_id)).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from(table).delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from(table).delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error(`[EduManage] ${table}.delete FAILED:`, delErr.message, delErr);
   }
 }
 
 async function syncFeeTypes(schoolId, feeTypes) {
   if (!feeTypes || !feeTypes.length) {
-    await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
+    const { error } = await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
+    if (error) console.error('[EduManage] fee_types.delete-all FAILED:', error.message, error);
     return;
   }
   const rows = feeTypes.map(f => ({
@@ -542,19 +565,22 @@ async function syncFeeTypes(schoolId, feeTypes) {
     applies_to_all:     f.appliesToAll !== false,
     applicable_classes: f.applicableClasses || [],
   }));
-  await getSupabase().from('fee_types').upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from('fee_types').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] fee_types.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_types): ' + upsertErr.message); }
   // Delete removed fee types
   const currentIds = new Set(rows.map(r => r.local_id));
   const { data: existing } = await getSupabase().from('fee_types').select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from('fee_types').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from('fee_types').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error('[EduManage] fee_types.delete FAILED:', delErr.message, delErr);
   }
 }
 
 async function syncFeeSchedule(schoolId, feeSchedule) {
   if (!feeSchedule || !feeSchedule.length) {
-    await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
+    const { error } = await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
+    if (error) console.error('[EduManage] fee_schedule.delete-all FAILED:', error.message, error);
     return;
   }
   const rows = feeSchedule.map(f => ({
@@ -566,12 +592,14 @@ async function syncFeeSchedule(schoolId, feeSchedule) {
     year:        f.year,
     amount:      f.amount,
   }));
-  await getSupabase().from('fee_schedule').upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from('fee_schedule').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] fee_schedule.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_schedule): ' + upsertErr.message); }
   const currentIds = new Set(rows.map(r => r.local_id));
   const { data: existing } = await getSupabase().from('fee_schedule').select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error('[EduManage] fee_schedule.delete FAILED:', delErr.message, delErr);
   }
 }
 
@@ -593,13 +621,15 @@ async function syncFeePayments(schoolId, feePayments) {
     method:      f.method || 'cash',
     note:        f.note || '',
   }));
-  await getSupabase().from('fee_payments').upsert(rows, { onConflict: 'school_id,local_id' });
+  const { error: upsertErr } = await getSupabase().from('fee_payments').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] fee_payments.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_payments): ' + upsertErr.message); }
   // Only delete payments that were explicitly removed
   const currentIds = new Set(rows.map(r => r.local_id));
   const { data: existing } = await getSupabase().from('fee_payments').select('local_id').eq('school_id', schoolId);
   const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
   if (toDelete.length > 0) {
-    await getSupabase().from('fee_payments').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    const { error: delErr } = await getSupabase().from('fee_payments').delete().eq('school_id', schoolId).in('local_id', toDelete);
+    if (delErr) console.error('[EduManage] fee_payments.delete FAILED:', delErr.message, delErr);
   }
 }
 
@@ -664,7 +694,8 @@ export async function loginTeacher(email, password) {
 
   // Migrate plain-text password to hashed on successful login
   if (teacher.password === password && !isHashed(password)) {
-    await getSupabase().from('teachers').update({ password: hashed }).eq('id', teacher.id);
+    const { error } = await getSupabase().from('teachers').update({ password: hashed }).eq('id', teacher.id);
+    if (error) console.error('[EduManage] teacher password migration FAILED:', error.message, error);
   }
   return teacher;
 }
@@ -684,7 +715,8 @@ export async function loginPrincipal(email, password) {
 
   // Migrate plain-text password to hashed on successful login
   if (school.principal_password === password && !isHashed(password)) {
-    await getSupabase().from('schools').update({ principal_password: hashed }).eq('id', school.id);
+    const { error } = await getSupabase().from('schools').update({ principal_password: hashed }).eq('id', school.id);
+    if (error) console.error('[EduManage] principal password migration FAILED:', error.message, error);
   }
   return school;
 }

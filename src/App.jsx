@@ -692,6 +692,19 @@ export default function App() {
           setLocalSchoolId(schoolId);
           const schoolData = await loadSchoolData(schoolId);
           if (schoolData) setDataRaw(schoolData);
+          // FIX: this auto-login path for a brand-new school was never
+          // calling loadLicenseFromCloud/bumping licenseRefreshKey — meaning
+          // useLicense's very first read of this school's token/license
+          // state happened before _schoolId was even populated, using the
+          // empty-schoolId key. Any token applied moments later in this
+          // same session would correctly show as active in memory, but the
+          // next real login (the normal returning-principal path) would
+          // read a properly-scoped key that this path never warmed up
+          // correctly — explaining brand-new schools specifically being
+          // asked to pay again after the very first logout, while schools
+          // that have been through a normal login at least once were fine.
+          await loadLicenseFromCloud(schoolId);
+          setLicenseRefreshKey(k => k + 1);
           // Auto-login as principal
           setUser({ role: 'principal', name: setupData.principalName || 'Principal', email: setupData.principalEmail });
           setPage('dashboard');
