@@ -147,8 +147,8 @@ export function renderSchoolStamp(data, { size = 130 } = {}) {
   return `
   <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
     <defs>
-      <path id="${topPathId}" d="M ${cx - rText},${cy} A ${rText},${rText} 0 1 1 ${cx + rText},${cy}" />
-      <path id="${botPathId}" d="M ${cx - rText},${cy} A ${rText},${rText} 0 0 0 ${cx + rText},${cy}" />
+      <path id="${topPathId}" d="M ${(cx - rText).toFixed(2)} ${cy.toFixed(2)} A ${rText.toFixed(2)} ${rText.toFixed(2)} 0 1 1 ${(cx + rText).toFixed(2)} ${cy.toFixed(2)}" />
+      <path id="${botPathId}" d="M ${(cx - rText).toFixed(2)} ${cy.toFixed(2)} A ${rText.toFixed(2)} ${rText.toFixed(2)} 0 0 0 ${(cx + rText).toFixed(2)} ${cy.toFixed(2)}" />
     </defs>
 
     <!-- Outer double ring -->
@@ -287,7 +287,6 @@ export function printClassList(ranked, subjects, exam, data) {
   ).join('');
 
   const rows = ranked.map((s, idx) => {
-    const bg      = idx % 2 === 0 ? '#ffffff' : '#f0f4ff';
     const pos     = posMap[s.name] || {};
     const streamLbl = stream || getStreamFromClass(s.class, data) || '-';
 
@@ -296,19 +295,15 @@ export function printClassList(ranked, subjects, exam, data) {
       const score = getScore(cell);
       const g     = score !== null && score !== undefined ? getGrade(score) : null;
       return score !== null && score !== undefined
-        ? `<td style="${TD}background:${bg}">${score}<sup style="color:#cc0000;font-size:7px;font-weight:900">${g.label}</sup></td>`
-        : `<td style="${TD}background:${bg};color:#999">-</td>`;
+        ? `<td style="${TD}"><div style="${SCORE_NUM}">${score}</div><div style="${GRADE_LBL}">${g.label}</div></td>`
+        : `<td style="${TD}color:#999">0</td>`;
     }).join('');
 
     const totalG = getGrade(Math.round(s.mean));
     return `<tr>
-      <td style="${TD}background:${bg};font-weight:700;color:#003399">${s.admNo}</td>
-      <td style="${TD}background:${bg};font-weight:700;text-align:left;padding-left:8px;white-space:nowrap">${s.name.toUpperCase()}</td>
+      <td style="${TD}text-align:left;font-weight:700;white-space:nowrap">${s.name.toUpperCase()}</td>
       ${subCells}
-      <td style="${TD}background:${bg};font-weight:900;font-size:11px">${s.total}<sup style="color:#cc0000;font-size:7px;font-weight:900">${totalG.label}</sup></td>
-      <td style="${TD}background:${bg};font-weight:700;color:#003399">${pos.overallPos || '-'}</td>
-      <td style="${TD}background:${bg};font-weight:700;color:#7c3aed">${pos.streamPos || '-'}</td>
-      <td style="${TD}background:${bg};font-weight:700">${streamLbl}</td>
+      <td style="${TD}"><div style="${SCORE_NUM}">${s.total}</div><div style="${GRADE_LBL}">${totalG.label}</div></td>
     </tr>`;
   }).join('');
 
@@ -319,7 +314,7 @@ export function printClassList(ranked, subjects, exam, data) {
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; padding: 16px; color: #111; }
-      @page { size: A4 landscape; margin: 12mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       @media print { body { padding: 0; } .no-print { display: none !important; } }
       .no-print { margin-top: 16px; text-align: center; }
     </style>
@@ -327,23 +322,19 @@ export function printClassList(ranked, subjects, exam, data) {
     ${schoolHeader(data)}
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 4px;font-size:12px">
       <div>
-        <strong>EXAMS :-</strong> ${exam.name.toUpperCase()}
+        <strong>EXAM:</strong> ${exam.name.toUpperCase()}
         &nbsp;&nbsp;&nbsp;&nbsp;
-        <strong>TERM:-</strong> ${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}
+        <strong>TERM:</strong> ${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}
       </div>
       <div style="font-size:11px;color:#555">Total Students: ${ranked.length}</div>
     </div>
     <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#003399">${classLabel}</div>
     <table style="width:100%;border-collapse:collapse;font-size:10px">
       <thead>
-        <tr style="background:#cc0000;color:#fff;font-size:10px">
-          <th style="${TH}">ADM<br>NO</th>
-          <th style="${TH}text-align:left;padding-left:8px">STUDENT</th>
+        <tr>
+          <th style="${TH}text-align:left">NAME</th>
           ${subHeaders}
           <th style="${TH}">TOTAL</th>
-          <th style="${TH}">POS</th>
-          <th style="${TH}">STRM<br>POS</th>
-          <th style="${TH}">STRM</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -362,8 +353,10 @@ export function printClassList(ranked, subjects, exam, data) {
   w.document.close();
 }
 
-const TH = 'border:1px solid #aaa;padding:5px 3px;text-align:center;font-size:9px;font-weight:700;white-space:nowrap;';
-const TD = 'border:1px solid #ccc;padding:4px 3px;text-align:center;font-size:10px;';
+const TH = 'border:1px solid #333;padding:6px 4px;text-align:center;font-size:10px;font-weight:700;white-space:nowrap;background:#fff;color:#111;';
+const TD = 'border:1px solid #333;padding:3px 4px;text-align:center;vertical-align:middle;';
+const SCORE_NUM = 'font-weight:700;font-size:11px;line-height:1.1;color:#111;';
+const GRADE_LBL = 'font-weight:700;font-size:9px;line-height:1.1;color:#cc0000;';
 
 /* ═══════════════════════════════════════════════════════
    INDIVIDUAL STUDENT REPORT FORM
