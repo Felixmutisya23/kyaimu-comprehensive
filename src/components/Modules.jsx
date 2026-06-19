@@ -3,6 +3,7 @@ import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, Progres
 import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug } from '../data/initialData';
 import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
 import { printFeeReceipt, renderSchoolStamp } from '../utils/print';
+import ClassRepairTool from './ClassRepairTool';
 
 /* ══════════════════════════════════════════════════════
    KITCHEN
@@ -1386,6 +1387,10 @@ export function Settings({ data, setData }) {
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
               Classes with multiple streams (e.g. East, West) are supported. Click streams to edit.
             </div>
+
+            {/* ── Class Repair Tool ─────────────────────────── */}
+            <ClassRepairTool data={data} setData={setData} />
+
             {classGroups.map(g => {
               const fullNames = g.streams.length == 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`);
               return (
