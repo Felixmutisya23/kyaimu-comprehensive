@@ -146,6 +146,7 @@ export default function Exams({ data, setData, user }) {
   }
 
   const ranked = rankStudents(selExam);
+  const hasStreams = selExam ? getSiblingStreams(selExam.class, data).length > 1 : false;
 
   /* ── Create exam ──────────────────────────────────── */
   function createExam() {
@@ -458,7 +459,7 @@ export default function Exams({ data, setData, user }) {
                   <th style={TS.th}>Name</th>
                   <th style={TS.th}>Adm No</th>
                   {visibleSubjects.map(s => <th key={s} style={TS.th}>{s}</th>)}
-                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th><th style={TS.th}>Strm Pos</th></>}
+                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
                   <th style={TS.th}>Action</th>
                 </tr>
               </thead>
@@ -499,9 +500,11 @@ export default function Exams({ data, setData, user }) {
                         <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>
                           {s.overallPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.overallOf}</span>
                         </td>
-                        <td style={{ ...TS.td, fontWeight: 700, color: '#4f8ef7' }}>
-                          {s.streamPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.streamOf}</span>
-                        </td>
+                        {hasStreams && (
+                          <td style={{ ...TS.td, fontWeight: 700, color: '#4f8ef7' }}>
+                            {s.streamPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.streamOf}</span>
+                          </td>
+                        )}
                       </>
                     )}
                     <td style={TS.td}>

@@ -129,6 +129,25 @@ export function renderSchoolStamp(data, { size = 130 } = {}) {
   const rText   = size * 0.355;  // radius the curved text sits on
   const rStar   = size * 0.40;
 
+  // ── Dynamic font sizing so ANY school name/address length fits cleanly
+  //    on its curved arc, instead of a fixed size that overflows for long
+  //    names and looks too small/sparse for short ones. ──
+  // Approximate usable arc length for the top/bottom semicircle text path,
+  // then scale font-size down as character count grows so it always wraps
+  // to fit within roughly that arc, with sensible min/max clamps.
+  const arcLen = Math.PI * rText; // half-circumference of the text path
+  function fitFontSize(text, baseFraction, minFraction) {
+    const base = size * baseFraction;
+    const min  = size * minFraction;
+    // Rough average glyph width at this weight/font ≈ 0.62 × font-size
+    const estWidth = text.length * base * 0.62;
+    if (estWidth <= arcLen) return base;
+    const scaled = base * (arcLen / estWidth);
+    return Math.max(scaled, min);
+  }
+  const topFontSize = fitFontSize(topTxt, 0.082, 0.040);
+  const botFontSize = fitFontSize(botTxt, 0.058, 0.032);
+
   function star5(x0, y0, outerR, innerR) {
     let d = '';
     for (let i = 0; i < 10; i++) {
@@ -160,12 +179,12 @@ export function renderSchoolStamp(data, { size = 130 } = {}) {
     <path d="${star5(cx + rStar, cy, size*0.045, size*0.018)}" fill="${pri}"/>
 
     <!-- School name curving along the top -->
-    <text font-size="${size * 0.082}" font-weight="700" fill="${pri}" letter-spacing="1" font-family="Georgia, 'Times New Roman', serif">
+    <text font-size="${topFontSize.toFixed(1)}" font-weight="700" fill="${pri}" letter-spacing="0.5" font-family="Georgia, 'Times New Roman', serif">
       <textPath href="#${topPathId}" startOffset="50%" text-anchor="middle">${topTxt}</textPath>
     </text>
 
     <!-- Address / location curving along the bottom -->
-    <text font-size="${size * 0.058}" font-weight="600" fill="${pri}" letter-spacing="0.5" font-family="Georgia, 'Times New Roman', serif">
+    <text font-size="${botFontSize.toFixed(1)}" font-weight="600" fill="${pri}" letter-spacing="0.3" font-family="Georgia, 'Times New Roman', serif">
       <textPath href="#${botPathId}" startOffset="50%" text-anchor="middle">${botTxt}</textPath>
     </text>
 
@@ -266,29 +285,15 @@ export function printClassList(ranked, subjects, exam, data) {
     ? `${data.schoolType || 'Junior School'} ${baseClass} ${stream.toUpperCase()}`
     : baseClass;
 
-  // Shorten subject names for column headers
-  function shortSubject(s) {
-    const MAP = {
-      'English': 'ENG', 'Kiswahili': 'KISW', 'Mathematics': 'MATH',
-      'Integrated Science': 'INTEG', 'Pre-Technical Studies': 'PRETECH',
-      'Social Studies': 'SST', 'Creative Arts': 'CA', 'CRE': 'CRE',
-      'Agriculture': 'AGRI', 'Physical Education': 'PE',
-      'Computer Studies': 'COMP', 'Business Studies': 'BST',
-      'Home Science': 'H.SC', 'Music': 'MUS', 'Art': 'ART',
-    };
-    return MAP[s] || s.substring(0, 6).toUpperCase();
-  }
-
-  // Compute positions
-  const { posMap } = computeRankings(exam, data.students, data);
+  // Compute positions + whether this class actually has sibling streams
+  const { posMap, hasStreams } = computeRankings(exam, data.students, data);
 
   const subHeaders = subjects.map(s =>
-    `<th style="${TH}">${shortSubject(s)}</th>`
+    `<th style="${TH}">${s.toUpperCase()}</th>`
   ).join('');
 
-  const rows = ranked.map((s, idx) => {
-    const pos     = posMap[s.name] || {};
-    const streamLbl = stream || getStreamFromClass(s.class, data) || '-';
+  const rows = ranked.map((s) => {
+    const pos = posMap[s.name] || {};
 
     const subCells = subjects.map(sub => {
       const cell  = s.results[sub];
@@ -304,6 +309,8 @@ export function printClassList(ranked, subjects, exam, data) {
       <td style="${TD}text-align:left;font-weight:700;white-space:nowrap">${s.name.toUpperCase()}</td>
       ${subCells}
       <td style="${TD}"><div style="${SCORE_NUM}">${s.total}</div><div style="${GRADE_LBL}">${totalG.label}</div></td>
+      <td style="${TD}"><div style="${SCORE_NUM}">${pos.overallPos || '-'}</div></td>
+      ${hasStreams ? `<td style="${TD}"><div style="${SCORE_NUM}">${pos.streamPos || '-'}</div></td>` : ''}
     </tr>`;
   }).join('');
 
@@ -313,33 +320,35 @@ export function printClassList(ranked, subjects, exam, data) {
     <title>Class List — ${exam.name} — ${classLabel}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; padding: 16px; color: #111; }
-      @page { size: A4 portrait; margin: 10mm; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; padding: 12px; color: #111; }
+      @page { size: A4 portrait; margin: 8mm; }
       @media print { body { padding: 0; } .no-print { display: none !important; } }
-      .no-print { margin-top: 16px; text-align: center; }
+      .no-print { margin-top: 14px; text-align: center; }
     </style>
   </head><body>
     ${schoolHeader(data)}
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 4px;font-size:12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:6px 0 3px;font-size:11px">
       <div>
         <strong>EXAM:</strong> ${exam.name.toUpperCase()}
-        &nbsp;&nbsp;&nbsp;&nbsp;
+        &nbsp;&nbsp;
         <strong>TERM:</strong> ${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}
       </div>
-      <div style="font-size:11px;color:#555">Total Students: ${ranked.length}</div>
+      <div style="font-size:10px;color:#555">Total Students: ${ranked.length}</div>
     </div>
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#003399">${classLabel}</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:5px;color:#003399">${classLabel}</div>
     <table style="width:100%;border-collapse:collapse;font-size:10px">
       <thead>
         <tr>
           <th style="${TH}text-align:left">NAME</th>
           ${subHeaders}
           <th style="${TH}">TOTAL</th>
+          <th style="${TH}">POS</th>
+          ${hasStreams ? `<th style="${TH}">STRM<br>POS</th>` : ''}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:10px;color:#555;border-top:1px solid #ccc;padding-top:8px">
+    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:10px;color:#555;border-top:1px solid #ccc;padding-top:6px">
       <span>Class Teacher: _______________________________</span>
       <span>Principal: _______________________________</span>
       <span>Printed: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}</span>
@@ -353,10 +362,10 @@ export function printClassList(ranked, subjects, exam, data) {
   w.document.close();
 }
 
-const TH = 'border:1px solid #333;padding:6px 4px;text-align:center;font-size:10px;font-weight:700;white-space:nowrap;background:#fff;color:#111;';
-const TD = 'border:1px solid #333;padding:3px 4px;text-align:center;vertical-align:middle;';
-const SCORE_NUM = 'font-weight:700;font-size:11px;line-height:1.1;color:#111;';
-const GRADE_LBL = 'font-weight:700;font-size:9px;line-height:1.1;color:#cc0000;';
+const TH = 'border:1px solid #333;padding:4px 3px;text-align:center;font-size:9px;font-weight:700;white-space:nowrap;background:#fff;color:#111;line-height:1.2;';
+const TD = 'border:1px solid #333;padding:2px 3px;text-align:center;vertical-align:middle;';
+const SCORE_NUM = 'font-weight:700;font-size:10px;line-height:1;color:#111;';
+const GRADE_LBL = 'font-weight:700;font-size:8px;line-height:1;color:#cc0000;';
 
 /* ═══════════════════════════════════════════════════════
    INDIVIDUAL STUDENT REPORT FORM
@@ -370,7 +379,7 @@ export function printReportForm(student, exam, data) {
   const baseClass = getBaseClass(exam.class, data);
 
   // Compute positions
-  const { posMap, overallSorted } = computeRankings(exam, data.students, data);
+  const { posMap, overallSorted, hasStreams } = computeRankings(exam, data.students, data);
   const pos = posMap[student.name] || {};
 
   // Fee balance for this exam's term/year
@@ -456,9 +465,22 @@ export function printReportForm(student, exam, data) {
       <tr>
         <td class="lbl">Class</td>
         <td>${baseClass}${stream ? ' ' + stream : ''}</td>
+        ${hasStreams ? `
         <td class="lbl">Stream</td>
-        <td>${stream || '—'}</td>
+        <td>${stream || '—'}</td>` : `
+        <td class="lbl">Exam</td>
+        <td>${exam.name}</td>`}
       </tr>
+      ${!hasStreams ? `
+      <tr>
+        <td class="lbl">Term</td>
+        <td colspan="3">${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Position</td>
+        <td colspan="3"><span style="font-size:18px;font-weight:900;color:#cc0000">${pos.overallPos || '—'}</span>
+          <span style="font-size:11px;color:#555"> out of ${pos.overallOf || '—'} students</span></td>
+      </tr>` : `
       <tr>
         <td class="lbl">Exam</td>
         <td>${exam.name}</td>
@@ -472,7 +494,7 @@ export function printReportForm(student, exam, data) {
         <td class="lbl">Stream Position</td>
         <td><span style="font-size:18px;font-weight:900;color:#003399">${pos.streamPos || '—'}</span>
           <span style="font-size:11px;color:#555"> out of ${pos.streamOf || '—'} in ${stream || 'class'}</span></td>
-      </tr>
+      </tr>`}
     </table>
 
     <table style="margin-bottom:14px">
@@ -559,7 +581,7 @@ export function printAllReportForms(exam, data) {
   const students = data.students.filter(s => s.class === exam.class);
   if (students.length === 0) { alert('No students in this class.'); return; }
 
-  const { posMap } = computeRankings(exam, data.students, data);
+  const { posMap, hasStreams } = computeRankings(exam, data.students, data);
   const stream    = getStreamFromClass(exam.class, data);
   const baseClass = getBaseClass(exam.class, data);
   const nextTermDate = getNextTermDate(exam, data);
@@ -620,8 +642,11 @@ export function printAllReportForms(exam, data) {
           <tr>
             <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Overall Position</td>
             <td style="padding:5px 8px;border:1px solid #ddd"><strong style="font-size:16px;color:#cc0000">${pos.overallPos || '—'}</strong> / ${pos.overallOf || '—'}</td>
+            ${hasStreams ? `
             <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Stream Position</td>
-            <td style="padding:5px 8px;border:1px solid #ddd"><strong style="font-size:16px;color:#003399">${pos.streamPos || '—'}</strong> / ${pos.streamOf || '—'}</td>
+            <td style="padding:5px 8px;border:1px solid #ddd"><strong style="font-size:16px;color:#003399">${pos.streamPos || '—'}</strong> / ${pos.streamOf || '—'}</td>` : `
+            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Term</td>
+            <td style="padding:5px 8px;border:1px solid #ddd">${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}</td>`}
           </tr>
         </table>
         <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px">
@@ -702,27 +727,27 @@ export function printAllReportForms(exam, data) {
 export function printSubjectPerformance(exam, data) {
   if (!exam) return;
 
-  // Get all streams for this exam's base class
-  const baseClass = exam.class.includes(' ')
-    ? exam.class.split(' ').slice(0, -1).join(' ')
-    : exam.class;
+  // Use the same correct, school-configured stream detection as everywhere
+  // else (computeRankings, the class list, etc.) instead of guessing from
+  // the class name string — the old version assumed every class name's
+  // last word was a stream letter to strip off, which silently merged
+  // unrelated classes together (e.g. "Grade 1" → baseClass "Grade", which
+  // then incorrectly matched "Grade 2", "Grade 3" via startsWith).
+  const baseClass     = getBaseClass(exam.class, data);
+  const siblingClasses = getSiblingStreams(exam.class, data);
+  const hasStreams     = siblingClasses.length > 1;
 
-  // Find all sibling stream exams with same name and same term/year
-  const siblingExams = (data.exams || []).filter(e =>
-    e.name === exam.name &&
-    e.term === exam.term &&
-    e.year === exam.year &&
-    (e.class === exam.class ||
-      e.class.startsWith(baseClass + ' ') ||
-      exam.class.startsWith(baseClass + ' '))
-  );
-
-  const hasStreams = siblingExams.length > 1;
+  // Find each sibling stream's matching exam (same name, term, year)
+  const siblingExams = siblingClasses
+    .map(cls => (data.exams || []).find(e =>
+      e.class === cls && e.term === exam.term && e.year === exam.year && e.name === exam.name
+    ))
+    .filter(Boolean);
 
   // Build stats for a given set of exams (for overall or per-stream)
   function buildStats(exams) {
     const allSubjects = [...new Set(
-      exams.flatMap(ex => Object.values(ex.results).flatMap(r => Object.keys(r)))
+      exams.flatMap(ex => Object.values(ex.results || {}).flatMap(r => Object.keys(r)))
     )];
     const allStudents = (data.students || []).filter(s =>
       exams.some(ex => ex.class === s.class)
@@ -731,7 +756,7 @@ export function printSubjectPerformance(exam, data) {
       const scores = allStudents.map(s => {
         const ex = exams.find(e => e.class === s.class);
         if (!ex) return null;
-        const cell = ex.results[s.name]?.[sub];
+        const cell = ex.results?.[s.name]?.[sub];
         return getScore(cell);
       }).filter(v => v !== null && v !== undefined);
       const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
