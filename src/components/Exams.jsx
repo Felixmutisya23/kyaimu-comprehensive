@@ -451,8 +451,19 @@ export default function Exams({ data, setData, user }) {
           )}
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => {
-              const subs = getSubjectsForClass(selClass, data) || [];
-              setSetupSubjectRows(subs.map(s => ({ original: s, current: s })));
+              // Start with subjects that have ACTUAL MARKS in any exam for this class
+              // These must always be shown so the principal can rename/manage them
+              const markedInAnyExam = new Set(
+                (data.exams || [])
+                  .filter(e => e.class === selClass)
+                  .flatMap(e => Object.values(e.results || {}).flatMap(r => Object.keys(r)))
+              );
+              // Also include subjects from Settings that don't have marks yet
+              const settingsSubs = getSubjectsForClass(selClass, data) || [];
+              settingsSubs.forEach(s => markedInAnyExam.add(s));
+              // Sort: subjects with marks first, then Settings-only subjects
+              const allSubs = [...markedInAnyExam];
+              setSetupSubjectRows(allSubs.map(s => ({ original: s, current: s })));
               setNewSubjectName('');
               setShowSetupSubjects(true);
             }}>
@@ -631,8 +642,9 @@ export default function Exams({ data, setData, user }) {
       <Modal show={showSetupSubjects} onClose={() => setShowSetupSubjects(false)} title={`Setup Subjects — ${selClass}`}>
         <Alert type="info">
           <Icon name="alert" size={14} />
-          These are the subjects used for entering marks in <strong>{selClass}</strong>. You can rename a subject
-          at any time, even after marks have been entered for it — existing scores move with it automatically.
+          Showing ALL subjects — both from Settings and those already used in exams for <strong>{selClass}</strong>.
+          You can rename any subject (marks move with it automatically) or delete subjects that have no marks entered.
+          <br/><strong style={{color:'#f59e0b'}}>⚠ Only delete subjects with no marks — deleting a subject with marks will hide those marks.</strong>
         </Alert>
 
         <FormGroup label={`Subjects (${setupSubjectRows.length})`}>
