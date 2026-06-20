@@ -65,28 +65,46 @@ export default function Exams({ data, setData, user }) {
   const selExam        = classExams.find(e => e.id === selExamId) || classExams[0] || null;
   const classStudents  = data.students.filter(s => s.class === selClass);
 
-  // Exam columns for the current class — respects groups defined in Settings
-  // and filters out any subject not in Settings (e.g. "Guidance & Counselling")
-  const examColumns = getExamColumnsForClass(selClass, data, selExam?.subjectColumns || null);
-
-  // Flat list of column names (for display headers, ranked, etc.)
-  const columnNames = examColumns.map(c => c.name);
-
-  // All raw subjects that appear in the current exam's results
-  // (kept for backward compat when reading existing marks)
-  const examSubjects = selExam
-    ? [...new Set(Object.values(selExam.results).flatMap(r => Object.keys(r)))]
+  // Get all subjects that already have marks entered in this exam
+  const markedSubjects = selExam
+    ? [...new Set(Object.values(selExam.results || {}).flatMap(r => Object.keys(r)))]
     : [];
 
-  // Subjects this user can see — filtered to Settings subjects only
+  // Exam columns for the current class — respects groups defined in Settings.
+  // IMPORTANT: if the exam already has marks entered, we ALWAYS show those
+  // columns — never hide existing marks. The Settings filter only applies
+  // to empty exams or columns with no data yet.
+  const examColumns = (() => {
+    const cols = getExamColumnsForClass(selClass, data, selExam?.subjectColumns || null);
+    if (!selExam || markedSubjects.length === 0) return cols;
+
+    // Build set of all subject names already covered by the columns
+    const coveredByCol = new Set(cols.flatMap(c =>
+      c.type === 'group' ? c.components : [c.subject || c.name]
+    ));
+
+    // Any marked subject NOT covered by the columns → add as plain column
+    const extraCols = markedSubjects
+      .filter(s => !coveredByCol.has(s) && !(cols.some(c => c.name === s)))
+      .map(s => ({ name: s, type: 'single', subject: s }));
+
+    return [...cols, ...extraCols];
+  })();
+
+  // Flat list of column names (for display headers)
+  const columnNames = examColumns.map(c => c.name);
+
+  // All raw subjects in current exam results (for backward compat)
+  const examSubjects = markedSubjects;
+
+  // Subjects this user can see — always include columns with existing marks
   function getVisibleSubjects(exam) {
     if (!exam) return [];
-    // Use column names so grouped subjects show as one column name
     if (isPrincipal || isClassTeacher) return columnNames;
-    // Subject teacher: only columns that contain at least one of their subjects
+    // Subject teacher: columns containing at least one of their subjects
     return examColumns
       .filter(col => {
-        if (col.type === 'single') return mySubjects.includes(col.subject);
+        if (col.type === 'single') return mySubjects.includes(col.subject || col.name);
         if (col.type === 'group')  return col.components.some(c => mySubjects.includes(c));
         return false;
       })
@@ -95,14 +113,18 @@ export default function Exams({ data, setData, user }) {
 
   const visibleSubjects = selExam ? getVisibleSubjects(selExam) : [];
 
-  // Subjects this user can ENTER scores for
+  // Subjects this teacher can ENTER scores for
   function getEnterableSubjects() {
-    const settingsSubs = getSubjectsForClass(selClass, data);
-    if (isPrincipal) return settingsSubs;
-    if (isClassTeacher && myClass === selClass) return settingsSubs;
+    const settingsSubs = new Set(getSubjectsForClass(selClass, data));
+    // Also include any subjects already in the exam (backward compat)
+    markedSubjects.forEach(s => settingsSubs.add(s));
+    const allValid = [...settingsSubs];
+    if (isPrincipal) return allValid;
+    if (isClassTeacher && myClass === selClass) return allValid;
     return (user.teacherSubjects || [])
-      .filter(s => s.classes.includes(selClass) && settingsSubs.includes(s.subject))
-      .map(s => s.subject);
+      .filter(s => s.classes.includes(selClass))
+      .map(s => s.subject)
+      .filter(s => settingsSubs.has(s));
   }
 
   const enterableSubjects = getEnterableSubjects();
