@@ -122,6 +122,102 @@ export function getSubjectsForClass(className, data) {
   return schoolSubs.filter(Boolean);
 }
 
+/**
+ * getExamColumnsForClass
+ * ─────────────────────
+ * Returns the columns a teacher sees when entering exam marks for a class.
+ *
+ * Each column is one of:
+ *   { name, type:'single', subject }           — maps to exactly one subject
+ *   { name, type:'group',  components, method } — combines multiple subjects (SUM or AVG)
+ *
+ * Priority:
+ *   1. Exam-level overrides  (exam.subjectColumns — set per-exam by principal/class teacher)
+ *   2. Level-template groups (data.subjectExamGroups[levelKey])
+ *   3. Plain subject list    (getSubjectsForClass — the existing fallback)
+ *
+ * The function ALWAYS filters out any subject not present in the school's
+ * Settings (getSubjectsForClass) so rogue subjects like "Guidance & Counselling"
+ * that were assigned to a teacher but never added to Settings never appear.
+ */
+export function getExamColumnsForClass(className, data, examOverrides) {
+  const settingsSubjects = new Set(getSubjectsForClass(className, data));
+  const level = getCurriculumLevel(className);
+
+  // If exam has its own column overrides, use those
+  if (examOverrides && examOverrides.length > 0) {
+    return examOverrides
+      .filter(col => {
+        if (col.type === 'single') return settingsSubjects.has(col.subject);
+        if (col.type === 'group')  return col.components.some(c => settingsSubjects.has(c));
+        return false;
+      })
+      .map(col => ({
+        ...col,
+        components: col.type === 'group'
+          ? col.components.filter(c => settingsSubjects.has(c))
+          : undefined,
+      }));
+  }
+
+  // Use level template groups if defined
+  if (level) {
+    const groups = (data.subjectExamGroups || {})[level.key] || [];
+    if (groups.length > 0) {
+      // Build columns from groups — single subjects that aren't part of any
+      // group still appear as plain columns
+      const groupedSubjects = new Set(groups.flatMap(g => g.components));
+      const columns = [];
+
+      // Add group columns first (in order defined)
+      groups.forEach(g => {
+        const validComponents = g.components.filter(c => settingsSubjects.has(c));
+        if (validComponents.length === 0) return;
+        if (validComponents.length === 1) {
+          // Only one component left — treat as single
+          columns.push({ name: g.name, type: 'single', subject: validComponents[0] });
+        } else {
+          columns.push({ name: g.name, type: 'group', components: validComponents, method: g.method || 'SUM' });
+        }
+      });
+
+      // Add ungrouped subjects as plain columns
+      [...settingsSubjects].forEach(sub => {
+        if (!groupedSubjects.has(sub)) {
+          columns.push({ name: sub, type: 'single', subject: sub });
+        }
+      });
+
+      return columns;
+    }
+  }
+
+  // Default — one column per subject, no grouping
+  return [...settingsSubjects].map(sub => ({ name: sub, type: 'single', subject: sub }));
+}
+
+/**
+ * computeColumnScore
+ * ──────────────────
+ * Given a results object for one student and one exam column,
+ * returns the display score (sum or avg of components, or single score).
+ * Returns null if no scores found.
+ */
+export function computeColumnScore(column, studentResults) {
+  if (column.type === 'single') {
+    return getScore(studentResults[column.subject]);
+  }
+  if (column.type === 'group') {
+    const scores = column.components
+      .map(c => getScore(studentResults[c]))
+      .filter(v => v !== null && v !== undefined);
+    if (scores.length === 0) return null;
+    const sum = scores.reduce((a, b) => a + b, 0);
+    return column.method === 'AVG' ? Math.round(sum / scores.length) : sum;
+  }
+  return null;
+}
+
 export function getAllSubjectsForSchool(data) {
   const classes = getAllClasses(data);
   const all = new Set();
@@ -301,6 +397,7 @@ export const INITIAL_DATA = {
   timetableRules:          [],
   extraSubjectsByLevel:    {},
   subjectOverridesByLevel: {},
+  subjectExamGroups:       {}, // { levelKey: [ { id, name, components: [subjectName], method: 'SUM'|'AVG' } ] }
 };
 
 export function getAllClasses(data) {

@@ -95,9 +95,10 @@ function schoolRowToData(row, related = {}) {
     currentYear:       row.current_year,
     licenseData:       row.license_data       || {},
     gradesConfig:      row.grades_config      || INITIAL_DATA.gradesConfig,
-    subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
+    subjectsByClass:         row.subjects_by_class          || {},
     subjectOverridesByLevel: row.subject_overrides_by_level || {},
     extraSubjectsByLevel:    row.extra_subjects_by_level    || {},
+    subjectExamGroups:       row.subject_exam_groups        || {},
     schoolStamp:             row.school_stamp               || INITIAL_DATA.schoolStamp,
     timetableRules:          row.timetable_rules             || [],
     // Public page fields
@@ -376,6 +377,7 @@ export async function saveSchoolData(data) {
   schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
   schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
   schoolPayload.extra_subjects_by_level    = data.extraSubjectsByLevel    ?? {};
+  schoolPayload.subject_exam_groups        = data.subjectExamGroups       ?? {};
   schoolPayload.school_stamp               = data.schoolStamp            ?? {};
   schoolPayload.timetable_rules            = data.timetableRules           ?? [];
   // Public page fields
