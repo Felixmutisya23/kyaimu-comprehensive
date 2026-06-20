@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass } from '../data/initialData';
-import { printClassList, printReportForm, printAllReportForms, computeRankings, printSubjectPerformance } from '../utils/print';
+import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 
 export default function Exams({ data, setData, user }) {
   const isPrincipal  = user.role === 'principal';
@@ -359,7 +359,10 @@ export default function Exams({ data, setData, user }) {
           {selExam && (isClassTeacher || isPrincipal) && (
             <>
               <Btn variant="ghost" size="sm" onClick={() => printClassList(ranked, visibleSubjects, selExam, data)}>
-                <Icon name="print" size={13} /> Class List
+                <Icon name="print" size={13} /> Stream List
+              </Btn>
+              <Btn variant="ghost" size="sm" onClick={() => printOverallClassList(selExam, data)}>
+                🏫 Overall Class List
               </Btn>
               <Btn variant="ghost" size="sm" onClick={() => printAllReportForms(selExam, data)}>
                 <Icon name="report" size={13} /> All Reports

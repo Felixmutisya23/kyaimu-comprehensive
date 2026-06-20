@@ -276,297 +276,630 @@ export function computeRankings(exam, allStudents, data) {
 /* ═══════════════════════════════════════════════════════
    CLASS PERFORMANCE LIST — matches screenshot exactly
 ═══════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   SCHOOL COLOUR HELPERS
+   Reads from schoolStamp settings so every school gets
+   its own branded colours on every printed document.
+═══════════════════════════════════════════════════════ */
+function schoolColors(data) {
+  const cfg = data.schoolStamp || {};
+  return {
+    primary: cfg.primaryColor || '#003399',
+    accent:  cfg.accentColor  || '#cc0000',
+  };
+}
+
+/* ═══════════════════════════════════════════════════════
+   SUBJECT ANALYSIS HELPERS
+   Pure read-only — never touches exam data
+═══════════════════════════════════════════════════════ */
+function buildSubjectStats(students, resultsMap, subjects) {
+  // resultsMap: { studentName → { subject → cell } }
+  return subjects.map(sub => {
+    const scores = students
+      .map(s => getScore((resultsMap[s.name] || {})[sub]))
+      .filter(v => v !== null && v !== undefined);
+    if (!scores.length) return { subject: sub, avg: 0, highest: 0, lowest: 0, count: 0, passRate: 0 };
+    const avg      = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const highest  = Math.max(...scores);
+    const lowest   = Math.min(...scores);
+    const passing  = scores.filter(s => s >= 50).length; // 50% pass mark
+    return {
+      subject: sub,
+      avg:      Math.round(avg * 10) / 10,
+      highest,
+      lowest,
+      count:    scores.length,
+      passRate: Math.round((passing / scores.length) * 100),
+    };
+  }).sort((a, b) => b.avg - a.avg); // best subject first
+}
+
+function subjectAnalysisTable(stats, pri, acc) {
+  if (!stats.length) return '';
+  const rows = stats.map((s, i) => {
+    const g        = getGrade(Math.round(s.avg));
+    const barPct   = Math.min(100, Math.round((s.avg / 100) * 100));
+    const barColor = s.avg >= 70 ? '#10b981' : s.avg >= 50 ? '#4f8ef7' : s.avg >= 30 ? '#f59e0b' : '#ef4444';
+    return `
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#f8fafc'}">
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${pri}">${i + 1}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:700">${s.subject}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;background:#e2e8f0;border-radius:3px;height:8px">
+              <div style="width:${barPct}%;background:${barColor};border-radius:3px;height:8px"></div>
+            </div>
+            <strong style="font-size:13px;min-width:32px;text-align:right">${s.avg}</strong>
+          </div>
+        </td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">
+          <span style="background:${g.color}22;color:${g.color};padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px">${g.label}</span>
+        </td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center;color:#10b981;font-weight:700">${s.highest}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center;color:#ef4444;font-weight:700">${s.lowest}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${s.count}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${s.passRate >= 60 ? '#10b981' : s.passRate >= 40 ? '#f59e0b' : '#ef4444'}">${s.passRate}%</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:${pri};color:#fff">
+          <th style="padding:7px 10px;border:1px solid ${pri};text-align:center">#</th>
+          <th style="padding:7px 10px;border:1px solid ${pri};text-align:left">Subject</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Class Average</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Grade</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Highest</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Lowest</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Students</th>
+          <th style="padding:7px 10px;border:1px solid ${pri}">Pass Rate</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GRADE COLOUR MAP  (CBC)
+═══════════════════════════════════════════════════════ */
+function gradeColor(label) {
+  if (!label) return '#64748b';
+  if (label.startsWith('EE')) return '#10b981';
+  if (label.startsWith('ME')) return '#3b82f6';
+  if (label.startsWith('AE')) return '#f59e0b';
+  return '#ef4444'; // BE
+}
+
+/* ═══════════════════════════════════════════════════════
+   SHARED PRINT STYLES
+═══════════════════════════════════════════════════════ */
+const PRINT_BASE_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; }
+  @page { size: A4 portrait; margin: 10mm; }
+  @media print { .no-print { display: none !important; } }
+  .no-print { text-align:center; padding:14px; }
+`;
+
+/* ═══════════════════════════════════════════════════════
+   STREAM RESULT SHEET  (one stream, sorted by stream pos)
+   + OVERALL CLASS RESULT SHEET (all streams combined)
+
+   Both use the same renderer — the caller decides the
+   student list and the title.
+═══════════════════════════════════════════════════════ */
+function renderResultSheet({
+  title, subtitle, students, subjects, resultsMap,
+  showStream, posLabel, posKey, ofKey,
+  subjectStats, pri, acc, data, exam,
+}) {
+  // Header
+  const hdr = schoolHeader(data);
+  const { primary: p, accent: a } = { primary: pri, accent: acc };
+
+  // Build table rows — students already sorted by caller
+  const subTHs = subjects.map(s =>
+    `<th style="padding:5px 4px;border:1px solid #cbd5e1;font-size:9px;text-align:center;white-space:nowrap;max-width:60px;overflow:hidden">${s.toUpperCase()}</th>`
+  ).join('');
+
+  const rows = students.map((s, idx) => {
+    const res   = resultsMap[s.name] || {};
+    const subs  = subjects.filter(k => res[k] !== undefined);
+    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const mean  = subs.length ? (total / subs.length).toFixed(1) : '—';
+    const g     = getGrade(Math.round(parseFloat(mean) || 0));
+    const pos   = s[posKey] || (idx + 1);
+    const of_   = s[ofKey]  || students.length;
+
+    const subCells = subjects.map(sub => {
+      const score = getScore(res[sub]);
+      const sg    = score !== null && score !== undefined ? getGrade(score) : null;
+      return score !== null && score !== undefined
+        ? `<td style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle">
+            <div style="font-weight:700;font-size:10px">${score}</div>
+            <div style="font-size:8px;font-weight:700;color:${gradeColor(sg?.label)}">${sg?.label || ''}</div>
+           </td>`
+        : `<td style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:10px">—</td>`;
+    }).join('');
+
+    const rowBg = idx % 2 === 0 ? '#fff' : '#f8fafc';
+    return `
+      <tr style="background:${rowBg}">
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${p};font-size:11px">${pos}</td>
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:11px;white-space:nowrap">${s.name.toUpperCase()}</td>
+        ${showStream ? `<td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:10px;color:#64748b;font-weight:600">${s.stream || s.class || ''}</td>` : ''}
+        ${subCells}
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:900;font-size:11px">${total}</td>
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:11px">${mean}</td>
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center">
+          <span style="background:${gradeColor(g.label)}22;color:${gradeColor(g.label)};padding:1px 6px;border-radius:8px;font-weight:700;font-size:10px">${g.label}</span>
+        </td>
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${p};font-size:11px">${pos} / ${of_}</td>
+      </tr>`;
+  }).join('');
+
+  // Best and weakest subject
+  const best    = subjectStats[0];
+  const weakest = subjectStats[subjectStats.length - 1];
+
+  // Summary stats
+  const allTotals = students.map(s => {
+    const res  = resultsMap[s.name] || {};
+    const subs = subjects.filter(k => res[k] !== undefined);
+    return subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+  });
+  const classMean = allTotals.length
+    ? (allTotals.reduce((a, b) => a + b, 0) / allTotals.length).toFixed(1)
+    : '—';
+  const classGrade = getGrade(Math.round(parseFloat(classMean) || 0));
+
+  return `
+    ${hdr}
+    <div style="background:${p};color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:15px;font-weight:900;letter-spacing:0.5px">${title}</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:2px">${subtitle}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;opacity:0.85">
+        Total Students: <strong style="font-size:14px">${students.length}</strong><br/>
+        Class Mean: <strong style="font-size:14px">${classMean}</strong> &nbsp;
+        <span style="background:#fff2;padding:2px 8px;border-radius:8px;font-weight:700">${classGrade.label}</span>
+      </div>
+    </div>
+
+    <!-- Summary pills -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      ${best ? `<div style="background:#10b98115;border:1px solid #10b98140;border-radius:6px;padding:6px 12px;font-size:11px">
+        🏆 <strong>Best Subject:</strong> ${best.subject} &nbsp; Avg: <strong>${best.avg}</strong>
+      </div>` : ''}
+      ${weakest && weakest !== best ? `<div style="background:#ef444415;border:1px solid #ef444440;border-radius:6px;padding:6px 12px;font-size:11px">
+        ⚠ <strong>Needs Attention:</strong> ${weakest.subject} &nbsp; Avg: <strong>${weakest.avg}</strong>
+      </div>` : ''}
+      <div style="background:${p}12;border:1px solid ${p}30;border-radius:6px;padding:6px 12px;font-size:11px">
+        📅 <strong>Printed:</strong> ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="background:${p};color:#fff">
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">${posLabel}</th>
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:left">NAME</th>
+            ${showStream ? `<th style="padding:7px 6px;border:1px solid ${p};text-align:center">STREAM</th>` : ''}
+            ${subTHs}
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">TOTAL</th>
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">MEAN</th>
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">GRADE</th>
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">POSITION</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <!-- Subject Analysis -->
+    <div style="margin-top:8px">
+      <div style="background:${p};color:#fff;padding:7px 14px;border-radius:4px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+        📊 Subject Performance Analysis — Ranked Best to Weakest
+      </div>
+      ${subjectAnalysisTable(subjectStats, p, acc)}
+    </div>
+
+    <!-- Footer -->
+    <div style="display:flex;justify-content:space-between;margin-top:16px;padding-top:10px;border-top:2px solid ${p};font-size:10px;color:#64748b">
+      <span>Class Teacher: ___________________________________</span>
+      <span>Principal: ___________________________________</span>
+      <span>${data.schoolName} · EduManage Pro</span>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PUBLIC: STREAM CLASS LIST  (what the old printClassList did)
+   — prints the current stream only, sorted by stream position
+═══════════════════════════════════════════════════════ */
 export function printClassList(ranked, subjects, exam, data) {
   if (!ranked || ranked.length === 0) { alert('No results to print.'); return; }
 
+  const { primary: pri, accent: acc } = schoolColors(data);
   const stream    = getStreamFromClass(exam.class, data);
   const baseClass = getBaseClass(exam.class, data);
-  const classLabel = stream
-    ? `${data.schoolType || 'Junior School'} ${baseClass} ${stream.toUpperCase()}`
-    : baseClass;
+  const hasStreams = getSiblingStreams(exam.class, data).length > 1;
 
-  // Compute positions + whether this class actually has sibling streams
-  const { posMap, hasStreams } = computeRankings(exam, data.students, data);
+  // ranked is already sorted by streamPos (lowest first) by rankStudents()
+  const streamSorted = [...ranked].sort((a, b) => (a.streamPos || 0) - (b.streamPos || 0));
 
-  const subHeaders = subjects.map(s =>
-    `<th style="${TH}">${s.toUpperCase()}</th>`
-  ).join('');
+  // Build a resultsMap: studentName → results object
+  const resultsMap = {};
+  streamSorted.forEach(s => { resultsMap[s.name] = s.results || {}; });
 
-  const rows = ranked.map((s) => {
-    const pos = posMap[s.name] || {};
+  // Subject stats for this stream only
+  const subjectStats = buildSubjectStats(streamSorted, resultsMap, subjects);
 
-    const subCells = subjects.map(sub => {
-      const cell  = s.results[sub];
-      const score = getScore(cell);
-      const g     = score !== null && score !== undefined ? getGrade(score) : null;
-      return score !== null && score !== undefined
-        ? `<td style="${TD}"><div style="${SCORE_NUM}">${score}</div><div style="${GRADE_LBL}">${g.label}</div></td>`
-        : `<td style="${TD}color:#999">0</td>`;
-    }).join('');
+  const title    = `${baseClass}${stream ? ' — ' + stream.toUpperCase() + ' STREAM' : ''} · ${exam.name}`;
+  const subtitle = `Term ${exam.term} · ${exam.year}  ·  Stream Result Sheet`;
 
-    const totalG = getGrade(Math.round(s.mean));
-    return `<tr>
-      <td style="${TD}text-align:left;font-weight:700;white-space:nowrap">${s.name.toUpperCase()}</td>
-      ${subCells}
-      <td style="${TD}"><div style="${SCORE_NUM}">${s.total}</div><div style="${GRADE_LBL}">${totalG.label}</div></td>
-      <td style="${TD}"><div style="${SCORE_NUM}">${pos.overallPos || '-'}</div></td>
-      ${hasStreams ? `<td style="${TD}"><div style="${SCORE_NUM}">${pos.streamPos || '-'}</div></td>` : ''}
-    </tr>`;
-  }).join('');
+  const html = renderResultSheet({
+    title, subtitle,
+    students:    streamSorted,
+    subjects,
+    resultsMap,
+    showStream:  false,
+    posLabel:    'STRM POS',
+    posKey:      'streamPos',
+    ofKey:       'streamOf',
+    subjectStats,
+    pri, acc, data, exam,
+  });
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <title>Class List — ${exam.name} — ${classLabel}</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; padding: 12px; color: #111; }
-      @page { size: A4 portrait; margin: 8mm; }
-      @media print { body { padding: 0; } .no-print { display: none !important; } }
-      .no-print { margin-top: 14px; text-align: center; }
-    </style>
+    <title>Stream List — ${exam.class} — ${exam.name}</title>
+    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
   </head><body>
-    ${schoolHeader(data)}
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:6px 0 3px;font-size:11px">
-      <div>
-        <strong>EXAM:</strong> ${exam.name.toUpperCase()}
-        &nbsp;&nbsp;
-        <strong>TERM:</strong> ${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}
-      </div>
-      <div style="font-size:10px;color:#555">Total Students: ${ranked.length}</div>
-    </div>
-    <div style="font-size:12px;font-weight:700;margin-bottom:5px;color:#003399">${classLabel}</div>
-    <table style="width:100%;border-collapse:collapse;font-size:10px">
-      <thead>
-        <tr>
-          <th style="${TH}text-align:left">NAME</th>
-          ${subHeaders}
-          <th style="${TH}">TOTAL</th>
-          <th style="${TH}">POS</th>
-          ${hasStreams ? `<th style="${TH}">STRM<br>POS</th>` : ''}
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:10px;color:#555;border-top:1px solid #ccc;padding-top:6px">
-      <span>Class Teacher: _______________________________</span>
-      <span>Principal: _______________________________</span>
-      <span>Printed: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}</span>
-    </div>
+    ${html}
     <div class="no-print">
-      <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
-        🖨 Print Class List
+      <button onclick="window.print()" style="padding:10px 28px;background:${pri};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print Stream List
       </button>
     </div>
   </body></html>`);
   w.document.close();
 }
 
-const TH = 'border:1px solid #333;padding:4px 3px;text-align:center;font-size:9px;font-weight:700;white-space:nowrap;background:#fff;color:#111;line-height:1.2;';
-const TD = 'border:1px solid #333;padding:2px 3px;text-align:center;vertical-align:middle;';
-const SCORE_NUM = 'font-weight:700;font-size:10px;line-height:1;color:#111;';
-const GRADE_LBL = 'font-weight:700;font-size:8px;line-height:1;color:#cc0000;';
+/* ═══════════════════════════════════════════════════════
+   PUBLIC: OVERALL CLASS LIST  (all streams combined)
+   Sorted overall position 1 → last
+═══════════════════════════════════════════════════════ */
+export function printOverallClassList(exam, data) {
+  if (!exam) return;
+
+  const { primary: pri, accent: acc } = schoolColors(data);
+  const baseClass     = getBaseClass(exam.class, data);
+  const siblingClasses = getSiblingStreams(exam.class, data);
+  const hasStreams     = siblingClasses.length > 1;
+
+  // Gather all sibling exams
+  function findSiblingExam(cls) {
+    if (cls === exam.class) return exam;
+    return (data.exams || []).find(e =>
+      e.class === cls && e.term === exam.term &&
+      e.year  === exam.year && e.name === exam.name
+    ) || null;
+  }
+
+  // Build merged results map and student list across all streams
+  const allStudents = (data.students || []).filter(s => siblingClasses.includes(s.class));
+  const resultsMap  = {};
+  allStudents.forEach(s => {
+    const ex = findSiblingExam(s.class);
+    resultsMap[s.name] = ex ? (ex.results[s.name] || {}) : {};
+  });
+
+  // Collect all subjects appearing in any sibling exam
+  const subjectSet = new Set();
+  siblingClasses.forEach(cls => {
+    const ex = findSiblingExam(cls);
+    if (ex) Object.values(ex.results || {}).forEach(r => Object.keys(r).forEach(k => subjectSet.add(k)));
+  });
+  const subjects = [...subjectSet];
+
+  // Rank overall — sorted by total descending
+  const withStats = allStudents.map(s => {
+    const res   = resultsMap[s.name] || {};
+    const subs  = Object.keys(res);
+    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const mean  = subs.length ? (total / subs.length).toFixed(1) : 0;
+    const stream = getStreamFromClass(s.class, data) || s.class;
+    return { ...s, results: res, total, mean: parseFloat(mean), stream };
+  }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+  // Assign overall positions
+  const overallSorted = withStats.map((s, i) => ({
+    ...s,
+    overallPos: i + 1,
+    overallOf:  withStats.length,
+  }));
+
+  const subjectStats = buildSubjectStats(overallSorted, resultsMap, subjects);
+
+  const title    = `${baseClass} — OVERALL CLASS RESULT · ${exam.name}`;
+  const subtitle = `Term ${exam.term} · ${exam.year}  ·  All Streams Combined · ${siblingClasses.join(', ')}`;
+
+  const html = renderResultSheet({
+    title, subtitle,
+    students:    overallSorted,
+    subjects,
+    resultsMap,
+    showStream:  hasStreams,
+    posLabel:    'OVR POS',
+    posKey:      'overallPos',
+    ofKey:       'overallOf',
+    subjectStats,
+    pri, acc, data, exam,
+  });
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Overall Class List — ${baseClass} — ${exam.name}</title>
+    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
+  </head><body>
+    ${html}
+    <div class="no-print">
+      <button onclick="window.print()" style="padding:10px 28px;background:${pri};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print Overall Class List
+      </button>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
 
 /* ═══════════════════════════════════════════════════════
-   INDIVIDUAL STUDENT REPORT FORM
+   INDIVIDUAL STUDENT REPORT FORM  — redesigned
 ═══════════════════════════════════════════════════════ */
 export function printReportForm(student, exam, data) {
   const res  = exam.results[student.name] || {};
   const subs = Object.keys(res);
   if (!subs.length) { alert('No results recorded for this student in this exam.'); return; }
 
+  const { primary: pri, accent: acc } = schoolColors(data);
   const stream    = getStreamFromClass(exam.class, data);
   const baseClass = getBaseClass(exam.class, data);
 
-  // Compute positions
-  const { posMap, overallSorted, hasStreams } = computeRankings(exam, data.students, data);
+  const { posMap, hasStreams } = computeRankings(exam, data.students, data);
   const pos = posMap[student.name] || {};
 
-  // Fee balance for this exam's term/year
+  const total       = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+  const mean        = subs.length ? +(total / subs.length).toFixed(1) : 0;
+  const grade       = getGrade(Math.round(mean));
+  const totalPoints = subs.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
+
+  // Fee info
   const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);
   const feeExpected = getFeeExpected(student, exam.term, exam.year, data);
   const feePaid     = getFeePaid(student.id, exam.term, exam.year, data);
-  const feeBalanceStr = feeExpected > 0
+  const feeStr      = feeExpected > 0
     ? (feeBalance > 0
-        ? `KES ${feeBalance.toLocaleString()} (Balance)`
+        ? `KES ${feeBalance.toLocaleString()} (Balance Due)`
         : feeBalance < 0
           ? `KES ${Math.abs(feeBalance).toLocaleString()} (Overpaid)`
-          : 'CLEARED ✓')
+          : 'FULLY CLEARED ✓')
     : 'N/A';
-  const feeCellColor = feeBalance > 0 ? '#cc0000' : '#10b981';
+  const feeColor = feeBalance > 0 ? acc : '#10b981';
 
-  // Next term start date
   const nextTermDate = getNextTermDate(exam, data);
 
-  // Student's scores
-  const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-  const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
-  const grade = getGrade(Math.round(mean));
+  // Class averages for each subject (stream only — fair comparison)
+  const streamStudents = (data.students || []).filter(s => s.class === exam.class);
+  const streamResults  = exam.results || {};
+  const classAvgMap    = {};
+  subs.forEach(sub => {
+    const scores = streamStudents
+      .map(s => getScore((streamResults[s.name] || {})[sub]))
+      .filter(v => v !== null && v !== undefined);
+    classAvgMap[sub] = scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 10) / 10
+      : null;
+  });
 
-  // Previous exams in same class for trend
+  // Best and weakest subject for THIS student
+  const scored = subs.map(k => ({ sub: k, score: getScore(res[k]) ?? 0 }))
+    .sort((a, b) => b.score - a.score);
+  const bestSub   = scored[0];
+  const weakSub   = scored[scored.length - 1];
+
+  // Previous exams trend
   const prevExams = (data.exams || [])
     .filter(e => e.class === exam.class && e.id !== exam.id)
     .map(ex => {
       const r  = ex.results[student.name] || {};
       const ks = Object.keys(r);
       if (!ks.length) return null;
-      const t = ks.reduce((a, k) => a + (getScore(r[k]) ?? 0), 0);
-      const m = +(t / ks.length).toFixed(1);
+      const t  = ks.reduce((a, k) => a + (getScore(r[k]) ?? 0), 0);
+      const m  = +(t / ks.length).toFixed(1);
       return { name: ex.name, total: t, mean: m, grade: getGrade(Math.round(m)) };
     }).filter(Boolean);
 
-  // Subject rows — with auto subject teacher comment
-  const subjectRows = subs.map(sub => {
-    const cell    = res[sub];
-    const score   = getScore(cell);
-    const g       = getGrade(score ?? 0);
-    const remark  = g.points >= 7 ? 'Excellent' : g.points >= 5 ? 'Good' : g.points >= 3 ? 'Average' : 'Below Average';
-    const subComment = autoSubjectComment(sub, score, g);
+  // Subject rows
+  const subjectRows = subs.map((sub, idx) => {
+    const score    = getScore(res[sub]);
+    const g        = getGrade(score ?? 0);
+    const clsAvg   = classAvgMap[sub];
+    const vsClass  = clsAvg !== null ? (score >= clsAvg ? '▲' : '▼') : '';
+    const vsColor  = clsAvg !== null ? (score >= clsAvg ? '#10b981' : '#ef4444') : '#94a3b8';
+    const rowBg    = idx % 2 === 0 ? '#fff' : '#f8fafc';
     return `
-      <tr style="background:${subs.indexOf(sub) % 2 === 0 ? '#fff' : '#f8f9ff'}">
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-weight:600">${sub}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-weight:900;font-size:13px">${score ?? '—'}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-weight:900;color:#cc0000">${g.label}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:center">${g.points}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#555">${remark}</td>
-        <td style="padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:10px;color:#444;font-style:italic">${subComment}</td>
+      <tr style="background:${rowBg}">
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:700;font-size:12px">${sub}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:900;font-size:14px">${score ?? '—'}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">
+          <span style="background:${gradeColor(g.label)}22;color:${gradeColor(g.label)};padding:3px 10px;border-radius:10px;font-weight:800;font-size:12px">${g.label}</span>
+        </td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700">${g.points}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-size:11px;color:#64748b">${clsAvg !== null ? clsAvg : '—'}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${vsColor};font-size:13px">${vsClass}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:left;font-size:11px;color:#555;font-style:italic">${autoSubjectComment(sub, score, g)}</td>
       </tr>`;
   }).join('');
-
-  // Grade summary totals
-  const totalPoints = subs.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Report — ${student.name}</title>
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 24px; max-width: 820px; margin: 0 auto; color: #111; }
-      @page { size: A4 portrait; margin: 12mm; }
-      @media print { body { padding: 0; } .no-print { display: none !important; } }
-      h3 { color: #003399; text-align: center; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 10px; font-size: 14px; }
-      table { border-collapse: collapse; width: 100%; }
-      .info-table td { padding: 5px 8px; border: 1px solid #ddd; font-size: 12px; }
-      .info-table .lbl { background: #f0f4ff; font-weight: 700; color: #003399; width: 150px; }
-      .no-print { margin-top: 16px; text-align: center; }
+      ${PRINT_BASE_CSS}
+      body { padding: 20px; max-width: 820px; margin: 0 auto; font-size: 12px; }
     </style>
   </head><body>
+
+    <!-- School Header -->
     ${schoolHeader(data)}
-    <h3>Student Academic Report Form</h3>
 
-    <table class="info-table" style="margin-bottom:14px">
-      <tr>
-        <td class="lbl">Student Name</td>
-        <td style="font-weight:700;font-size:14px">${student.name.toUpperCase()}</td>
-        <td class="lbl">Adm Number</td>
-        <td style="font-weight:700">${student.admNo}</td>
-      </tr>
-      <tr>
-        <td class="lbl">Class</td>
-        <td>${baseClass}${stream ? ' ' + stream : ''}</td>
+    <!-- Coloured identity banner -->
+    <div style="background:linear-gradient(135deg,${pri},${pri}cc);color:#fff;border-radius:8px;padding:14px 20px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:1px">Student Academic Report Form</div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:0.5px;margin:4px 0">${student.name.toUpperCase()}</div>
+        <div style="font-size:12px;opacity:0.9">${baseClass}${stream ? ' · ' + stream : ''} &nbsp;·&nbsp; Adm No: <strong>${student.admNo}</strong></div>
+        <div style="font-size:11px;opacity:0.8;margin-top:2px">${exam.name} &nbsp;·&nbsp; ${exam.termLabel || `Term ${exam.term} · ${exam.year}`}</div>
+      </div>
+
+      <!-- Position badges -->
+      <div style="display:flex;gap:10px;align-items:center">
         ${hasStreams ? `
-        <td class="lbl">Stream</td>
-        <td>${stream || '—'}</td>` : `
-        <td class="lbl">Exam</td>
-        <td>${exam.name}</td>`}
-      </tr>
-      ${!hasStreams ? `
-      <tr>
-        <td class="lbl">Term</td>
-        <td colspan="3">${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}</td>
-      </tr>
-      <tr>
-        <td class="lbl">Position</td>
-        <td colspan="3"><span style="font-size:18px;font-weight:900;color:#cc0000">${pos.overallPos || '—'}</span>
-          <span style="font-size:11px;color:#555"> out of ${pos.overallOf || '—'} students</span></td>
-      </tr>` : `
-      <tr>
-        <td class="lbl">Exam</td>
-        <td>${exam.name}</td>
-        <td class="lbl">Term</td>
-        <td>${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}</td>
-      </tr>
-      <tr>
-        <td class="lbl">Overall Position</td>
-        <td><span style="font-size:18px;font-weight:900;color:#cc0000">${pos.overallPos || '—'}</span>
-          <span style="font-size:11px;color:#555"> out of ${pos.overallOf || '—'} students</span></td>
-        <td class="lbl">Stream Position</td>
-        <td><span style="font-size:18px;font-weight:900;color:#003399">${pos.streamPos || '—'}</span>
-          <span style="font-size:11px;color:#555"> out of ${pos.streamOf || '—'} in ${stream || 'class'}</span></td>
-      </tr>`}
-    </table>
+        <div style="text-align:center">
+          <div style="font-size:9px;opacity:0.8;text-transform:uppercase;margin-bottom:4px">Stream Position</div>
+          <div style="background:#fff;color:${pri};border-radius:50%;width:64px;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;box-shadow:0 2px 8px #0003">
+            <div style="font-size:22px;line-height:1">${pos.streamPos || '—'}</div>
+            <div style="font-size:9px;color:#64748b">/ ${pos.streamOf || '—'}</div>
+          </div>
+        </div>` : ''}
+        <div style="text-align:center">
+          <div style="font-size:9px;opacity:0.8;text-transform:uppercase;margin-bottom:4px">${hasStreams ? 'Overall Position' : 'Position'}</div>
+          <div style="background:${acc};color:#fff;border-radius:50%;width:72px;height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;box-shadow:0 2px 8px #0004">
+            <div style="font-size:26px;line-height:1">${pos.overallPos || '—'}</div>
+            <div style="font-size:10px;opacity:0.85">/ ${pos.overallOf || '—'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <table style="margin-bottom:14px">
+    <!-- Quick stats bar -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Total Marks</div>
+        <div style="font-size:20px;font-weight:900;color:${pri}">${total}</div>
+      </div>
+      <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Mean Score</div>
+        <div style="font-size:20px;font-weight:900;color:${pri}">${mean}</div>
+      </div>
+      <div style="flex:1;background:${gradeColor(grade.label)}15;border:1px solid ${gradeColor(grade.label)}40;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">CBC Grade</div>
+        <div style="font-size:20px;font-weight:900;color:${gradeColor(grade.label)}">${grade.label}</div>
+      </div>
+      <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Total Points</div>
+        <div style="font-size:20px;font-weight:900;color:${pri}">${totalPoints}</div>
+      </div>
+      <div style="flex:1;background:#10b98112;border:1px solid #10b98140;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Best Subject</div>
+        <div style="font-size:11px;font-weight:900;color:#10b981;line-height:1.3;margin-top:4px">${bestSub?.sub || '—'}<br/><span style="font-size:14px">${bestSub?.score ?? ''}</span></div>
+      </div>
+      <div style="flex:1;background:#ef444412;border:1px solid #ef444440;border-radius:6px;padding:8px 12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Needs Work</div>
+        <div style="font-size:11px;font-weight:900;color:#ef4444;line-height:1.3;margin-top:4px">${weakSub?.sub || '—'}<br/><span style="font-size:14px">${weakSub?.score ?? ''}</span></div>
+      </div>
+    </div>
+
+    <!-- Subject table -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px">
       <thead>
-        <tr style="background:#003399;color:#fff">
-          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Subject</th>
-          <th style="padding:7px 10px;border:1px solid #003399">Score</th>
-          <th style="padding:7px 10px;border:1px solid #003399">Grade</th>
-          <th style="padding:7px 10px;border:1px solid #003399">Points</th>
-          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Remarks</th>
-          <th style="padding:7px 10px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
+        <tr style="background:${pri};color:#fff">
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Subject</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center">Score</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center">Grade</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center">Points</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center">Class Avg</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center">vs Class</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Teacher Remark</th>
         </tr>
       </thead>
       <tbody>
         ${subjectRows}
-        <tr style="background:#e8eeff;font-weight:700">
-          <td style="padding:7px 10px;border:1px solid #ddd;font-weight:900">TOTAL / MEAN</td>
-          <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:15px;font-weight:900">${total}</td>
-          <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-size:14px;font-weight:900;color:#cc0000">${grade.label}</td>
-          <td style="padding:7px 10px;border:1px solid #ddd;text-align:center;font-weight:900">${totalPoints}</td>
-          <td colspan="2" style="padding:7px 10px;border:1px solid #ddd;font-size:11px;color:#555">
-            Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)
+        <tr style="background:${pri}15;font-weight:900">
+          <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:13px">TOTAL / MEAN</td>
+          <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;font-size:16px;color:${pri}">${total}</td>
+          <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center">
+            <span style="background:${gradeColor(grade.label)};color:#fff;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px">${grade.label}</span>
+          </td>
+          <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;font-size:14px">${totalPoints}</td>
+          <td colspan="3" style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#555">
+            Mean Score: <strong>${mean}</strong> &nbsp;·&nbsp; CBC Grade: <strong>${grade.label}</strong> (${grade.points} pts) &nbsp;·&nbsp; ${subs.length} subject${subs.length !== 1 ? 's' : ''}
           </td>
         </tr>
       </tbody>
     </table>
 
+    <!-- Trend -->
     ${prevExams.length > 0 ? `
-    <div style="background:#fffbe6;border:1px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:11px">
-      <strong style="color:#b45309">Performance Trend: </strong>
-      ${prevExams.map(p => `${p.name}: <strong style="color:${p.grade.color}">${p.grade.label} (${p.total})</strong>`).join(' → ')}
-      → <strong style="color:${grade.color}">Current: ${grade.label} (${total})</strong>
+    <div style="background:#fffbe6;border:1px solid #f59e0b50;border-radius:6px;padding:8px 14px;margin-bottom:14px;font-size:11px">
+      <strong style="color:#b45309">📈 Performance Trend: </strong>
+      ${prevExams.map(p => `${p.name}: <strong style="color:${gradeColor(p.grade.label)}">${p.grade.label} (${p.total})</strong>`).join(' → ')}
+      → <strong style="color:${gradeColor(grade.label)}">This Exam: ${grade.label} (${total})</strong>
     </div>` : ''}
 
-    <table style="margin-bottom:14px">
+    <!-- Comments -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
       <tr>
-        <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
-          <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Class Teacher's Comment</div>
-          <div style="min-height:48px;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
+        <td style="width:50%;padding:10px 14px;border:2px solid ${pri}30;border-radius:0;vertical-align:top">
+          <div style="font-weight:800;color:${pri};font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Class Teacher's Comment</div>
+          <div style="font-size:11px;color:#222;line-height:1.7">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
         </td>
-        <td style="width:50%;padding:10px;border:1px solid #ccc;vertical-align:top">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-            <div style="flex:1">
-              <div style="font-weight:700;color:#003399;margin-bottom:6px;font-size:11px;text-transform:uppercase">Principal's Comment</div>
-              <div style="min-height:48px;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
-            </div>
-            ${data.schoolStamp?.enabled !== false ? `<div style="flex-shrink:0">${renderSchoolStamp(data, { size: 78 })}</div>` : ''}
-          </div>
+        <td style="width:50%;padding:10px 14px;border:2px solid ${pri}30;border-left:none;vertical-align:top">
+          <div style="font-weight:800;color:${pri};font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Principal's Comment</div>
+          <div style="font-size:11px;color:#222;line-height:1.7">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
         </td>
       </tr>
     </table>
 
-    <table style="font-size:11px;margin-top:4px">
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
-          <strong>Next Term Begins:</strong> ${nextTermDate}
-        </td>
-        <td style="padding:6px 10px;border:1px solid #ccc;background:#f0f4ff">
-          <strong>Closing Date:</strong> ___________________________
-        </td>
-        <td style="padding:6px 10px;border:1px solid #ccc;background:#fff0f0;color:${feeCellColor};font-weight:700">
-          <strong style="color:#333">Fees Balance:</strong> ${feeBalanceStr}
-          ${feeExpected > 0 ? `<div style="font-size:9px;color:#777;font-weight:400">Expected: KES ${feeExpected.toLocaleString()} · Paid: KES ${feePaid.toLocaleString()}</div>` : ''}
-        </td>
-        <td style="padding:6px 10px;border:1px solid #ccc;background:#f0fff4;color:#555;font-size:10px">
-          Printed: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}
-        </td>
-      </tr>
-    </table>
+    <!-- Bottom info + stamp -->
+    <div style="display:flex;gap:0;margin-bottom:0">
+      <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 12px">
+        <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Next Term Begins</div>
+        <div style="font-size:12px;font-weight:700;margin-top:2px">${nextTermDate}</div>
+      </div>
+      <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:8px 12px">
+        <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Fees Balance</div>
+        <div style="font-size:12px;font-weight:900;color:${feeColor};margin-top:2px">${feeStr}</div>
+        ${feeExpected > 0 ? `<div style="font-size:9px;color:#94a3b8">Expected: KES ${feeExpected.toLocaleString()} · Paid: KES ${feePaid.toLocaleString()}</div>` : ''}
+      </div>
+      <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:8px 12px">
+        <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Date Issued</div>
+        <div style="font-size:12px;font-weight:700;margin-top:2px">${new Date().toLocaleDateString('en-KE', {day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:6px 10px;border:1px solid #e2e8f0;border-left:none;background:#f8fafc">
+        ${data.schoolStamp?.enabled !== false ? renderSchoolStamp(data, { size: 72 }) : ''}
+      </div>
+    </div>
 
-    <div class="no-print">
-      <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+    <!-- Grade key -->
+    <div style="margin-top:10px;padding:6px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;font-size:10px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
+      <strong>CBC Grade Key:</strong>
+      <span><span style="color:#10b981;font-weight:700">EE (Exceeds Expectation)</span> = 75–100</span>
+      <span><span style="color:#3b82f6;font-weight:700">ME (Meets Expectation)</span> = 50–74</span>
+      <span><span style="color:#f59e0b;font-weight:700">AE (Approaches Expectation)</span> = 25–49</span>
+      <span><span style="color:#ef4444;font-weight:700">BE (Below Expectation)</span> = 0–24</span>
+    </div>
+
+    <div class="no-print" style="margin-top:16px">
+      <button onclick="window.print()" style="padding:10px 28px;background:${pri};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
         🖨 Print Report Form
       </button>
     </div>
@@ -576,154 +909,229 @@ export function printReportForm(student, exam, data) {
 
 /* ═══════════════════════════════════════════════════════
    BULK: PRINT ALL REPORT FORMS FOR A CLASS
+   Sorted by overall position — position 1 first, last last
 ═══════════════════════════════════════════════════════ */
 export function printAllReportForms(exam, data) {
-  const students = data.students.filter(s => s.class === exam.class);
-  if (students.length === 0) { alert('No students in this class.'); return; }
+  const students = (data.students || []).filter(s => s.class === exam.class);
+  if (!students.length) { alert('No students in this class.'); return; }
 
+  const { primary: pri, accent: acc } = schoolColors(data);
   const { posMap, hasStreams } = computeRankings(exam, data.students, data);
   const stream    = getStreamFromClass(exam.class, data);
   const baseClass = getBaseClass(exam.class, data);
   const nextTermDate = getNextTermDate(exam, data);
 
-  const allPages = students.map(student => {
-    const res  = exam.results[student.name] || {};
+  // Sort students by overall position ascending (1 first)
+  const sorted = [...students].sort((a, b) => {
+    const pa = (posMap[a.name] || {}).overallPos || 9999;
+    const pb = (posMap[b.name] || {}).overallPos || 9999;
+    return pa - pb;
+  });
+
+  // Class averages per subject (stream)
+  const streamStudents = students;
+  const streamResults  = exam.results || {};
+  const allSubsInExam  = [...new Set(
+    Object.values(streamResults).flatMap(r => Object.keys(r))
+  )];
+  const classAvgMap = {};
+  allSubsInExam.forEach(sub => {
+    const scores = streamStudents
+      .map(s => getScore((streamResults[s.name] || {})[sub]))
+      .filter(v => v !== null && v !== undefined);
+    classAvgMap[sub] = scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 10) / 10
+      : null;
+  });
+
+  const allPages = sorted.map(student => {
+    const res  = streamResults[student.name] || {};
     const subs = Object.keys(res);
     if (!subs.length) return '';
 
-    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
-    const grade = getGrade(Math.round(mean));
-    const pos   = posMap[student.name] || {};
+    const total       = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const mean        = subs.length ? +(total / subs.length).toFixed(1) : 0;
+    const grade       = getGrade(Math.round(mean));
+    const totalPoints = subs.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
+    const pos         = posMap[student.name] || {};
 
-    // Fee balance for this student
     const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);
     const feeExpected = getFeeExpected(student, exam.term, exam.year, data);
     const feePaid     = getFeePaid(student.id, exam.term, exam.year, data);
-    const feeBalanceStr = feeExpected > 0
-      ? (feeBalance > 0
-          ? `KES ${feeBalance.toLocaleString()} (Balance)`
-          : feeBalance < 0
-            ? `KES ${Math.abs(feeBalance).toLocaleString()} (Overpaid)`
-            : 'CLEARED ✓')
+    const feeStr      = feeExpected > 0
+      ? (feeBalance > 0 ? `KES ${feeBalance.toLocaleString()} (Balance)` : feeBalance < 0 ? `KES ${Math.abs(feeBalance).toLocaleString()} (Overpaid)` : 'CLEARED ✓')
       : 'N/A';
-    const feeCellColor = feeBalance > 0 ? '#cc0000' : '#10b981';
+    const feeColor = feeBalance > 0 ? acc : '#10b981';
 
-    const rows = subs.map(sub => {
-      const score = getScore(res[sub]);
-      const g     = getGrade(score ?? 0);
-      const subComment = autoSubjectComment(sub, score, g);
-      return `<tr>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-weight:600">${sub}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:900">${score ?? '—'}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:900;color:#cc0000">${g.label}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${g.points}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#444;font-style:italic">${subComment}</td>
+    const scored  = subs.map(k => ({ sub: k, score: getScore(res[k]) ?? 0 })).sort((a, b) => b.score - a.score);
+    const bestSub = scored[0];
+    const weakSub = scored[scored.length - 1];
+
+    const subRows = subs.map((sub, idx) => {
+      const score  = getScore(res[sub]);
+      const g      = getGrade(score ?? 0);
+      const clsAvg = classAvgMap[sub];
+      const vs     = clsAvg !== null ? (score >= clsAvg ? '▲' : '▼') : '';
+      const vsCol  = clsAvg !== null ? (score >= clsAvg ? '#10b981' : '#ef4444') : '#94a3b8';
+      return `<tr style="background:${idx%2===0?'#fff':'#f8fafc'}">
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:600;font-size:11px">${sub}</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:900;font-size:13px">${score ?? '—'}</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center">
+          <span style="background:${gradeColor(g.label)}22;color:${gradeColor(g.label)};padding:2px 8px;border-radius:8px;font-weight:800;font-size:11px">${g.label}</span>
+        </td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:700">${g.points}</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:10px;color:#64748b">${clsAvg !== null ? clsAvg : '—'}</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${vsCol}">${vs}</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0;font-size:10px;color:#555;font-style:italic">${autoSubjectComment(sub, score, g)}</td>
       </tr>`;
     }).join('');
 
     return `
-      <div style="page-break-after:always;max-width:780px;margin:0 auto;padding:16px 0">
+      <div style="page-break-after:always;max-width:780px;margin:0 auto;padding:14px 0">
         ${schoolHeader(data)}
-        <h3 style="color:#003399;text-align:center;text-transform:uppercase;font-size:13px;margin:10px 0">Student Academic Report Form</h3>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px">
-          <tr>
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399;width:140px">Student Name</td>
-            <td style="padding:5px 8px;border:1px solid #ddd;font-weight:900;font-size:13px">${student.name.toUpperCase()}</td>
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399;width:120px">Adm No</td>
-            <td style="padding:5px 8px;border:1px solid #ddd;font-weight:700">${student.admNo}</td>
-          </tr>
-          <tr>
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Class / Stream</td>
-            <td style="padding:5px 8px;border:1px solid #ddd">${baseClass}${stream ? ' ' + stream : ''}</td>
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Exam</td>
-            <td style="padding:5px 8px;border:1px solid #ddd">${exam.name} · ${exam.termLabel || `Term ${exam.term} ${exam.year}`}</td>
-          </tr>
-          <tr>
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Overall Position</td>
-            <td style="padding:5px 8px;border:1px solid #ddd"><strong style="font-size:16px;color:#cc0000">${pos.overallPos || '—'}</strong> / ${pos.overallOf || '—'}</td>
-            ${hasStreams ? `
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Stream Position</td>
-            <td style="padding:5px 8px;border:1px solid #ddd"><strong style="font-size:16px;color:#003399">${pos.streamPos || '—'}</strong> / ${pos.streamOf || '—'}</td>` : `
-            <td style="padding:5px 8px;border:1px solid #ddd;background:#f0f4ff;font-weight:700;color:#003399">Term</td>
-            <td style="padding:5px 8px;border:1px solid #ddd">${exam.termLabel || `Term ${exam.term} of Year ${exam.year}`}</td>`}
-          </tr>
-        </table>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px">
-          <thead><tr style="background:#003399;color:#fff">
-            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Subject</th>
-            <th style="padding:6px 8px;border:1px solid #003399">Score</th>
-            <th style="padding:6px 8px;border:1px solid #003399">Grade</th>
-            <th style="padding:6px 8px;border:1px solid #003399">Points</th>
-            <th style="padding:6px 8px;text-align:left;border:1px solid #003399">Subject Teacher Comment</th>
-          </tr></thead>
-          <tbody>${rows}
-            <tr style="background:#e8eeff;font-weight:900">
-              <td style="padding:6px 8px;border:1px solid #ddd">TOTAL / MEAN</td>
-              <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;font-size:14px">${total}</td>
-              <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#cc0000;font-size:13px">${grade.label}</td>
-              <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${grade.points}</td>
-              <td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#555">Mean Score: ${mean} | CBC Grade: ${grade.label} (${grade.points} pts)</td>
+
+        <!-- Banner -->
+        <div style="background:linear-gradient(135deg,${pri},${pri}cc);color:#fff;border-radius:8px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:10px;opacity:0.8;text-transform:uppercase">Student Academic Report</div>
+            <div style="font-size:17px;font-weight:900;margin:3px 0">${student.name.toUpperCase()}</div>
+            <div style="font-size:11px;opacity:0.85">${baseClass}${stream?' · '+stream:''} &nbsp;·&nbsp; Adm: ${student.admNo} &nbsp;·&nbsp; ${exam.name} · Term ${exam.term} · ${exam.year}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            ${hasStreams ? `<div style="text-align:center">
+              <div style="font-size:8px;opacity:0.8;margin-bottom:3px">STREAM POS</div>
+              <div style="background:#fff;color:${pri};border-radius:50%;width:52px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900">
+                <div style="font-size:18px;line-height:1">${pos.streamPos||'—'}</div>
+                <div style="font-size:8px;color:#64748b">/${pos.streamOf||'—'}</div>
+              </div>
+            </div>` : ''}
+            <div style="text-align:center">
+              <div style="font-size:8px;opacity:0.8;margin-bottom:3px">OVERALL POS</div>
+              <div style="background:${acc};color:#fff;border-radius:50%;width:58px;height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900">
+                <div style="font-size:20px;line-height:1">${pos.overallPos||'—'}</div>
+                <div style="font-size:9px;opacity:0.85">/${pos.overallOf||'—'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Total</div>
+            <div style="font-size:17px;font-weight:900;color:${pri}">${total}</div>
+          </div>
+          <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Mean</div>
+            <div style="font-size:17px;font-weight:900;color:${pri}">${mean}</div>
+          </div>
+          <div style="flex:1;background:${gradeColor(grade.label)}15;border:1px solid ${gradeColor(grade.label)}40;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Grade</div>
+            <div style="font-size:17px;font-weight:900;color:${gradeColor(grade.label)}">${grade.label}</div>
+          </div>
+          <div style="flex:1;background:#f0f4ff;border:1px solid ${pri}30;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Points</div>
+            <div style="font-size:17px;font-weight:900;color:${pri}">${totalPoints}</div>
+          </div>
+          <div style="flex:1;background:#10b98112;border:1px solid #10b98140;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Best</div>
+            <div style="font-size:10px;font-weight:900;color:#10b981;margin-top:2px">${bestSub?.sub||'—'} <span style="font-size:13px">${bestSub?.score??''}</span></div>
+          </div>
+          <div style="flex:1;background:#ef444412;border:1px solid #ef444440;border-radius:5px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Needs Work</div>
+            <div style="font-size:10px;font-weight:900;color:#ef4444;margin-top:2px">${weakSub?.sub||'—'} <span style="font-size:13px">${weakSub?.score??''}</span></div>
+          </div>
+        </div>
+
+        <!-- Subject table -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px">
+          <thead>
+            <tr style="background:${pri};color:#fff">
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:left">Subject</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:center">Score</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:center">Grade</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:center">Pts</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:center">Cls Avg</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:center">vs Cls</th>
+              <th style="padding:6px 8px;border:1px solid ${pri};text-align:left">Remark</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${subRows}
+            <tr style="background:${pri}15;font-weight:900">
+              <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:12px">TOTAL / MEAN</td>
+              <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-size:14px;color:${pri}">${total}</td>
+              <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center">
+                <span style="background:${gradeColor(grade.label)};color:#fff;padding:2px 8px;border-radius:8px;font-weight:800;font-size:12px">${grade.label}</span>
+              </td>
+              <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-size:13px">${totalPoints}</td>
+              <td colspan="3" style="padding:6px 8px;border:1px solid #e2e8f0;font-size:10px;color:#555">
+                Mean: <strong>${mean}</strong> · Grade: <strong>${grade.label}</strong> (${grade.points} pts) · ${subs.length} subjects
+              </td>
             </tr>
           </tbody>
         </table>
-        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px">
+
+        <!-- Comments -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
           <tr>
-            <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <strong style="color:#003399;font-size:11px;text-transform:uppercase">Class Teacher's Comment</strong>
-              <div style="margin:6px 0;font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
+            <td style="width:50%;padding:8px 12px;border:2px solid ${pri}30;vertical-align:top">
+              <div style="font-weight:800;color:${pri};font-size:10px;text-transform:uppercase;margin-bottom:5px">Class Teacher's Comment</div>
+              <div style="font-size:11px;color:#222;line-height:1.6">${autoClassTeacherComment(student.name, mean, grade, pos, subs.length)}</div>
             </td>
-            <td style="padding:8px;border:1px solid #ccc;width:50%;vertical-align:top">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <td style="width:50%;padding:8px 12px;border:2px solid ${pri}30;border-left:none;vertical-align:top">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
                 <div style="flex:1">
-                  <strong style="color:#003399;font-size:11px;text-transform:uppercase">Principal's Comment</strong>
-                  <div style="margin:6px 0;font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
+                  <div style="font-weight:800;color:${pri};font-size:10px;text-transform:uppercase;margin-bottom:5px">Principal's Comment</div>
+                  <div style="font-size:11px;color:#222;line-height:1.6">${autoPrincipalComment(student.name, mean, grade, pos)}</div>
                 </div>
-                ${data.schoolStamp?.enabled !== false ? `<div style="flex-shrink:0">${renderSchoolStamp(data, { size: 64 })}</div>` : ''}
+                <div style="flex-shrink:0">${data.schoolStamp?.enabled!==false?renderSchoolStamp(data,{size:60}):''}</div>
               </div>
             </td>
           </tr>
         </table>
-        <table style="width:100%;border-collapse:collapse;font-size:10px">
-          <tr>
-            <td style="padding:5px 8px;border:1px solid #ccc;background:#f0f4ff"><strong>Next Term Begins:</strong> ${nextTermDate}</td>
-            <td style="padding:5px 8px;border:1px solid #ccc;background:#fff0f0;color:${feeCellColor};font-weight:700"><strong style="color:#333">Fees Balance:</strong> ${feeBalanceStr}${feeExpected > 0 ? ` <span style="font-size:8px;color:#777;font-weight:400">(Exp: KES ${feeExpected.toLocaleString()} · Paid: KES ${feePaid.toLocaleString()})</span>` : ''}</td>
-            <td style="padding:5px 8px;border:1px solid #ccc;font-size:9px;color:#888">Printed: ${new Date().toLocaleDateString('en-KE')}</td>
-          </tr>
-        </table>
+
+        <!-- Footer bar -->
+        <div style="display:flex;gap:0">
+          <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;padding:6px 10px">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Next Term</div>
+            <div style="font-size:11px;font-weight:700;margin-top:1px">${nextTermDate}</div>
+          </div>
+          <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:6px 10px">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Fees Balance</div>
+            <div style="font-size:11px;font-weight:900;color:${feeColor};margin-top:1px">${feeStr}</div>
+          </div>
+          <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:6px 10px">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Issued</div>
+            <div style="font-size:11px;font-weight:700;margin-top:1px">${new Date().toLocaleDateString('en-KE')}</div>
+          </div>
+        </div>
       </div>`;
   }).join('');
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <title>All Report Forms — ${exam.name} — ${exam.class}</title>
+    <title>All Reports — ${exam.class} — ${exam.name}</title>
     <style>
-      * { box-sizing: border-box; }
-      body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
-      @page { size: A4 portrait; margin: 10mm; }
-      @media print { body { padding: 0; } .no-print { display: none !important; } }
-      .no-print { text-align: center; padding: 16px; position: sticky; top: 0; background: #fff; border-bottom: 1px solid #eee; z-index: 10; }
+      ${PRINT_BASE_CSS}
+      body { padding: 0; font-size: 11px; }
+      .no-print { padding: 14px; background: #fff; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 10; }
     </style>
   </head><body>
     <div class="no-print">
-      <button onclick="window.print()" style="padding:10px 28px;background:#003399;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
-        🖨 Print All ${students.length} Report Forms
+      <button onclick="window.print()" style="padding:10px 28px;background:${pri};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print All ${sorted.length} Reports (Sorted by Position)
       </button>
-      <span style="margin-left:16px;font-size:13px;color:#555">${exam.class} · ${exam.name}</span>
+      <span style="margin-left:16px;font-size:12px;color:#64748b">${exam.class} · ${exam.name} · Position 1 first</span>
     </div>
-    ${allPages}
+    <div style="padding:14px">
+      ${allPages}
+    </div>
   </body></html>`);
   w.document.close();
 }
 
-/* ═══════════════════════════════════════════════════════
-   FEE RECEIPT
-═══════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════
-   SUBJECT PERFORMANCE REPORT — Best to Worst Subject
-   Shows class averages per subject, ranked best → last
-═══════════════════════════════════════════════════════ */
 export function printSubjectPerformance(exam, data) {
   if (!exam) return;
 
