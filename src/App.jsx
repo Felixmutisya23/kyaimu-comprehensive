@@ -28,6 +28,7 @@ import {
   loadLicenseFromCloud,
   getSubscription, upsertSubscription,
   supabaseClient,
+  findStudentBySlc,
 } from './supabase';
 
 /*
@@ -631,24 +632,24 @@ export default function App() {
       onStudentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        // First check already-loaded data
-        let student = (data.students || []).find(s =>
-          String(s.slc || '').trim() === slcTrim
-        );
-        // If not found and we have a schoolId, reload from DB
+        let student = (data.students || []).find(s => String(s.slc || '').trim() === slcTrim);
         if (!student) {
           const schoolId = getLocalSchoolId();
           if (schoolId) {
             try {
               const freshData = await loadSchoolData(schoolId);
-              if (freshData) {
-                setDataRaw(freshData);
-                student = (freshData.students || []).find(s =>
-                  String(s.slc || '').trim() === slcTrim
-                );
-              }
+              if (freshData) { setDataRaw(freshData); student = (freshData.students || []).find(s => String(s.slc || '').trim() === slcTrim); }
             } catch(e) { console.error('SLC load error:', e); }
           }
+        }
+        if (!student) {
+          try {
+            const result = await findStudentBySlc(slcTrim);
+            if (result) {
+              const freshData = await loadSchoolData(result.schoolId);
+              if (freshData) { setDataRaw(freshData); setLocalSchoolId(result.schoolId); student = result.student; }
+            }
+          } catch(e) { console.error('SLC cross-school error:', e); }
         }
         if (student) { setStudentUser(student); return true; }
         return false;
@@ -656,24 +657,24 @@ export default function App() {
       onParentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        // First check already-loaded data
-        let student = (data.students || []).find(s =>
-          String(s.slc || '').trim() === slcTrim
-        );
-        // If not found, reload from DB
+        let student = (data.students || []).find(s => String(s.slc || '').trim() === slcTrim);
         if (!student) {
           const schoolId = getLocalSchoolId();
           if (schoolId) {
             try {
               const freshData = await loadSchoolData(schoolId);
-              if (freshData) {
-                setDataRaw(freshData);
-                student = (freshData.students || []).find(s =>
-                  String(s.slc || '').trim() === slcTrim
-                );
-              }
+              if (freshData) { setDataRaw(freshData); student = (freshData.students || []).find(s => String(s.slc || '').trim() === slcTrim); }
             } catch(e) { console.error('SLC parent load error:', e); }
           }
+        }
+        if (!student) {
+          try {
+            const result = await findStudentBySlc(slcTrim);
+            if (result) {
+              const freshData = await loadSchoolData(result.schoolId);
+              if (freshData) { setDataRaw(freshData); setLocalSchoolId(result.schoolId); student = result.student; }
+            }
+          } catch(e) { console.error('SLC parent cross-school error:', e); }
         }
         if (student) {
           setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id });

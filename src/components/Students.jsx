@@ -645,6 +645,53 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           </FormGroup>
         </FormRow>
 
+        {/* Optional Fee Enrollment */}
+        {(() => {
+          const optFees = (data.feeTypes || []).filter(ft => ft.isOptional);
+          if (!optFees.length) return null;
+          const enrolled = (data.studentFeeEnrollments || {})[form.id] || [];
+          return (
+            <div style={{ marginBottom: 14, background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>
+                📋 Optional Fees for this Student
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+                Tick the optional fees that apply to this student (transport, lunch etc.)
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {optFees.map(ft => {
+                  const isEnrolled = enrolled.includes(ft.id);
+                  return (
+                    <label key={ft.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                      background: isEnrolled ? '#4f8ef720' : '#252d42',
+                      border: `1px solid ${isEnrolled ? '#4f8ef7' : '#2a3350'}`,
+                      borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#e2e8f0',
+                    }}>
+                      <input type="checkbox" checked={isEnrolled}
+                        onChange={e => {
+                          setData(d => {
+                            const cur = (d.studentFeeEnrollments || {})[form.id] || [];
+                            const next = e.target.checked
+                              ? [...cur.filter(x => x !== ft.id), ft.id]
+                              : cur.filter(x => x !== ft.id);
+                            return { ...d, studentFeeEnrollments: { ...(d.studentFeeEnrollments || {}), [form.id]: next } };
+                          });
+                        }}
+                        style={{ margin: 0 }}
+                      />
+                      {ft.optionalType === 'transport' ? '🚌' :
+                       ft.optionalType === 'lunch'     ? '🍽' :
+                       ft.optionalType === 'music'     ? '🎵' :
+                       ft.optionalType === 'remedial'  ? '📚' : '⚙'} {ft.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         <Alert type="info"><Icon name="alert" size={13}/> A <strong>Student Login Code (SLC)</strong> will be auto-generated and printed on their report form. Fee details are managed in the Fees module.</Alert>
 
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>

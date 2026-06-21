@@ -73,8 +73,16 @@ export function getExpected(student, feeTypeId, term, year, data) {
   if (!ft) return 0;
   const cat = studentCategory(student);
   if (!feeTypeAppliesTo(ft, cat)) return 0;
-  const applies = ft.appliesToAll || (ft.applicableClasses || []).includes(student.class);
-  if (!applies) return 0;
+
+  // Optional fee — only applies if student is specifically enrolled
+  if (ft.isOptional) {
+    const enrolled = ((data.studentFeeEnrollments || {})[student.id] || []);
+    if (!enrolled.includes(feeTypeId)) return 0;
+  } else {
+    const applies = ft.appliesToAll || (ft.applicableClasses || []).includes(student.class);
+    if (!applies) return 0;
+  }
+
   const sch = findSchedule(student, feeTypeId, term, year, data);
   return sch ? Number(sch.amount) : 0;
 }
@@ -911,6 +919,10 @@ function FeeStructure({ data, setData }) {
   const [typeForm, setTypeForm] = useState({
     name: '', description: '', appliesToAll: true,
     applicableClasses: [], applicableCategories: [],
+    isOptional: false,        // optional = must be assigned per student
+    optionalType: 'transport', // transport | lunch | music | special | other
+    optionalLabel: '',         // custom label when type = 'other'
+    lunchType: 'term',         // term | daily (for lunch fees)
   });
   const [schedForm, setSchedForm] = useState({
     feeTypeId: '', class: 'ALL', category: 'ALL',
@@ -932,7 +944,7 @@ function FeeStructure({ data, setData }) {
     if (!typeForm.name.trim()) return;
     setData(d => ({ ...d, feeTypes: [...(d.feeTypes || []), { id: String(Date.now()), ...typeForm }] }));
     setShowAddType(false);
-    setTypeForm({ name: '', description: '', appliesToAll: true, applicableClasses: [], applicableCategories: [] });
+    setTypeForm({ name: '', description: '', appliesToAll: true, applicableClasses: [], applicableCategories: [], isOptional: false, optionalType: 'transport', optionalLabel: '', lunchType: 'term' });
   }
 
   function addSched() {
@@ -1161,6 +1173,75 @@ function FeeStructure({ data, setData }) {
             </div>
           </FormGroup>
         )}
+
+        {/* Optional / per-student fee */}
+        <FormGroup>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', marginBottom: 8 }}>
+            <input type="checkbox" checked={typeForm.isOptional}
+              onChange={e => setTypeForm({ ...typeForm, isOptional: e.target.checked })} />
+            <span><strong>This is an Optional Fee</strong> — only charged to specific students</span>
+          </label>
+          {typeForm.isOptional && (
+            <div style={{ background: '#1e2435', border: '1px solid #4f8ef760', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                Optional fees are assigned per-student. After creating this fee type, go to each student's profile to enroll them.
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Fee Type:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {[
+                  { val: 'transport', label: '🚌 Transport', desc: 'School bus/van pickup' },
+                  { val: 'lunch',     label: '🍽 Lunch',     desc: 'School lunch/meals' },
+                  { val: 'music',     label: '🎵 Music',     desc: 'Music lessons/instruments' },
+                  { val: 'remedial',  label: '📚 Remedial',  desc: 'Extra tuition/coaching' },
+                  { val: 'uniform',   label: '👕 Uniform',   desc: 'Uniform supply' },
+                  { val: 'insurance', label: '🛡 Insurance',  desc: 'Student insurance' },
+                  { val: 'other',     label: '⚙ Other',      desc: 'Custom optional fee' },
+                ].map(opt => (
+                  <div key={opt.val} onClick={() => setTypeForm({ ...typeForm, optionalType: opt.val })}
+                    title={opt.desc}
+                    style={{
+                      padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                      background: typeForm.optionalType === opt.val ? '#4f8ef7' : '#252d42',
+                      color:      typeForm.optionalType === opt.val ? '#fff'    : '#94a3b8',
+                      border: `1px solid ${typeForm.optionalType === opt.val ? '#4f8ef7' : '#2a3350'}`,
+                    }}>
+                    {opt.label}
+                  </div>
+                ))}
+              </div>
+              {typeForm.optionalType === 'transport' && (
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  💡 You can set different amounts per route/zone in the Fee Schedule after creating this fee type.
+                </div>
+              )}
+              {typeForm.optionalType === 'lunch' && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>Lunch charged:</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { val: 'term',  label: 'Per term (fixed amount)' },
+                      { val: 'daily', label: 'Per day (tracked daily)' },
+                    ].map(opt => (
+                      <label key={opt.val} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                        <input type="radio" value={opt.val}
+                          checked={typeForm.lunchType === opt.val}
+                          onChange={() => setTypeForm({ ...typeForm, lunchType: opt.val })} />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {typeForm.optionalType === 'other' && (
+                <FormGroup label="Custom Label">
+                  <input value={typeForm.optionalLabel}
+                    onChange={e => setTypeForm({ ...typeForm, optionalLabel: e.target.value })}
+                    placeholder="e.g. Swimming Pool, After-School Care, Special Diet..." />
+                </FormGroup>
+              )}
+            </div>
+          )}
+        </FormGroup>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowAddType(false)}>Cancel</Btn>

@@ -31,14 +31,29 @@ function getFeeBalance(student, term, year, data) {
 }
 
 function getNextTermDate(exam, data) {
-  const terms = data.terms || [];
+  const terms    = data.terms || [];
   const nextTerm = exam.term < 3 ? exam.term + 1 : 1;
   const nextYear = exam.term < 3 ? exam.year : (Number(exam.year) || 0) + 1;
-  const found = terms.find(t => Number(t.term) === nextTerm && Number(t.year) === nextYear);
+  const found    = terms.find(t => Number(t.term) === nextTerm && Number(t.year) === nextYear);
+
+  // Use explicitly set nextTermOpeningDate if available (set in Term Calendar)
+  if (found && found.nextTermOpeningDate) {
+    return new Date(found.nextTermOpeningDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  // Fall back to the term's startDate
   if (found && found.startDate) {
     return new Date(found.startDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
   }
   return '___________________________';
+}
+
+function getMidtermReportingDate(exam, data) {
+  const terms = data.terms || [];
+  const found = terms.find(t => Number(t.term) === Number(exam.term) && Number(t.year) === Number(exam.year));
+  if (found && found.midtermReportingDate) {
+    return new Date(found.midtermReportingDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  return null;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1094,9 +1109,14 @@ export function printAllReportForms(exam, data) {
         <!-- Footer bar -->
         <div style="display:flex;gap:0">
           <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;padding:6px 10px">
-            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Next Term</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Next Term Opens</div>
             <div style="font-size:11px;font-weight:700;margin-top:1px">${nextTermDate}</div>
           </div>
+          ${getMidtermReportingDate(exam, data) ? `
+          <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:6px 10px">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Midterm Reporting</div>
+            <div style="font-size:11px;font-weight:700;margin-top:1px">${getMidtermReportingDate(exam, data)}</div>
+          </div>` : ''}
           <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:none;padding:6px 10px">
             <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">Fees Balance</div>
             <div style="font-size:11px;font-weight:900;color:${feeColor};margin-top:1px">${feeStr}</div>

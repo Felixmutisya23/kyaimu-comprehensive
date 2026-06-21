@@ -110,16 +110,20 @@ export function getCurriculumLevel(className) {
 }
 
 export function getSubjectsForClass(className, data) {
-  const custom = (data.subjectsByClass || {})[className];
-  if (custom && custom.length > 0) return custom;
   const level = getCurriculumLevel(className);
-  if (level) {
-    const coreSubs = (data.subjectOverridesByLevel || {})[level.key] || level.subjects;
-    const extras   = (data.extraSubjectsByLevel    || {})[level.key] || [];
-    return [...coreSubs, ...extras];
+  const coreSubs = level
+    ? [...((data.subjectOverridesByLevel || {})[level.key] || level.subjects),
+       ...((data.extraSubjectsByLevel    || {})[level.key] || [])]
+    : (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || '')).filter(Boolean);
+
+  // If there's a custom per-class list (set via Setup Subjects), merge it
+  // with the level subjects so nothing from Settings is ever hidden.
+  const custom = (data.subjectsByClass || {})[className];
+  if (custom && custom.length > 0) {
+    // Union: level subjects first (canonical order), then any extras from custom
+    return [...new Set([...coreSubs, ...custom])];
   }
-  const schoolSubs = (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || ''));
-  return schoolSubs.filter(Boolean);
+  return coreSubs;
 }
 
 /**

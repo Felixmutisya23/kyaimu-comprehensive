@@ -15,6 +15,8 @@ const BLANK_TERM = (year, term) => ({
   term: Number(term),
   startDate: '',
   endDate: '',
+  midtermReportingDate: '', // date students report back after midterm break
+  nextTermOpeningDate:  '', // date next term opens (shown on report forms)
   name: `Term ${term} ${year}`,
   opened: false,
   closed: false,
@@ -80,14 +82,26 @@ export default function TermManagement({ data, setData }) {
 
   function startEdit(term) {
     setEditing(term);
-    setForm({ name: term.name, startDate: term.startDate, endDate: term.endDate });
+    setForm({
+      name:                 term.name,
+      startDate:            term.startDate            || '',
+      endDate:              term.endDate              || '',
+      midtermReportingDate: term.midtermReportingDate || '',
+      nextTermOpeningDate:  term.nextTermOpeningDate  || '',
+    });
   }
 
   function save() {
     setData(d => {
       const existing = d.terms || [];
       const without  = existing.filter(t => t.id !== editing.id);
-      const updated  = { ...editing, ...form, startDate: form.startDate, endDate: form.endDate };
+      const updated  = {
+        ...editing, ...form,
+        startDate:            form.startDate,
+        endDate:              form.endDate,
+        midtermReportingDate: form.midtermReportingDate || '',
+        nextTermOpeningDate:  form.nextTermOpeningDate  || '',
+      };
       return { ...d, terms: [...without, updated] };
     });
     setEditing(null);
@@ -211,6 +225,16 @@ export default function TermManagement({ data, setData }) {
               </FormGroup>
               <FormGroup label="End Date">
                 <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+              </FormGroup>
+            </FormRow>
+            <FormRow>
+              <FormGroup label="Midterm — Reporting Date" hint="Date students report back after midterm break">
+                <input type="date" value={form.midtermReportingDate} onChange={e => setForm({ ...form, midtermReportingDate: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+              </FormGroup>
+              <FormGroup label="Next Term Opening Date" hint="Printed on end-of-term report forms">
+                <input type="date" value={form.nextTermOpeningDate} onChange={e => setForm({ ...form, nextTermOpeningDate: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </FormRow>

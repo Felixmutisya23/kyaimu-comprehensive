@@ -95,10 +95,11 @@ function schoolRowToData(row, related = {}) {
     currentYear:       row.current_year,
     licenseData:       row.license_data       || {},
     gradesConfig:      row.grades_config      || INITIAL_DATA.gradesConfig,
-    subjectsByClass:         row.subjects_by_class          || {},
+    subjectsByClass:   row.subjects_by_class   || {}, // FIX: was never loaded
     subjectOverridesByLevel: row.subject_overrides_by_level || {},
     extraSubjectsByLevel:    row.extra_subjects_by_level    || {},
     subjectExamGroups:       row.subject_exam_groups        || {},
+    studentFeeEnrollments:   row.student_fee_enrollments    || {},
     schoolStamp:             row.school_stamp               || INITIAL_DATA.schoolStamp,
     timetableRules:          row.timetable_rules             || [],
     // Public page fields
@@ -138,6 +139,46 @@ function schoolRowToData(row, related = {}) {
     inventory:         related.inventory      || [],
     editRequests:      related.editRequests   || [],
   };
+}
+
+/**
+ * findStudentBySlc
+ * ────────────────
+ * Searches ALL schools for a student whose SLC matches.
+ * SLC is stored in the `extra` JSON blob on each student row.
+ * We query all students with matching slc from the extra field.
+ * Returns { schoolId, student } or null.
+ */
+export async function findStudentBySlc(slcCode) {
+  if (!slcCode) return null;
+  const slc = String(slcCode).trim();
+  try {
+    // Query students table — extra->>'slc' matches the code
+    const { data: rows, error } = await getSupabase()
+      .from('students')
+      .select('school_id, local_id, name, adm_no, class, gender, dob, parent_name, parent_phone, parent_email, status, extra')
+      .eq('extra->>slc', slc)
+      .limit(1);
+    if (error || !rows || rows.length === 0) return null;
+    const row = rows[0];
+    const student = {
+      id:          row.local_id,
+      name:        row.name,
+      admNo:       row.adm_no,
+      class:       row.class,
+      gender:      row.gender,
+      dob:         row.dob,
+      parentName:  row.parent_name,
+      parentPhone: row.parent_phone,
+      parentEmail: row.parent_email,
+      status:      row.status,
+      ...(row.extra || {}),
+    };
+    return { schoolId: row.school_id, student };
+  } catch (e) {
+    console.error('[EduManage] findStudentBySlc error:', e);
+    return null;
+  }
 }
 
 // ── Load full school data ────────────────────────────────────────
@@ -371,13 +412,14 @@ export async function saveSchoolData(data) {
   schoolPayload.departments     = data.departments     ?? [];
   schoolPayload.bells           = (data.bells && data.bells.length > 0) ? data.bells : INITIAL_DATA.bells;
   schoolPayload.parents         = data.parents         ?? [];   // FIX: was never saved
-  schoolPayload.promotion_history = data.promotionHistory ?? []; // FIX: was never saved
+  schoolPayload.promotion_history = data.promotionHistory ?? [];
   if (data.timetable && Object.keys(data.timetable||{}).length > 0) schoolPayload.timetable = data.timetable;
   if (data.gradesConfig) schoolPayload.grades_config = data.gradesConfig;
   schoolPayload.subjects_by_class          = data.subjectsByClass          || {};
   schoolPayload.subject_overrides_by_level = data.subjectOverridesByLevel ?? {};
   schoolPayload.extra_subjects_by_level    = data.extraSubjectsByLevel    ?? {};
   schoolPayload.subject_exam_groups        = data.subjectExamGroups       ?? {};
+  schoolPayload.student_fee_enrollments    = data.studentFeeEnrollments   ?? {};
   schoolPayload.school_stamp               = data.schoolStamp            ?? {};
   schoolPayload.timetable_rules            = data.timetableRules           ?? [];
   // Public page fields
@@ -502,7 +544,7 @@ async function syncStudents(schoolId, students, studentsLoaded) {
     ['id','name','admNo','class','gender','dob','parentName','parentPhone','parentEmail','status','_uuid'].forEach(k => delete extra[k]);
     return {
       school_id:    schoolId,
-      local_id:     s.id || generateId(), // FIX: guarantee non-null
+      local_id:     s.id || generateId(),
       name:         s.name,
       adm_no:       s.admNo || '',
       class:        s.class || '',
@@ -512,7 +554,7 @@ async function syncStudents(schoolId, students, studentsLoaded) {
       parent_phone: s.parentPhone || '',
       parent_email: s.parentEmail || '',
       status:       s.status || 'active',
-      extra,
+      extra:        { ...extra, slc: s.slc || '' }, // ensure SLC is always in extra for querying
     };
   });
   const { error: upsertErr } = await getSupabase().from('students').upsert(rows, { onConflict: 'school_id,local_id' });
