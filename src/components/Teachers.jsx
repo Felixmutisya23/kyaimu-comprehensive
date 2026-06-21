@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Avatar, Alert, Icon } from './UI';
 import * as XLSX from 'xlsx';
 import { getAllClasses, getSubjectsForClass, CURRICULUM_LEVELS } from '../data/initialData';
-import { printStaffIntakeForm } from '../utils/print';
+import { printStaffIntakeForm, printTeacherLoginSheet } from '../utils/print';
 import { PendingTeacherApprovals, InviteLinkGenerator } from './TeacherRegistration';
 
 const STAFF_TYPES = [
@@ -15,11 +15,10 @@ const DEPT_ICONS = {
   Library: '📖', Finance: '💰', Counselling: '🧡', Security: '🔒',
 };
 
-/* Get all subjects relevant to a set of classes, plus standard non-academic roles */
+/* Get all subjects relevant to a set of classes — Settings only, no hardcoded extras */
 function getSubjectsForClasses(classes, data) {
   const set = new Set();
   classes.forEach(cls => getSubjectsForClass(cls, data).forEach(s => set.add(s)));
-  ['Administration', 'Guidance & Counselling', 'Sports', 'Library'].forEach(s => set.add(s));
   return [...set].sort();
 }
 
@@ -337,16 +336,30 @@ export default function Teachers({ data, setData }) {
     );
   }
 
-  /* ── Subject rows UI (shared by add & edit) ──────── */
   function SubjectRows() {
     const levelGroups = Object.entries(CURRICULUM_LEVELS).map(([key, level]) => ({
       key, label: level.label,
       classes: allClasses.filter(c => {
         const name = c.toLowerCase();
-        // Match by startsWith against all alias names in the level
         return level.classes.some(lc => name.startsWith(lc.toLowerCase()));
       }),
+      isLowerPrimary: key === 'LOWER_PRIMARY',
     })).filter(g => g.classes.length > 0);
+
+    // "Assign All Subjects" for a Lower Primary class — one click assigns
+    // every subject in that class to the teacher across all subject rows
+    function assignAllSubjectsForClass(cls) {
+      const allSubs = getSubjectsForClass(cls, data);
+      if (!allSubs.length) return;
+      setSubjectRows(rows => {
+        // Remove any existing rows for this class first to avoid duplicates
+        const cleaned = rows.filter(r => !r.classes.includes(cls) || r.classes.length > 1);
+        // Add one row per subject for this class
+        const newRows = allSubs.map(sub => ({ subject: sub, classes: [cls] }));
+        // Keep rows for other classes + add all subjects for this class
+        return [...cleaned.filter(r => !r.classes.includes(cls)), ...newRows];
+      });
+    }
 
     return (
       <>
@@ -354,6 +367,27 @@ export default function Teachers({ data, setData }) {
           Add each subject this teacher teaches and select the classes.
           <span style={{ color: '#64748b', fontSize: 11 }}> Subject list filters to match selected classes.</span>
         </div>
+
+        {/* Lower Primary quick-assign panel */}
+        {levelGroups.filter(g => g.isLowerPrimary).map(group => (
+          <div key={group.key} style={{ background: '#10b98112', border: '1px solid #10b98140', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>
+              ⚡ Lower Primary — Quick Assign All Subjects
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+              For Grade 1, 2 or 3 teachers who teach ALL subjects in their class — click one button:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {group.classes.map(cls => (
+                <Btn key={cls} size="sm" variant="ghost"
+                  style={{ borderColor: '#10b981', color: '#10b981' }}
+                  onClick={() => assignAllSubjectsForClass(cls)}>
+                  ✓ Assign All Subjects → {cls}
+                </Btn>
+              ))}
+            </div>
+          </div>
+        ))}
 
         {subjectRows.map((row, i) => {
           const availSubs = row.classes.length > 0
@@ -443,6 +477,9 @@ export default function Teachers({ data, setData }) {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <Btn variant="ghost" onClick={() => printStaffIntakeForm(data)}>
             <Icon name="print" size={14} /> Staff Form
+          </Btn>
+          <Btn variant="ghost" onClick={() => printTeacherLoginSheet(data)}>
+            📧 Print Login Emails
           </Btn>
           <Btn variant="ghost" onClick={() => { setShowStaffUpload(true); setStaffUploadRows([]); setStaffUploadErrors([]); setStaffUploadDone(false); setStaffUploadSummary(null); }}>
             <Icon name="upload" size={14} /> Bulk Upload

@@ -1583,6 +1583,99 @@ export function printStudentIntakeForm(data, options = {}) {
 
 /* ═══════════════════════════════════════════════════════
    STAFF INTAKE / REGISTRATION FORM
+/* ═══════════════════════════════════════════════════════
+   TEACHER LOGIN EMAIL SHEET
+   Prints a clean list of all teacher login credentials.
+   Principal sticks this in the staffroom so teachers
+   know their login email and can access the portal.
+   Sorted alphabetically by name.
+═══════════════════════════════════════════════════════ */
+export function printTeacherLoginSheet(data) {
+  const teachers = (data.teachers || [])
+    .filter(t => t.staffType === 'teaching' || !t.staffType)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (!teachers.length) { alert('No teaching staff found.'); return; }
+
+  const { primary: pri, accent: acc } = schoolColors(data);
+  const hdr = schoolHeader(data);
+
+  const rows = teachers.map((t, i) => {
+    const subjects = (t.subjects || []).map(s => s.subject).join(', ') || '—';
+    const classOf  = t.classTeacherOf ? `Class Teacher: ${t.classTeacherOf}` : '';
+    return `
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#f8fafc'}">
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${pri}">${i + 1}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-weight:700;font-size:13px">${t.name}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:12px;color:#1d4ed8;font-weight:600">${t.email || '—'}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;font-family:monospace">${t.staffId || '—'}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#555">${subjects}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#10b981;font-weight:600">${classOf}</td>
+      </tr>`;
+  }).join('');
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Teacher Login Sheet — ${data.schoolName}</title>
+    <style>
+      ${PRINT_BASE_CSS}
+      body { padding: 20px; max-width: 900px; margin: 0 auto; font-size: 12px; }
+    </style>
+  </head><body>
+    ${hdr}
+
+    <!-- Header banner -->
+    <div style="background:${pri};color:#fff;border-radius:8px;padding:12px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:16px;font-weight:900">📧 Teacher Login Credentials</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:3px">
+          Confidential — For Staffroom Notice Board Only · ${teachers.length} Teaching Staff
+        </div>
+      </div>
+      <div style="text-align:right;font-size:11px;opacity:0.85">
+        Printed: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}
+      </div>
+    </div>
+
+    <!-- Instructions box -->
+    <div style="background:#fffbe6;border:1px solid #f59e0b50;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#92400e">
+      <strong>Instructions for teachers:</strong> Use your email address to log in at the school portal.
+      Your default password is your Staff ID. Please change your password after first login.
+      Contact the principal if you cannot access your account.
+    </div>
+
+    <!-- Login table -->
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:${pri};color:#fff">
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:center;width:40px">#</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Name</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Login Email</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Staff ID / Default Password</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Subjects</th>
+          <th style="padding:8px 10px;border:1px solid ${pri};text-align:left">Role</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <!-- Footer -->
+    <div style="margin-top:16px;padding-top:10px;border-top:2px solid ${pri};display:flex;justify-content:space-between;font-size:10px;color:#94a3b8">
+      <span>⚠ This document contains login credentials. Keep confidential.</span>
+      <span>${data.schoolName} · EduManage Pro</span>
+    </div>
+
+    <div class="no-print" style="margin-top:16px;text-align:center">
+      <button onclick="window.print()" style="padding:10px 28px;background:${pri};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+        🖨 Print Login Sheet
+      </button>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
+
+   /* ═══════════════════════════════════════════════════════
    Admin prints this for new staff to fill in,
    then enters their details into the system.
 ═══════════════════════════════════════════════════════ */

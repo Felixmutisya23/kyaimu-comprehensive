@@ -212,11 +212,15 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   function setLic(val) {
     setLicRaw(val);
     saveLicense(val, schoolId); // school-specific key
-    // Push into Supabase by updating data.licenseData
+    // Push into Supabase — read current token from d (not stale closure)
     if (setData) {
       setData(d => ({
         ...d,
-        licenseData: { ...((d.licenseData) || {}), lic: val, token: tokenState },
+        licenseData: {
+          ...((d.licenseData) || {}),
+          lic:   val,
+          token: (d.licenseData || {}).token ?? tokenState,
+        },
       }));
     }
   }
@@ -225,10 +229,15 @@ export function useLicense(data, refreshKey = 0, setData = null) {
   function setToken(state) {
     setTok(state);
     saveTokenState(state, schoolId); // school-specific key
+    // Push into Supabase — read current lic from d (not stale closure)
     if (setData) {
       setData(d => ({
         ...d,
-        licenseData: { ...((d.licenseData) || {}), token: state, lic: lic },
+        licenseData: {
+          ...((d.licenseData) || {}),
+          token: state,
+          lic:   (d.licenseData || {}).lic ?? lic,
+        },
       }));
     }
   }
