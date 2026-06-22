@@ -110,20 +110,22 @@ export function getCurriculumLevel(className) {
 }
 
 export function getSubjectsForClass(className, data) {
-  const level = getCurriculumLevel(className);
-  const coreSubs = level
-    ? [...((data.subjectOverridesByLevel || {})[level.key] || level.subjects),
-       ...((data.extraSubjectsByLevel    || {})[level.key] || [])]
-    : (data.subjects || []).map(s => typeof s === 'string' ? s : (s.name || s.code || '')).filter(Boolean);
-
-  // If there's a custom per-class list (set via Setup Subjects), merge it
-  // with the level subjects so nothing from Settings is ever hidden.
+  // Custom per-class list set via Setup Subjects in Exams.
+  // When it exists, use it exclusively — it IS the exam subject list.
+  // Settings subjects are only used when no custom list has been set.
   const custom = (data.subjectsByClass || {})[className];
-  if (custom && custom.length > 0) {
-    // Union: level subjects first (canonical order), then any extras from custom
-    return [...new Set([...coreSubs, ...custom])];
+  if (custom && custom.length > 0) return custom;
+
+  // No custom list — fall back to Settings (level defaults)
+  const level = getCurriculumLevel(className);
+  if (level) {
+    const coreSubs = (data.subjectOverridesByLevel || {})[level.key] || level.subjects;
+    const extras   = (data.extraSubjectsByLevel    || {})[level.key] || [];
+    return [...coreSubs, ...extras];
   }
-  return coreSubs;
+  return (data.subjects || [])
+    .map(s => typeof s === 'string' ? s : (s.name || s.code || ''))
+    .filter(Boolean);
 }
 
 /**

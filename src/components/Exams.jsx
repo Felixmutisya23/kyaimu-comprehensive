@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, getCurriculumLevel } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, computeRankings, printSubjectPerformance } from '../utils/print';
 
 export default function Exams({ data, setData, user }) {
@@ -697,25 +697,12 @@ export default function Exams({ data, setData, user }) {
               .map(r => ({ from: r.original, to: r.current.trim() }));
 
             setData(d => {
-              // Merge finalSubs with the level's default subjects so we never
-              // lose subjects that exist in Settings but weren't in this exam.
-              // The level subjects are the source of truth — exam setup only
-              // ADDS or RENAMES, never silently removes level subjects.
-              const levelSubs = (() => {
-                const lvl = getCurriculumLevel(selClass);
-                if (!lvl) return d.subjects || [];
-                const core   = (d.subjectOverridesByLevel || {})[lvl.key] || lvl.subjects || [];
-                const extras = (d.extraSubjectsByLevel    || {})[lvl.key] || [];
-                return [...core, ...extras];
-              })();
-
-              // Union: keep all level subjects + any new ones from exam setup
-              const merged = [...new Set([...levelSubs, ...finalSubs])];
-
-              let next = { ...d, subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: merged } };
-
+              // Save EXACTLY what the principal selected — no merging with Settings
+              let next = {
+                ...d,
+                subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: finalSubs },
+              };
               if (renames.length > 0) {
-                // Migrate every exam for this class: move scores from old key to new key
                 next = {
                   ...next,
                   exams: (d.exams || []).map(ex => {
