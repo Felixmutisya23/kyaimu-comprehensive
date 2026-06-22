@@ -850,7 +850,7 @@ export default function App() {
 
   function renderPage() {
     if (!nav.find(n => n.id == page)) return <Dashboard data={data} setData={setData} user={user} />;
-    const props = { data, setData, user, isUnlocked: license.isUnlocked };
+    const props = { data, setData, user, isUnlocked: license.isUnlocked, flushSave: flushPendingSave };
     switch (page) {
       case 'dashboard':     return <Dashboard     {...props} />;
       case 'notifications': return <Notifications {...props} />;

@@ -36,7 +36,8 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
       (s.admNo || '').toLowerCase().includes(search.toLowerCase()) ||
       (s.slc   || '').includes(search)
     );
-    return students;
+    // Always sort alphabetically by name
+    return [...students].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
   const [show, setShow]               = useState(false);
@@ -494,6 +495,27 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               <Icon name="print" size={14} /> Intake Form
             </Btn>
           )}
+          {isPrincipal && (
+            <Btn variant="ghost" onClick={() => {
+              const missing = (data.students || []).filter(s => !s.slc);
+              if (!missing.length) { alert('All students already have login codes.'); return; }
+              setData(d => {
+                const existing = new Set(d.students.map(s => s.slc).filter(Boolean));
+                const students = d.students.map(s => {
+                  if (s.slc) return s;
+                  let code;
+                  do { code = `${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`; }
+                  while (existing.has(code));
+                  existing.add(code);
+                  return { ...s, slc: code };
+                });
+                return { ...d, students };
+              });
+              alert(`Generated login codes for ${missing.length} student${missing.length > 1 ? 's' : ''}.`);
+            }} style={{ borderColor: '#f59e0b', color: '#f59e0b' }}>
+              🔑 Fix Missing Codes ({(data.students || []).filter(s => !s.slc).length})
+            </Btn>
+          )}
           {(isPrincipal || isClassTeacher) && (
             <Btn variant="ghost" onClick={() => {
               const cls = filterClass || myClass || '';
@@ -546,28 +568,45 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                 const pd  = getPaid(s.id, curT, curY, data);
                 const pct = exp > 0 ? Math.round(pd / exp * 100) : 0;
                 return (
-                  <tr key={s.id}>
+                  <tr key={s.id} style={{ borderBottom: '1px solid #1e2435' }}>
                     <td style={TS.td}>
-                      {s.admNo ? <Tag color="blue">{s.admNo}</Tag> : <span style={{color:'#64748b',fontSize:11}}>—</span>}
+                      {s.admNo
+                        ? <span style={{ background: '#1d4ed820', color: '#60a5fa', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>{s.admNo}</span>
+                        : <span style={{ color: '#64748b', fontSize: 11 }}>—</span>}
                     </td>
-                    <td style={{...TS.td,fontWeight:500}}>{s.name}</td>
-                    <td style={TS.td}>{s.class}</td>
+                    <td style={{ ...TS.td, fontWeight: 700, fontSize: 13, color: '#f1f5f9', letterSpacing: 0.3 }}>
+                      {(s.name || '').toUpperCase()}
+                    </td>
+                    <td style={{ ...TS.td, fontSize: 12 }}>
+                      <span style={{ background: '#7c3aed20', color: '#a78bfa', padding: '2px 8px', borderRadius: 6, fontWeight: 600, fontSize: 11 }}>
+                        {s.class || '—'}
+                      </span>
+                    </td>
                     <td style={TS.td}>
-                      <span style={{fontFamily:'monospace',fontSize:12,color:'#10b981',fontWeight:600}}>{s.slc||'—'}</span>
+                      {s.slc
+                        ? <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#10b981', fontWeight: 700, background: '#10b98115', padding: '2px 8px', borderRadius: 6 }}>{s.slc}</span>
+                        : <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600, background: '#f59e0b15', padding: '2px 8px', borderRadius: 6 }}>⚠ No Code</span>}
                     </td>
-                    {(user.canSeeFees||isPrincipal)&&(
+                    {(user.canSeeFees || isPrincipal) && (
                       <td style={TS.td}>
-                        {exp>0
-                          ?<div style={{display:'flex',alignItems:'center',gap:8}}><ProgressBar pct={pct}/><span style={{fontSize:11,color:'#64748b'}}>{pct}%</span></div>
-                          :<span style={{fontSize:11,color:'#64748b'}}>Not set</span>}
+                        {exp > 0
+                          ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <ProgressBar pct={pct} />
+                              <span style={{ fontSize: 11, color: pct >= 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444', fontWeight: 700 }}>{pct}%</span>
+                            </div>
+                          : <span style={{ fontSize: 11, color: '#64748b' }}>Not set</span>}
                       </td>
                     )}
-                    <td style={TS.td}>{s.cases?.length>0?<Tag color="red">{s.cases.length}</Tag>:<Tag color="green">Clear</Tag>}</td>
                     <td style={TS.td}>
-                      <div style={{display:'flex',gap:6}}>
-                        <Btn size="sm" variant="ghost" onClick={()=>setViewStudent(s)}><Icon name="eye" size={13}/></Btn>
-                        {(isPrincipal||isClassTeacher)&&<Btn size="sm" variant="ghost" onClick={()=>openEdit(s)}><Icon name="edit" size={13}/></Btn>}
-                        {isPrincipal&&<Btn size="sm" variant="danger" onClick={()=>deleteStudent(s.id)}><Icon name="trash" size={13}/></Btn>}
+                      {s.cases?.length > 0
+                        ? <span style={{ background: '#ef444420', color: '#ef4444', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{s.cases.length} Case{s.cases.length > 1 ? 's' : ''}</span>
+                        : <span style={{ background: '#10b98115', color: '#10b981', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>Clear</span>}
+                    </td>
+                    <td style={TS.td}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <Btn size="sm" variant="ghost" onClick={() => setViewStudent(s)}><Icon name="eye" size={13} /></Btn>
+                        {(isPrincipal || isClassTeacher) && <Btn size="sm" variant="ghost" onClick={() => openEdit(s)}><Icon name="edit" size={13} /></Btn>}
+                        {isPrincipal && <Btn size="sm" variant="danger" onClick={() => deleteStudent(s.id)}><Icon name="trash" size={13} /></Btn>}
                       </div>
                     </td>
                   </tr>
@@ -644,53 +683,6 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             <input value={form.joined} onChange={e=>setForm({...form,joined:e.target.value})} />
           </FormGroup>
         </FormRow>
-
-        {/* Optional Fee Enrollment */}
-        {(() => {
-          const optFees = (data.feeTypes || []).filter(ft => ft.isOptional);
-          if (!optFees.length) return null;
-          const enrolled = (data.studentFeeEnrollments || {})[form.id] || [];
-          return (
-            <div style={{ marginBottom: 14, background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>
-                📋 Optional Fees for this Student
-              </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
-                Tick the optional fees that apply to this student (transport, lunch etc.)
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {optFees.map(ft => {
-                  const isEnrolled = enrolled.includes(ft.id);
-                  return (
-                    <label key={ft.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                      background: isEnrolled ? '#4f8ef720' : '#252d42',
-                      border: `1px solid ${isEnrolled ? '#4f8ef7' : '#2a3350'}`,
-                      borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#e2e8f0',
-                    }}>
-                      <input type="checkbox" checked={isEnrolled}
-                        onChange={e => {
-                          setData(d => {
-                            const cur = (d.studentFeeEnrollments || {})[form.id] || [];
-                            const next = e.target.checked
-                              ? [...cur.filter(x => x !== ft.id), ft.id]
-                              : cur.filter(x => x !== ft.id);
-                            return { ...d, studentFeeEnrollments: { ...(d.studentFeeEnrollments || {}), [form.id]: next } };
-                          });
-                        }}
-                        style={{ margin: 0 }}
-                      />
-                      {ft.optionalType === 'transport' ? '🚌' :
-                       ft.optionalType === 'lunch'     ? '🍽' :
-                       ft.optionalType === 'music'     ? '🎵' :
-                       ft.optionalType === 'remedial'  ? '📚' : '⚙'} {ft.name}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
 
         <Alert type="info"><Icon name="alert" size={13}/> A <strong>Student Login Code (SLC)</strong> will be auto-generated and printed on their report form. Fee details are managed in the Fees module.</Alert>
 

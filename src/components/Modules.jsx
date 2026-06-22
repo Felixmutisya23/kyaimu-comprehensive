@@ -3,6 +3,7 @@ import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, Progres
 import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug, getExamColumnsForClass } from '../data/initialData';
 import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
 import { printFeeReceipt, renderSchoolStamp } from '../utils/print';
+import ClassRepairTool from './ClassRepairTool';
 
 /* ══════════════════════════════════════════════════════
    KITCHEN
@@ -809,272 +810,6 @@ function FeeStructure({ data, setData }) {
 /* ══════════════════════════════════════════════════════
    SETTINGS
 ══════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════
-   EXAM SUBJECT GROUPS CARD
-   Lets the principal define how teaching subjects are
-   combined into exam columns (e.g. Kiswahili Language +
-   Insha → "Kiswahili" on the report).
-   Lower Primary is excluded — one teacher, simple columns.
-══════════════════════════════════════════════════════ */
-function ExamSubjectGroupsCard({ data, setData }) {
-  const [openLevel, setOpenLevel] = useState(null);
-  const [editGroup, setEditGroup] = useState(null); // { levelKey, group } | null
-  const [form, setForm]           = useState({ name: '', components: [], method: 'SUM' });
-
-  const levels = Object.entries(CURRICULUM_LEVELS).filter(([key]) => key !== 'LOWER_PRIMARY');
-  const groups = data.subjectExamGroups || {};
-
-  function saveGroup(levelKey) {
-    if (!form.name.trim() || form.components.length === 0) return;
-    setData(d => {
-      const existing = (d.subjectExamGroups || {})[levelKey] || [];
-      let updated;
-      if (editGroup && editGroup.group) {
-        // editing existing
-        updated = existing.map(g => g.id === editGroup.group.id
-          ? { ...g, name: form.name.trim(), components: form.components, method: form.method }
-          : g);
-      } else {
-        // new group
-        updated = [...existing, { id: Date.now().toString(), name: form.name.trim(), components: form.components, method: form.method }];
-      }
-      return { ...d, subjectExamGroups: { ...(d.subjectExamGroups || {}), [levelKey]: updated } };
-    });
-    setEditGroup(null);
-    setForm({ name: '', components: [], method: 'SUM' });
-  }
-
-  function removeGroup(levelKey, groupId) {
-    setData(d => ({
-      ...d,
-      subjectExamGroups: {
-        ...(d.subjectExamGroups || {}),
-        [levelKey]: ((d.subjectExamGroups || {})[levelKey] || []).filter(g => g.id !== groupId),
-      },
-    }));
-  }
-
-  function openEdit(levelKey, group) {
-    setEditGroup({ levelKey, group });
-    setForm({ name: group.name, components: [...group.components], method: group.method || 'SUM' });
-    setOpenLevel(levelKey);
-  }
-
-  function openNew(levelKey) {
-    setEditGroup({ levelKey, group: null });
-    setForm({ name: '', components: [], method: 'SUM' });
-    setOpenLevel(levelKey);
-  }
-
-  function toggleComponent(sub) {
-    setForm(f => ({
-      ...f,
-      components: f.components.includes(sub)
-        ? f.components.filter(c => c !== sub)
-        : [...f.components, sub],
-    }));
-  }
-
-  return (
-    <Card style={{ marginBottom: 16 }}>
-      <SectionTitle icon="exams">Exam Subject Groups</SectionTitle>
-      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.6 }}>
-        Define how subjects are combined on the exam sheet and report card.
-        E.g. <strong>Kiswahili Language + Insha → "Kiswahili"</strong> (marks are added together).
-        Timetable and teacher assignments are not affected.
-        <br/>Lower Primary (Grade 1–3) uses all subjects directly — no groups needed.
-      </div>
-
-      {levels.map(([key, level]) => {
-        const levelGroups   = groups[key] || [];
-        const levelSubjects = getSubjectsForClass(level.classes[0], data);
-        const isOpen        = openLevel === key;
-
-        // Subjects already in a group
-        const grouped = new Set(levelGroups.flatMap(g => g.components));
-        // Ungrouped subjects — will appear as plain columns
-        const ungrouped = levelSubjects.filter(s => !grouped.has(s));
-
-        return (
-          <div key={key} style={{ marginBottom: 10, border: '1px solid #2a3350', borderRadius: 8, overflow: 'hidden' }}>
-            {/* Level header */}
-            <div
-              onClick={() => setOpenLevel(isOpen ? null : key)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '10px 14px', background: '#1e2435', cursor: 'pointer' }}
-            >
-              <div>
-                <span style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 13 }}>{level.label}</span>
-                <span style={{ marginLeft: 10, fontSize: 11, color: '#64748b' }}>
-                  {levelGroups.length > 0
-                    ? `${levelGroups.length} group${levelGroups.length > 1 ? 's' : ''} defined`
-                    : 'No groups — all subjects appear separately'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Btn size="sm" onClick={e => { e.stopPropagation(); openNew(key); }}>
-                  + Add Group
-                </Btn>
-                <span style={{ color: '#64748b', fontSize: 14 }}>{isOpen ? '▲' : '▼'}</span>
-              </div>
-            </div>
-
-            {isOpen && (
-              <div style={{ padding: '12px 14px', background: '#16192a' }}>
-
-                {/* Edit/New group form */}
-                {editGroup?.levelKey === key && (
-                  <div style={{ background: '#1e2435', border: '1px solid #4f8ef760', borderRadius: 8, padding: 14, marginBottom: 14 }}>
-                    <div style={{ fontWeight: 700, color: '#4f8ef7', fontSize: 13, marginBottom: 10 }}>
-                      {editGroup.group ? '✏️ Edit Group' : '➕ New Exam Group'}
-                    </div>
-
-                    {/* Group name */}
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4, fontWeight: 600 }}>
-                        GROUP NAME (appears on report & exam sheet)
-                      </label>
-                      <input
-                        value={form.name}
-                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                        placeholder="e.g. Kiswahili, English, Integrated Science…"
-                        style={{ width: '100%', padding: '7px 10px', background: '#0f1117', border: '1px solid #2a3350',
-                          borderRadius: 6, color: '#e2e8f0', fontSize: 13 }}
-                      />
-                    </div>
-
-                    {/* Component subjects */}
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                        COMPONENT SUBJECTS (tick all that combine into this group)
-                      </label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {levelSubjects.map(sub => (
-                          <label key={sub} style={{
-                            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                            background: form.components.includes(sub) ? '#4f8ef720' : '#0f1117',
-                            border: `1px solid ${form.components.includes(sub) ? '#4f8ef7' : '#2a3350'}`,
-                            borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#e2e8f0',
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={form.components.includes(sub)}
-                              onChange={() => toggleComponent(sub)}
-                              style={{ margin: 0 }}
-                            />
-                            {sub}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Method */}
-                    {form.components.length > 1 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                          HOW TO COMBINE MARKS
-                        </label>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          {[
-                            { val: 'SUM', label: 'Add together (SUM)', desc: 'e.g. Kiswahili 45 + Insha 33 = 78' },
-                            { val: 'AVG', label: 'Average (AVG)',      desc: 'e.g. (45 + 33) ÷ 2 = 39' },
-                          ].map(opt => (
-                            <label key={opt.val} style={{
-                              flex: 1, padding: '8px 12px', background: form.method === opt.val ? '#4f8ef720' : '#0f1117',
-                              border: `1px solid ${form.method === opt.val ? '#4f8ef7' : '#2a3350'}`,
-                              borderRadius: 6, cursor: 'pointer',
-                            }}>
-                              <input type="radio" value={opt.val}
-                                checked={form.method === opt.val}
-                                onChange={() => setForm(f => ({ ...f, method: opt.val }))}
-                                style={{ marginRight: 6 }}
-                              />
-                              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{opt.label}</span>
-                              <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{opt.desc}</div>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <Btn variant="ghost" size="sm" onClick={() => { setEditGroup(null); setForm({ name: '', components: [], method: 'SUM' }); }}>
-                        Cancel
-                      </Btn>
-                      <Btn size="sm" onClick={() => saveGroup(key)}
-                        disabled={!form.name.trim() || form.components.length === 0}>
-                        ✓ Save Group
-                      </Btn>
-                    </div>
-                  </div>
-                )}
-
-                {/* Existing groups */}
-                {levelGroups.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                    {levelGroups.map(g => (
-                      <div key={g.id} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 12px', background: '#1e2435', borderRadius: 6,
-                        border: '1px solid #2a3350',
-                      }}>
-                        <div>
-                          <span style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 13 }}>{g.name}</span>
-                          <span style={{ margin: '0 8px', color: '#4f8ef7', fontSize: 12 }}>
-                            = {g.components.join(' + ')}
-                          </span>
-                          <span style={{ fontSize: 10, color: '#64748b', background: '#2a3350', padding: '1px 6px', borderRadius: 8 }}>
-                            {g.method || 'SUM'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Btn size="sm" variant="ghost" onClick={() => openEdit(key, g)}>✏️</Btn>
-                          <Btn size="sm" variant="danger" onClick={() => removeGroup(key, g.id)}>×</Btn>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-                    No groups defined yet. All subjects appear as separate columns.
-                  </div>
-                )}
-
-                {/* Preview of what teacher sees */}
-                {levelSubjects.length > 0 && (
-                  <div style={{ background: '#0f1117', borderRadius: 6, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 11, color: '#4f8ef7', fontWeight: 700, marginBottom: 6 }}>
-                      📋 Preview — Exam columns teachers will see:
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {levelGroups.map(g => (
-                        <span key={g.id} style={{
-                          padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700,
-                          background: '#4f8ef720', border: '1px solid #4f8ef750', color: '#4f8ef7',
-                        }}>
-                          {g.name} ({g.components.join('+')} → {g.method})
-                        </span>
-                      ))}
-                      {ungrouped.map(sub => (
-                        <span key={sub} style={{
-                          padding: '3px 10px', borderRadius: 10, fontSize: 11,
-                          background: '#2a3350', border: '1px solid #3a4360', color: '#94a3b8',
-                        }}>
-                          {sub}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </Card>
-  );
-}
-
 export function Settings({ data, setData }) {
   const [profile, setProfile] = useState({
     schoolName:     data.schoolName     || '',
@@ -1409,13 +1144,60 @@ export function Settings({ data, setData }) {
   }
 
   function saveStreams(groupId) {
-    const streams = editStreamsVal.trim()
+    const newStreams = editStreamsVal.trim()
       ? editStreamsVal.split(',').map(s => s.trim()).filter(Boolean)
       : [];
-    setData(d => ({
-      ...d,
-      classGroups: (d.classGroups || []).map(g => g.id == groupId ? { ...g, streams } : g),
-    }));
+
+    setData(d => {
+      const group = (d.classGroups || []).find(g => g.id == groupId);
+      if (!group) return d;
+
+      const oldStreams = group.streams || [];
+
+      // Build rename map: old full class name → new full class name
+      // Only rename when a stream name actually changed position/spelling
+      const renameMap = {};
+      oldStreams.forEach((oldStream, i) => {
+        const newStream = newStreams[i];
+        if (newStream && oldStream !== newStream) {
+          renameMap[`${group.name} ${oldStream}`] = `${group.name} ${newStream}`;
+        }
+      });
+
+      if (Object.keys(renameMap).length === 0) {
+        // No renames — just update classGroups
+        return {
+          ...d,
+          classGroups: (d.classGroups || []).map(g => g.id == groupId ? { ...g, streams: newStreams } : g),
+        };
+      }
+
+      const r = k => renameMap[k] || k;
+
+      // Update every record that references old class names
+      return {
+        ...d,
+        classGroups: (d.classGroups || []).map(g => g.id == groupId ? { ...g, streams: newStreams } : g),
+        students: (d.students || []).map(s => ({ ...s, class: r(s.class) })),
+        teachers: (d.teachers || []).map(t => ({
+          ...t,
+          classTeacherOf: r(t.classTeacherOf),
+          subjects: (t.subjects || []).map(sub => ({
+            ...sub,
+            classes: (sub.classes || []).map(r),
+          })),
+        })),
+        exams: (d.exams || []).map(e => ({ ...e, class: r(e.class) })),
+        subjectsByClass: Object.fromEntries(
+          Object.entries(d.subjectsByClass || {}).map(([cls, subs]) => [r(cls), subs])
+        ),
+        timetable: Object.fromEntries(
+          Object.entries(d.timetable || {}).map(([cls, slots]) => [r(cls), slots])
+        ),
+        feeSchedule: (d.feeSchedule || []).map(f => ({ ...f, class: r(f.class) })),
+      };
+    });
+
     setEditingGroup(null);
   }
 
@@ -1643,9 +1425,6 @@ export function Settings({ data, setData }) {
 
         {/* RIGHT COLUMN */}
         <div>
-          {/* ── Exam Subject Groups ─────────────────────────── */}
-          <ExamSubjectGroupsCard data={data} setData={setData} />
-
           {/* Classes & Streams */}
           <Card style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>

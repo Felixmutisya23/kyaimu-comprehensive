@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore } from '../data/initialData';
-import { printClassList, printReportForm, printAllReportForms, computeRankings, printSubjectPerformance } from '../utils/print';
+import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 
-export default function Exams({ data, setData, user }) {
+export default function Exams({ data, setData, user, flushSave }) {
   const isPrincipal  = user.role === 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass      = user.classTeacherOf;
@@ -54,7 +54,7 @@ export default function Exams({ data, setData, user }) {
     year: String(data.currentYear || new Date().getFullYear()),
     forAllClasses: false,
     selectedStreams: [],
-    subjectColumns: null, // null = use level template; array = custom override
+    subjectColumns: null,
   });
   const [examForm, setExamForm] = useState(blankExamForm);
   const [scores, setScores]     = useState({});
@@ -63,45 +63,31 @@ export default function Exams({ data, setData, user }) {
 
   const classExams     = data.exams.filter(e => e.class === selClass);
   const selExam        = classExams.find(e => e.id === selExamId) || classExams[0] || null;
-  const classStudents  = data.students.filter(s => s.class === selClass);
+  const classStudents  = [...data.students.filter(s => s.class === selClass)].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  // Get all subjects that already have marks entered in this exam
+  // Subjects that already have actual marks in this exam
   const markedSubjects = selExam
     ? [...new Set(Object.values(selExam.results || {}).flatMap(r => Object.keys(r)))]
     : [];
 
-  // Exam columns for the current class — respects groups defined in Settings.
-  // IMPORTANT: if the exam already has marks entered, we ALWAYS show those
-  // columns — never hide existing marks. The Settings filter only applies
-  // to empty exams or columns with no data yet.
+  // Exam columns — respects groups + always shows columns with marks
   const examColumns = (() => {
     const cols = getExamColumnsForClass(selClass, data, selExam?.subjectColumns || null);
     if (!selExam || markedSubjects.length === 0) return cols;
-
-    // Build set of all subject names already covered by the columns
     const coveredByCol = new Set(cols.flatMap(c =>
       c.type === 'group' ? c.components : [c.subject || c.name]
     ));
-
-    // Any marked subject NOT covered by the columns → add as plain column
     const extraCols = markedSubjects
-      .filter(s => !coveredByCol.has(s) && !(cols.some(c => c.name === s)))
+      .filter(s => !coveredByCol.has(s) && !cols.some(c => c.name === s))
       .map(s => ({ name: s, type: 'single', subject: s }));
-
     return [...cols, ...extraCols];
   })();
 
-  // Flat list of column names (for display headers)
   const columnNames = examColumns.map(c => c.name);
 
-  // All raw subjects in current exam results (for backward compat)
-  const examSubjects = markedSubjects;
-
-  // Subjects this user can see — always include columns with existing marks
   function getVisibleSubjects(exam) {
     if (!exam) return [];
     if (isPrincipal || isClassTeacher) return columnNames;
-    // Subject teacher: columns containing at least one of their subjects
     return examColumns
       .filter(col => {
         if (col.type === 'single') return mySubjects.includes(col.subject || col.name);
@@ -113,10 +99,8 @@ export default function Exams({ data, setData, user }) {
 
   const visibleSubjects = selExam ? getVisibleSubjects(selExam) : [];
 
-  // Subjects this teacher can ENTER scores for
   function getEnterableSubjects() {
     const settingsSubs = new Set(getSubjectsForClass(selClass, data));
-    // Also include any subjects already in the exam (backward compat)
     markedSubjects.forEach(s => settingsSubs.add(s));
     const allValid = [...settingsSubs];
     if (isPrincipal) return allValid;
@@ -209,8 +193,6 @@ export default function Exams({ data, setData, user }) {
       class: cls,
       year: examForm.year,
       results: {},
-      // Save custom subject columns if principal changed them; null = use level template
-      subjectColumns: examForm.subjectColumns || null,
     }));
 
     setData(d => ({ ...d, exams: [...d.exams, ...newExams] }));
@@ -280,6 +262,8 @@ export default function Exams({ data, setData, user }) {
         })(),
       ],
     }));
+    // Flush immediately so marks never lost if teacher closes browser quickly
+    if (flushSave) setTimeout(() => flushSave(), 50);
     setShowEnter(false);
   }
 
@@ -294,6 +278,26 @@ export default function Exams({ data, setData, user }) {
     const newScore = Number(editNewScore);
     if (isNaN(newScore) || newScore < 0 || newScore > 100) { alert('Please enter a valid score (0–100)'); return; }
     if (newScore === editTarget.currentScore) { alert('New score is the same as current score.'); return; }
+
+    // Principal edits marks directly — no approval needed
+    if (isPrincipal) {
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => {
+          if (ex.id !== editTarget.examId) return ex;
+          const newResults = { ...ex.results };
+          if (!newResults[editTarget.studentName]) newResults[editTarget.studentName] = {};
+          newResults[editTarget.studentName] = {
+            ...newResults[editTarget.studentName],
+            [editTarget.subject]: { score: newScore, submittedBy: user.staffId, locked: false, editedByPrincipal: true },
+          };
+          return { ...ex, results: newResults };
+        }),
+      }));
+      setShowEditReq(false);
+      if (flushSave) setTimeout(() => flushSave(), 50);
+      return;
+    }
 
     const ctStaffId = getClassTeacherStaffId(selClass, data);
 
@@ -382,14 +386,34 @@ export default function Exams({ data, setData, user }) {
     <div>
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(null); }} style={{ width: 160 }}>
+        <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(null); }}
+          style={{ width: 160, padding: '8px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
           {accessibleClasses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {classExams.length > 0 && (
-          <select value={selExamId || ''} onChange={e => setSelExamId(Number(e.target.value) || null)} style={{ width: 240 }}>
-            {classExams.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-        )}
+        {classExams.length > 0 && (() => {
+          // Group exams by year for better navigation
+          const byYear = {};
+          classExams.forEach(e => {
+            const yr = e.year || 'Unknown';
+            if (!byYear[yr]) byYear[yr] = [];
+            byYear[yr].push(e);
+          });
+          const years = Object.keys(byYear).sort((a, b) => b - a); // newest first
+          return (
+            <select value={selExamId || ''} onChange={e => setSelExamId(Number(e.target.value) || null)}
+              style={{ width: 260, padding: '8px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              {years.map(yr => (
+                <optgroup key={yr} label={`── ${yr} ──`} style={{ color: '#94a3b8', fontSize: 11 }}>
+                  {byYear[yr].map(e => (
+                    <option key={e.id} value={e.id}>
+                      Term {e.term} · {e.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          );
+        })()}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {selExam && enterableSubjects.length > 0 && (
             <Btn variant="ghost" size="sm" onClick={() => openEnterScores(selExam)}>
@@ -399,7 +423,10 @@ export default function Exams({ data, setData, user }) {
           {selExam && (isClassTeacher || isPrincipal) && (
             <>
               <Btn variant="ghost" size="sm" onClick={() => printClassList(ranked, visibleSubjects, selExam, data)}>
-                <Icon name="print" size={13} /> Class List
+                <Icon name="print" size={13} /> Stream List
+              </Btn>
+              <Btn variant="ghost" size="sm" onClick={() => printOverallClassList(selExam, data)}>
+                🏫 Overall Class List
               </Btn>
               <Btn variant="ghost" size="sm" onClick={() => printAllReportForms(selExam, data)}>
                 <Icon name="report" size={13} /> All Reports
@@ -451,19 +478,16 @@ export default function Exams({ data, setData, user }) {
           )}
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => {
-              // Start with subjects that have ACTUAL MARKS in any exam for this class
-              // These must always be shown so the principal can rename/manage them
+              // Show ALL subjects that have marks in any exam for this class
+              // PLUS subjects from Settings — so principal sees everything
               const markedInAnyExam = new Set(
                 (data.exams || [])
                   .filter(e => e.class === selClass)
                   .flatMap(e => Object.values(e.results || {}).flatMap(r => Object.keys(r)))
               );
-              // Also include subjects from Settings that don't have marks yet
               const settingsSubs = getSubjectsForClass(selClass, data) || [];
               settingsSubs.forEach(s => markedInAnyExam.add(s));
-              // Sort: subjects with marks first, then Settings-only subjects
-              const allSubs = [...markedInAnyExam];
-              setSetupSubjectRows(allSubs.map(s => ({ original: s, current: s })));
+              setSetupSubjectRows([...markedInAnyExam].map(s => ({ original: s, current: s })));
               setNewSubjectName('');
               setShowSetupSubjects(true);
             }}>
@@ -525,26 +549,18 @@ export default function Exams({ data, setData, user }) {
                     <td style={{ ...TS.td, fontWeight: 500 }}>{s.name}</td>
                     <td style={TS.td}>{s.admNo}</td>
                     {visibleSubjects.map(colName => {
-                      const col     = examColumns.find(c => c.name === colName) || { name: colName, type: 'single', subject: colName };
-                      const score   = computeColumnScore(col, s.results);
-                      const rawCell = col.type === 'single' ? s.results[col.subject] : null;
-                      const submittedBy = rawCell?.submittedBy;
-                      const submitter   = submittedBy ? data.teachers.find(t => t.staffId === submittedBy) : null;
-                      const canEdit     = col.type === 'single' && canRequestEdit(col.subject, selExam);
-                      const isGrouped   = col.type === 'group';
+                      const col   = examColumns.find(c => c.name === colName) || { name: colName, type: 'single', subject: colName };
+                      const score = computeColumnScore(col, s.results);
+                      const canEdit = col.type === 'single' && canRequestEdit(col.subject || col.name, selExam);
                       return (
                         <td key={colName} style={{ ...TS.td, textAlign: 'center', position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                            <span title={
-                              isGrouped
-                                ? `${col.components.map(c => `${c}: ${getScore(s.results[c]) ?? '—'}`).join(', ')} → ${col.method} = ${score ?? '—'}`
-                                : submitter ? `Submitted by ${submitter.name}` : ''
-                            } style={{ color: isGrouped ? '#4f8ef7' : 'inherit', fontWeight: isGrouped ? 700 : 'inherit' }}>
+                            <span title={col.type === 'group' ? col.components.map(c => `${c}: ${getScore(s.results[c]) ?? '—'}`).join(', ') : ''}
+                              style={{ color: col.type === 'group' ? '#4f8ef7' : 'inherit', fontWeight: col.type === 'group' ? 700 : 'inherit' }}>
                               {score ?? <span style={{ color: '#64748b' }}>—</span>}
                             </span>
                             {score !== null && canEdit && (
-                              <button onClick={() => openEditRequest(s.name, col.subject, score, selExam.id)}
-                                title="Request score edit"
+                              <button onClick={() => openEditRequest(s.name, col.subject || col.name, score, selExam.id)}
                                 style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '1px 4px', borderRadius: 4, opacity: 0.7 }}>✎</button>
                             )}
                           </div>
@@ -641,10 +657,10 @@ export default function Exams({ data, setData, user }) {
       {/* Setup Subjects Modal */}
       <Modal show={showSetupSubjects} onClose={() => setShowSetupSubjects(false)} title={`Setup Subjects — ${selClass}`}>
         <Alert type="info">
-          <Icon name="alert" size={14} />
           Showing ALL subjects — both from Settings and those already used in exams for <strong>{selClass}</strong>.
-          You can rename any subject (marks move with it automatically) or delete subjects that have no marks entered.
-          <br/><strong style={{color:'#f59e0b'}}>⚠ Only delete subjects with no marks — deleting a subject with marks will hide those marks.</strong>
+          Rename a subject and marks move with it automatically.
+          <strong style={{ color: '#f59e0b' }}> Only delete subjects with no marks — deleting a subject with marks will hide those marks.</strong>
+          <br/>Changes here do <strong>not</strong> affect Settings subjects used for timetable or teacher assignment.
         </Alert>
 
         <FormGroup label={`Subjects (${setupSubjectRows.length})`}>
@@ -697,12 +713,11 @@ export default function Exams({ data, setData, user }) {
               .map(r => ({ from: r.original, to: r.current.trim() }));
 
             setData(d => {
-              // Save EXACTLY what the principal selected — no merging with Settings
-              let next = {
-                ...d,
-                subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: finalSubs },
-              };
+              let next = { ...d, subjectsByClass: { ...(d.subjectsByClass || {}), [selClass]: finalSubs } };
               if (renames.length > 0) {
+                // Migrate every exam for this class: for every student, move
+                // their score from the old subject key to the new one so
+                // nothing is lost when a subject is renamed.
                 next = {
                   ...next,
                   exams: (d.exams || []).map(ex => {
@@ -832,63 +847,6 @@ export default function Exams({ data, setData, user }) {
             This exam will be created for <strong>{allClassesList.length} classes</strong>: {allClassesList.join(', ')}
           </Alert>
         )}
-
-        {/* Subject columns selector */}
-        {(() => {
-          const targetClass = examForm.selectedStreams.length > 0 ? examForm.selectedStreams[0] : examForm.class;
-          const defaultCols = getExamColumnsForClass(targetClass, data, null);
-          const selectedCols = examForm.subjectColumns || defaultCols;
-          const allAvailableSubs = getSubjectsForClass(targetClass, data);
-          if (!allAvailableSubs.length) return null;
-          return (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>
-                📋 Subjects for this exam
-                <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 8, fontSize: 11 }}>
-                  (pre-selected from your Settings — untick any not needed)
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, background: '#0f1117', padding: 10, borderRadius: 6, border: '1px solid #2a3350' }}>
-                {defaultCols.map(col => {
-                  const isSelected = selectedCols.some(c => c.name === col.name);
-                  return (
-                    <label key={col.name} style={{
-                      display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                      background: isSelected ? '#4f8ef720' : '#1e2435',
-                      border: `1px solid ${isSelected ? '#4f8ef7' : '#2a3350'}`,
-                      borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#e2e8f0',
-                    }}>
-                      <input type="checkbox" checked={isSelected}
-                        onChange={e => {
-                          setExamForm(f => {
-                            const cur = f.subjectColumns || defaultCols;
-                            const next = e.target.checked
-                              ? [...cur.filter(c => c.name !== col.name), col]
-                              : cur.filter(c => c.name !== col.name);
-                            return { ...f, subjectColumns: next };
-                          });
-                        }}
-                        style={{ margin: 0 }}
-                      />
-                      <span>{col.name}</span>
-                      {col.type === 'group' && (
-                        <span style={{ fontSize: 10, color: '#64748b' }}>
-                          ({col.components.join('+')} → {col.method})
-                        </span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-              {examForm.subjectColumns && (
-                <button onClick={() => setExamForm(f => ({ ...f, subjectColumns: null }))}
-                  style={{ marginTop: 6, fontSize: 11, color: '#4f8ef7', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  ↩ Reset to defaults
-                </button>
-              )}
-            </div>
-          );
-        })()}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <Btn variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Btn>
