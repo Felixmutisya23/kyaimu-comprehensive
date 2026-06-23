@@ -213,7 +213,7 @@ function Notifications({ data, setData, user }) {
         Notifications {unread > 0 && <span style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '2px 7px', borderRadius: 10, marginLeft: 8 }}>{unread}</span>}
       </div>
       {myNotifs.length == 0 ? (
-        <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
           No notifications yet.
         </div>
       ) : [...myNotifs].reverse().map(n => (
@@ -255,7 +255,7 @@ function SetupWizard({ data, setData, onDone }) {
 
   const inp = (val, onChange, ph) => ({
     value: val, onChange: e => onChange(e.target.value), placeholder: ph,
-    style: { width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
+    style: { width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
     onFocus: e => { e.target.style.borderColor = '#4f8ef7'; },
     onBlur:  e => { e.target.style.borderColor = 'var(--border)'; },
   });
@@ -268,7 +268,7 @@ function SetupWizard({ data, setData, onDone }) {
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>EduManage Pro</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Welcome! Set up your school — takes 2 minutes.</div>
         </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 16, padding: 28 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#4f8ef7', marginBottom: 16 }}>🏫 School Information</div>
           <div style={{ display: 'grid', gap: 12 }}>
             <div>
@@ -282,7 +282,7 @@ function SetupWizard({ data, setData, onDone }) {
               </div>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Type</label>
-                <select value={form.schoolType} onChange={e => setForm({...form, schoolType: e.target.value})} style={{ width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
+                <select value={form.schoolType} onChange={e => setForm({...form, schoolType: e.target.value})} style={{ width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
                   {['Primary','Junior Secondary','Secondary','Combined'].map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -380,11 +380,11 @@ export default function App() {
       '--surface':     '#ffffff',
       '--surface2':    '#f3f6fa',
       '--border':      '#9aafc5',
-      '--text':        '#050d1a',
+      '--text':        'var(--text)',
       '--text-sub':    '#1a3557',
       '--text-muted':  '#3d5a7a',
       '--input-bg':    '#ffffff',
-      '--input-color': '#050d1a',
+      '--input-color': 'var(--text)',
       '--accent':      '#0d47c9',
       '--card-shadow': '0 2px 10px rgba(0,0,0,0.15)',
       '--table-header-bg':   '#0d47c9',
@@ -900,11 +900,11 @@ export default function App() {
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Only you can see this, Felix</div>
               </div>
               <button onClick={() => setShowDevPanel(false)}
-                style={{ background: 'var(--surface2)', border: '1px solid #2a3350', color: 'var(--text-sub)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-sub)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
             <TokenGenerator data={data} />
-            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, fontSize: 11, color: '#475569', textAlign: 'center' }}>
-              Press <kbd style={{ background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 4, padding: '1px 6px', color: '#7c3aed', fontFamily: 'monospace' }}>felix</kbd> again anywhere to close
+            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+              Press <kbd style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px', color: '#7c3aed', fontFamily: 'monospace' }}>felix</kbd> again anywhere to close
             </div>
           </div>
         </div>
@@ -914,7 +914,7 @@ export default function App() {
         <div style={{
           position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
           background: saveStatus === 'saved' ? '#10b981' : 'var(--surface)',
-          border: saveStatus === 'saved' ? 'none' : '1px solid #2a3350',
+          border: saveStatus === 'saved' ? 'none' : '1px solid var(--border)',
           color: saveStatus === 'saved' ? '#fff' : 'var(--text-sub)',
           padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600,
           boxShadow: '0 4px 20px #0006', display: 'flex', alignItems: 'center', gap: 8,
@@ -925,7 +925,7 @@ export default function App() {
       {/* LOGGING OUT OVERLAY — guarantees the pending save finishes before the screen changes */}
       {loggingOut && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15,17,23,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-          <div style={{ width: 36, height: 36, border: '3px solid #2a3350', borderTopColor: '#4f8ef7', borderRadius: '50%', animation: 'edu-spin 0.8s linear infinite' }} />
+          <div style={{ width: 36, height: 36, border: '3px solid var(--border)', borderTopColor: '#4f8ef7', borderRadius: '50%', animation: 'edu-spin 0.8s linear infinite' }} />
           <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600 }}>Saving your changes…</div>
           <style>{`@keyframes edu-spin { to { transform: rotate(360deg); } }`}</style>
         </div>
@@ -956,7 +956,7 @@ export default function App() {
           .edu-hamburger-btn { display: flex !important; }
         }
         .edu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999; cursor: pointer; }
-        .edu-top-bar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 997; background: #171b26; border-bottom: 1px solid #2a3350; padding: 0 14px; height: 52px; align-items: center; gap: 12px; }
+        .edu-top-bar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 997; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 14px; height: 52px; align-items: center; gap: 12px; }
         .edu-hamburger-btn { display: none; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; padding: 6px; line-height: 1; }
         /* Make tables scroll on mobile */
         @media (max-width: 768px) {
@@ -978,8 +978,8 @@ export default function App() {
         {myNotifUnread > 0 && <div style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{myNotifUnread}</div>}
       </div>
       {/* SIDEBAR */}
-      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: 'var(--surface)', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
-        <div style={{ padding: '14px 12px', borderBottom: '1px solid #2a3350', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
+        <div style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#fff', flexShrink: 0 }}>E</div>
           {!collapsed && (
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -993,7 +993,7 @@ export default function App() {
         </div>
 
         {!collapsed && (
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2a3350' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: roleColor }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: roleColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1014,7 +1014,7 @@ export default function App() {
                 return (
                   <div key={n.id} onClick={() => { setPage(n.id); if (window.innerWidth < 768) setCollapsed(true); }} title={collapsed ? n.label : undefined}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '11px 0' : '9px 14px', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', fontSize: 13, color: active ? '#4f8ef7' : 'var(--text-sub)', background: active ? 'var(--surface2)' : 'transparent', borderLeft: active ? '3px solid #4f8ef7' : '3px solid transparent', fontWeight: active ? 600 : 400, transition: 'all 0.12s' }}
-                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#1e243570'; }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--border)70'; }}
                     onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                   >
                     <Icon name={n.icon} size={16} />
@@ -1027,7 +1027,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div style={{ borderTop: '1px solid #2a3350' }}>
+        <div style={{ borderTop: '1px solid var(--border)' }}>
           {!collapsed ? (
             <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{initials}</div>
@@ -1050,7 +1050,7 @@ export default function App() {
 
       {/* MAIN */}
       <main className="edu-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
-        <header style={{ background: 'var(--surface)', borderBottom: '1px solid #2a3350', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={() => setCollapsed(c => !c)}
               style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 20, padding: 4, borderRadius: 6 }}>☰</button>
@@ -1071,22 +1071,22 @@ export default function App() {
                 <span style={{ display: 'inline-block', transform: reloading ? 'rotate(360deg)' : 'none', transition: reloading ? 'transform 0.8s linear' : 'none' }}>⟳</span>
                 {reloading ? 'Refreshing…' : 'Refresh'}
               </button>
-              {/* Theme toggle — always visible for ALL users */}
-              <button
-                onClick={() => setData(d => ({ ...d, darkTheme: !d.darkTheme }))}
-                title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  fontSize: 12, fontWeight: 700, padding: '4px 12px',
-                  borderRadius: 20, cursor: 'pointer',
-                  background: isDark ? '#f59e0b20' : '#1a56db20',
-                  border: isDark ? '1px solid #f59e0b50' : '1px solid #1a56db50',
-                  color: isDark ? '#f59e0b' : '#1a56db',
-                  transition: 'all 0.2s',
-                }}>
-                {isDark ? '☀ Light' : '🌙 Dark'}
-              </button>
             )}
+            {/* Theme toggle — visible for ALL users */}
+            <button
+              onClick={() => setData(d => ({ ...d, darkTheme: !d.darkTheme }))}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: 12, fontWeight: 700, padding: '4px 12px',
+                borderRadius: 20, cursor: 'pointer',
+                background: isDark ? '#f59e0b20' : '#1a56db20',
+                border: isDark ? '1px solid #f59e0b50' : '1px solid #1a56db50',
+                color: isDark ? '#f59e0b' : '#1a56db',
+                transition: 'all 0.2s',
+              }}>
+              {isDark ? '☀ Light' : '🌙 Dark'}
+            </button>
             {/* License status badge */}
             {user?.role == 'principal' && (
               license.isUnlocked
