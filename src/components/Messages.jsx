@@ -49,7 +49,7 @@ export default function Messages({ data, setData, role }) {
           <Icon name="back" size={14} /> Back to Messages
         </Btn>
         <Card>
-          <div style={{ borderBottom: '1px solid #2a3350', paddingBottom: 16, marginBottom: 16 }}>
+          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>{msg.subject}</div>
             <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
               <span>From: <strong style={{ color: 'var(--text-sub)' }}>{msg.from}</strong></span>
@@ -61,7 +61,7 @@ export default function Messages({ data, setData, role }) {
             {msg.body}
           </div>
           {msg.replies.length > 0 && (
-            <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>
                 Replies ({msg.replies.length})
               </div>
@@ -114,7 +114,7 @@ export default function Messages({ data, setData, role }) {
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No messages yet.</div>
         ) : visible.map(m => (
           <div key={m.id} onClick={() => open(m)} style={{
-            padding: '14px 18px', borderBottom: '1px solid #2a3350', cursor: 'pointer',
+            padding: '14px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
             transition: 'background 0.1s', borderLeft: m.read ? '3px solid transparent' : '3px solid #4f8ef7',
           }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}

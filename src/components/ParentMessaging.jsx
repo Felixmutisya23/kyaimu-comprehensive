@@ -228,7 +228,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </div>
           <FormGroup label="Target Class">
             <select value={selClass} onChange={e => setSel(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.parentPhone).length} parents with phones)</option>
               {classes.map(c => {
                 const count = (data.students||[]).filter(s=>s.class===c&&s.parentPhone).length;
@@ -239,7 +239,7 @@ export default function ParentMessaging({ data, setData, user }) {
           <FormGroup label="Message">
             <textarea value={message} onChange={e => setMsg(e.target.value)} rows={5}
               placeholder={`Dear Parent/Guardian,\n\n[Your message here]\n\nRegards,\n${data.schoolName || 'School'} Administration`}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
           </FormGroup>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Btn onClick={broadcastMessage} disabled={sending || !message.trim()} style={{ background: '#10b981' }}>
@@ -265,7 +265,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </Alert>
           <FormGroup label="Select Exam" style={{ marginTop: 12 }}>
             <select value={selExam} onChange={e => setExam(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="">-- Select Exam --</option>
               {exams.map(e => (
                 <option key={e.id} value={e.id}>{e.name} · {e.class} · Term {e.term} {e.year}</option>
@@ -274,7 +274,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </FormGroup>
           <FormGroup label="Filter by Class">
             <select value={selClass} onChange={e => setSel(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="ALL">All Classes</option>
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -302,7 +302,7 @@ export default function ParentMessaging({ data, setData, user }) {
           {logs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No messages sent yet.</div>
           ) : logs.map(log => (
-            <div key={log.id} style={{ padding: '14px 18px', borderBottom: '1px solid #2a3350' }}>
+            <div key={log.id} style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
                   {log.type === 'results' ? `📊 Results: ${log.examName}` : '📢 Broadcast'}
@@ -334,7 +334,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </Alert>
           <FormGroup label="SMS Provider" style={{ marginTop: 12 }}>
             <select value={smsConf.provider} onChange={e => setSmsConf({ ...smsConf, provider: e.target.value })}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="africastalking">Africa's Talking (Recommended)</option>
               <option value="manual">Manual / Print List (No API)</option>
             </select>
@@ -344,18 +344,18 @@ export default function ParentMessaging({ data, setData, user }) {
               <FormGroup label="Username">
                 <input value={smsConf.username || ''} onChange={e => setSmsConf({ ...smsConf, username: e.target.value })}
                   placeholder="your_username or sandbox"
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="API Key">
                 <input value={smsConf.apiKey || ''} onChange={e => setSmsConf({ ...smsConf, apiKey: e.target.value })}
                   placeholder="Your Africa's Talking API Key"
                   type="password"
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="Sender ID (max 11 chars)">
                 <input value={smsConf.senderId || ''} onChange={e => setSmsConf({ ...smsConf, senderId: e.target.value.slice(0,11) })}
                   placeholder="SchoolName"
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </>
           )}

@@ -128,7 +128,7 @@ function DeveloperAuditView() {
             { l:'Total Logins',   v:loginCount,      c:'#7c3aed' },
             { l:'Active Schools', v:schoolCount,     c:'#f59e0b' },
           ].map(s=>(
-            <div key={s.l} style={{ background:'var(--surface)',border:'1px solid #2a3350',borderRadius:12,padding:'18px 20px' }}>
+            <div key={s.l} style={{ background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'18px 20px' }}>
               <div style={{ fontSize:28,fontWeight:900,color:s.c }}>{s.v}</div>
               <div style={{ fontSize:11,color:'var(--text-muted)',marginTop:2 }}>{s.l}</div>
             </div>
@@ -151,7 +151,7 @@ function DeveloperAuditView() {
             <option value="">All Roles</option>
             {roles.map(r=><option key={r} value={r}>{r}</option>)}
           </select>
-          <button onClick={fetchLogs} style={{ padding:'9px 18px',background:'var(--border)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 }}>
+          <button onClick={fetchLogs} style={{ padding:'9px 18px',background:'var(--border)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 }}>
             🔄 Refresh
           </button>
           <span style={{ fontSize:13,color:'var(--text-muted)',alignSelf:'center',marginLeft:'auto' }}>
@@ -160,12 +160,12 @@ function DeveloperAuditView() {
         </div>
 
         {/* Table */}
-        <div style={{ background:'var(--surface)',border:'1px solid #2a3350',borderRadius:14,overflow:'hidden' }}>
+        <div style={{ background:'var(--surface)',border:'1px solid var(--border)',borderRadius:14,overflow:'hidden' }}>
           <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
             <thead>
               <tr style={{ background:'var(--surface2)' }}>
                 {['Timestamp','School','User','Role','Action','Details'].map(h=>(
-                  <th key={h} style={{ textAlign:'left',padding:'12px 16px',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:0.5,borderBottom:'1px solid #2a3350' }}>{h}</th>
+                  <th key={h} style={{ textAlign:'left',padding:'12px 16px',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:0.5,borderBottom:'1px solid var(--border)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -177,7 +177,7 @@ function DeveloperAuditView() {
               ) : pageLogs.map((log,i)=>{
                 const act = ACTION_LABELS[log.action]||{ label:log.action,icon:'📌',color:'var(--text-muted)' };
                 return (
-                  <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}
+                  <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}
                     onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
                     onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                     <td style={{ padding:'11px 16px',color:'var(--text-muted)',whiteSpace:'nowrap',fontSize:12 }}>
@@ -270,7 +270,7 @@ function SchoolAuditView({ data }) {
           { l:'Today',        v:todayCount,    c:'#10b981' },
           { l:'Logins',       v:loginCount,    c:'#7c3aed' },
         ].map(s=>(
-          <div key={s.l} style={{ background:'var(--surface)',border:'1px solid #2a3350',borderRadius:10,padding:'14px 16px' }}>
+          <div key={s.l} style={{ background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px' }}>
             <div style={{ fontSize:22,fontWeight:900,color:s.c }}>{s.v}</div>
             <div style={{ fontSize:11,color:'var(--text-muted)',marginTop:2 }}>{s.l}</div>
           </div>
@@ -284,17 +284,17 @@ function SchoolAuditView({ data }) {
           <option value="">All Actions</option>
           {actions.map(a=><option key={a} value={a}>{ACTION_LABELS[a]?.label||a}</option>)}
         </select>
-        <button onClick={fetchLogs} style={{ padding:'9px 16px',background:'var(--border)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 }}>
+        <button onClick={fetchLogs} style={{ padding:'9px 16px',background:'var(--border)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 }}>
           🔄 Refresh
         </button>
       </div>
 
-      <div style={{ background:'var(--surface)',border:'1px solid #2a3350',borderRadius:12,overflow:'hidden' }}>
+      <div style={{ background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,overflow:'hidden' }}>
         <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
           <thead>
             <tr style={{ background:'var(--surface2)' }}>
               {['Time','User','Role','Action','Details'].map(h=>(
-                <th key={h} style={{ textAlign:'left',padding:'11px 14px',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',borderBottom:'1px solid #2a3350' }}>{h}</th>
+                <th key={h} style={{ textAlign:'left',padding:'11px 14px',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',borderBottom:'1px solid var(--border)' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -306,7 +306,7 @@ function SchoolAuditView({ data }) {
             ) : pageLogs.map((log,i)=>{
               const act = ACTION_LABELS[log.action]||{ label:log.action,icon:'📌',color:'var(--text-muted)' };
               return (
-                <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}
+                <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
                   onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                   <td style={{ padding:'10px 14px',color:'var(--text-muted)',fontSize:12,whiteSpace:'nowrap' }}>
@@ -360,7 +360,7 @@ export default function AuditLog({ data, isDevMode = false }) {
           <input type="password" value={devPass} onChange={e=>setDevPass(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&checkPassword()}
             placeholder="Developer password"
-            style={{ width:'100%',padding:'11px 14px',background:'var(--surface2)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text)',fontSize:14,outline:'none',boxSizing:'border-box',marginBottom:10 }} />
+            style={{ width:'100%',padding:'11px 14px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:14,outline:'none',boxSizing:'border-box',marginBottom:10 }} />
           {passErr && <div style={{ fontSize:12,color:'#ef4444',marginBottom:10 }}>{passErr}</div>}
           <button onClick={checkPassword} disabled={loading||!devPass} style={{ width:'100%',padding:12,background:'#7c3aed',border:'none',borderRadius:8,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer' }}>
             {loading?'Verifying...':'Unlock →'}
@@ -390,6 +390,6 @@ export default function AuditLog({ data, isDevMode = false }) {
 }
 
 /* ── Shared styles ────────────────────────────────────────────── */
-const INP = { flex:1,minWidth:180,padding:'9px 12px',background:'var(--surface2)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text)',fontSize:13,outline:'none' };
-const SEL = { padding:'9px 12px',background:'var(--surface2)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text)',fontSize:13,outline:'none' };
-const PBTN = { padding:'8px 18px',background:'var(--surface2)',border:'1px solid #2a3350',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 };
+const INP = { flex:1,minWidth:180,padding:'9px 12px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,outline:'none' };
+const SEL = { padding:'9px 12px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,outline:'none' };
+const PBTN = { padding:'8px 18px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text-sub)',cursor:'pointer',fontSize:13 };

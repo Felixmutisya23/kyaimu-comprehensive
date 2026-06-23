@@ -3,14 +3,14 @@ import React, { useState } from 'react';
 const IS = {
   base: {
     width:'100%', padding:'11px 14px',
-    background:'#f8fafc',
-    border:'1.5px solid #e2e8f0',
-    borderRadius:10, color:'#1e293b', fontSize:14,
+    background:'var(--surface2)',
+    border:'1.5px solid var(--border)',
+    borderRadius:10, color:'var(--text)', fontSize:14,
     outline:'none', boxSizing:'border-box',
     transition:'all 0.15s',
   },
   focused: {
-    background:'#fff',
+    background:'var(--surface)',
     border:'1.5px solid #1e40af',
   },
 };
@@ -19,7 +19,7 @@ function Field({ label, value, onChange, type='text', placeholder, hint, autoFoc
   const [focus, setFocus] = useState(false);
   return (
     <div style={{marginBottom:16}}>
-      <label style={{fontSize:12,fontWeight:600,color:'#475569',display:'block',marginBottom:5}}>{label}</label>
+      <label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:5}}>{label}</label>
       <input
         value={value} onChange={e=>onChange(e.target.value)}
         type={type} placeholder={placeholder} autoFocus={autoFocus}
@@ -121,13 +121,13 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             margin:'0 auto 14px', fontSize:26, fontWeight:900, color:'#fff',
             boxShadow:'0 12px 32px #1e40af40',
           }}>E</div>
-          <div style={{fontSize:22, fontWeight:800, color:'#1e293b', letterSpacing:-0.5}}>EduManage Pro</div>
+          <div style={{fontSize:22, fontWeight:800, color:'var(--text)', letterSpacing:-0.5}}>EduManage Pro</div>
           <div style={{fontSize:13, color:'var(--text-sub)', marginTop:3}}>School Management System</div>
         </div>
 
         {/* Tab switcher */}
         <div style={{
-          display:'flex', background:'#fff', border:'1.5px solid #e2e8f0',
+          display:'flex', background:'var(--surface)', border:'1.5px solid var(--border)',
           borderRadius:14, padding:5, marginBottom:20, gap:4,
           boxShadow:'0 2px 8px #0000000a',
         }}>
@@ -147,11 +147,11 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
 
         {/* Login card */}
         <div style={{
-          background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:20,
+          background:'var(--surface)', border:'1.5px solid var(--border)', borderRadius:20,
           padding:32, boxShadow:'0 20px 60px #0000000f', marginBottom:16,
         }}>
           <div style={{marginBottom:22}}>
-            <div style={{fontSize:17, fontWeight:800, color:'#1e293b'}}>
+            <div style={{fontSize:17, fontWeight:800, color:'var(--text)'}}>
               {TABS.find(t=>t.id===tab)?.label} Login
             </div>
             <div style={{fontSize:13, color:'var(--text-sub)', marginTop:3}}>
@@ -172,7 +172,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
                 />
                 <div style={{marginBottom:16}}>
                   <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                    <label style={{fontSize:12, fontWeight:600, color:'#475569'}}>Password</label>
+                    <label style={{fontSize:12, fontWeight:600, color:'var(--text-muted)'}}>Password</label>
                     <span style={{fontSize:12, color:'#1e40af', cursor:'pointer', fontWeight:500}}
                       onClick={() => setShowPw(!showPw)}>
                       {showPw ? 'Hide' : 'Show'}
@@ -277,12 +277,12 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
           display:'flex', alignItems:'center', justifyContent:'center', padding:20,
         }}>
           <div style={{
-            background:'#fff', borderRadius:20, padding:32,
+            background:'var(--surface)', borderRadius:20, padding:32,
             width:'100%', maxWidth:460,
             boxShadow:'0 24px 80px #00000020',
             maxHeight:'90vh', overflowY:'auto',
           }}>
-            <div style={{fontSize:18, fontWeight:800, color:'#1e293b', marginBottom:4}}>
+            <div style={{fontSize:18, fontWeight:800, color:'var(--text)', marginBottom:4}}>
               🏫 Register Your School
             </div>
             <div style={{fontSize:13, color:'var(--text-muted)', marginBottom:22}}>
@@ -297,7 +297,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
                 { label:'Confirm Password *',key:'confirm',    ph:'Re-enter password',           type:'password' },
               ].map(f => (
                 <div key={f.key} style={{marginBottom:14}}>
-                  <label style={{fontSize:12, fontWeight:600, color:'#475569', display:'block', marginBottom:5}}>
+                  <label style={{fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:5}}>
                     {f.label}
                   </label>
                   <input
@@ -320,7 +320,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
               <div style={{display:'flex', gap:10, marginTop:8}}>
                 <button type="button" onClick={() => setShowCreate(false)} style={{
                   flex:1, padding:12, borderRadius:10,
-                  border:'1.5px solid #e2e8f0', background:'transparent',
+                  border:'1.5px solid var(--border)', background:'transparent',
                   color:'var(--text-muted)', fontSize:14, cursor:'pointer', fontWeight:600,
                 }}>
                   Cancel

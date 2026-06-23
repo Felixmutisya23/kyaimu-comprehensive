@@ -10,9 +10,9 @@ import React, { useState } from 'react';
 const C = {
   primary:   '#1e40af',
   accent:    '#10b981',
-  text:      '#1e293b',
+  text:      'var(--text)',
   sub:       'var(--text-muted)',
-  light:     '#f8fafc',
+  light:     'var(--surface2)',
   border:    'var(--text)',
   white:     '#ffffff',
   gradient:  'linear-gradient(135deg,#1e40af 0%,#7c3aed 100%)',
@@ -112,7 +112,7 @@ export default function PublicPage({ data, onLoginClick }) {
           {data.schoolMotto && <div style={{ fontSize:22,color:'#e0e7ff',marginBottom:32,fontStyle:'italic' }}>"{data.schoolMotto}"</div>}
           <div style={{ display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap' }}>
             <button onClick={()=>document.getElementById('apply')?.scrollIntoView({behavior:'smooth',block:'start'})}
-              style={{ padding:'14px 32px',borderRadius:12,border:'none',background:'#fff',color:C.primary,fontSize:15,fontWeight:800,cursor:'pointer' }}>
+              style={{ padding:'14px 32px',borderRadius:12,border:'none',background:'var(--surface)',color:C.primary,fontSize:15,fontWeight:800,cursor:'pointer' }}>
               Apply for Admission
             </button>
             <button onClick={()=>document.getElementById('about')?.scrollIntoView({behavior:'smooth'})}
@@ -371,14 +371,14 @@ export default function PublicPage({ data, onLoginClick }) {
       </Section>
 
       {/* ── FOOTER ──────────────────────────────────────── */}
-      <footer style={{ background:'#0f172a',color:'var(--text-sub)',padding:'40px 24px',textAlign:'center' }}>
+      <footer style={{ background:'var(--text)',color:'var(--text-sub)',padding:'40px 24px',textAlign:'center' }}>
         <div style={{ maxWidth:1100,margin:'0 auto' }}>
           <div style={{ fontSize:18,fontWeight:800,color:'#fff',marginBottom:6 }}>{data.schoolName}</div>
           {data.schoolMotto && <div style={{ fontSize:13,marginBottom:16,fontStyle:'italic' }}>"{data.schoolMotto}"</div>}
           <div style={{ fontSize:12,marginBottom:16 }}>
             {[data.schoolPOBox,data.schoolLocation,data.schoolCounty].filter(Boolean).join(' · ')}
           </div>
-          <div style={{ borderTop:'1px solid #1e293b',paddingTop:16,fontSize:11,color:'#475569' }}>
+          <div style={{ borderTop:'1px solid var(--text)',paddingTop:16,fontSize:11,color:'var(--text-muted)' }}>
             Powered by EduManage Pro · {new Date().getFullYear()}
           </div>
         </div>

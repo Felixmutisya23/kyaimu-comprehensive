@@ -8,10 +8,10 @@ import { getStudentFeeSummary, getTotalPaidAllTime } from './FeesModule';
    LIGHT THEME TOKENS
 ───────────────────────────────────────────────────────────────── */
 const L = {
-  bg:       '#f8fafc',
+  bg:       'var(--surface2)',
   card:     '#ffffff',
   border:   'var(--text)',
-  text:     '#1e293b',
+  text:     'var(--text)',
   sub:      'var(--text-muted)',
   primary:  '#1e40af',
   accent:   '#10b981',

@@ -387,7 +387,7 @@ export default function Exams({ data, setData, user, flushSave }) {
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(null); }}
-          style={{ width: 160, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+          style={{ width: 160, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
           {accessibleClasses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {classExams.length > 0 && (() => {
@@ -401,7 +401,7 @@ export default function Exams({ data, setData, user, flushSave }) {
           const years = Object.keys(byYear).sort((a, b) => b - a); // newest first
           return (
             <select value={selExamId || ''} onChange={e => setSelExamId(Number(e.target.value) || null)}
-              style={{ width: 260, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              style={{ width: 260, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               {years.map(yr => (
                 <optgroup key={yr} label={`── ${yr} ──`} style={{ color: 'var(--text-sub)', fontSize: 11 }}>
                   {byYear[yr].map(e => (
@@ -520,7 +520,7 @@ export default function Exams({ data, setData, user, flushSave }) {
       {/* Results table */}
       {selExam ? (
         <Card noPad>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #2a3350', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{selExam.name} — {selClass}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {isClassTeacher ? 'Viewing all subjects for your class' : !isPrincipal ? `Showing: ${visibleSubjects.join(', ')}` : 'Full results view'}
@@ -622,7 +622,7 @@ export default function Exams({ data, setData, user, flushSave }) {
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>📊 Subjects Ranked: Best → Weakest</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {subStats.map((s, i) => (
-                <div key={s.sub} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350' }}>
+                <div key={s.sub} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--text-sub)' : i === 2 ? '#cd7c32' : 'var(--text-muted)' }}>#{i + 1}</span>
                   <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{s.sub}</span>
                   <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: s.avg >= 60 ? '#10b98130' : s.avg >= 43 ? '#4f8ef730' : s.avg >= 25 ? '#f59e0b30' : '#ef444430', color: s.avg >= 60 ? '#10b981' : s.avg >= 43 ? '#4f8ef7' : s.avg >= 25 ? '#f59e0b' : '#ef4444' }}>
@@ -642,7 +642,7 @@ export default function Exams({ data, setData, user, flushSave }) {
           <Card style={{ marginTop: 16 }}>
             <SectionTitle icon="alert">My Pending Edit Requests</SectionTitle>
             {myPending.map(r => (
-              <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
+              <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ fontWeight: 500 }}>{r.studentName}</span> — {r.subject}: {r.oldScore} → {r.newScore}
                 <span style={{ marginLeft: 12, fontSize: 11, color: 'var(--text-muted)' }}>
                   Class Teacher: <span style={{ color: r.approvals.classTeacher === 'approved' ? '#10b981' : '#f59e0b' }}>{r.approvals.classTeacher || 'Pending'}</span>
@@ -963,6 +963,6 @@ export default function Exams({ data, setData, user, flushSave }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
 };

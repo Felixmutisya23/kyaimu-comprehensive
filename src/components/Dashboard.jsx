@@ -116,7 +116,7 @@ export default function Dashboard({ data, user }) {
             {data.students.slice(0, 6).map(s => {
               const pct = Math.round((s.fees?.paid || 0) / (s.fees?.total || 1) * 100);
               return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #2a3350' }}>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ width: 100, fontSize: 12, color: 'var(--text-sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                   <ProgressBar pct={pct} />
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32 }}>{pct}%</span>
@@ -134,7 +134,7 @@ export default function Dashboard({ data, user }) {
               const pct = Math.round(i.current / i.max * 100);
               const low = i.current <= i.min;
               return (
-                <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #2a3350' }}>
+                <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ width: 120, fontSize: 12, color: low ? '#ef4444' : 'var(--text-sub)', fontWeight: low ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {low ? '⚠ ' : ''}{i.name}
                   </div>
@@ -153,7 +153,7 @@ export default function Dashboard({ data, user }) {
             {myStudents.length == 0
               ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No students in {myClass} yet. Add them from Students.</p>
               : myStudents.map(s => (
-                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a3350', fontSize: 13, alignItems: 'center' }}>
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 13, alignItems: 'center' }}>
                   <span style={{ fontWeight: 500 }}>{s.name}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.admNo}</span>
                   {s.cases.length > 0 ? <Tag color="red">{s.cases.length} case{s.cases.length > 1 ? 's' : ''}</Tag> : <Tag color="green">Clear</Tag>}
@@ -169,7 +169,7 @@ export default function Dashboard({ data, user }) {
             {(user.teacherSubjects || []).length == 0
               ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No subjects assigned to you yet.</p>
               : (user.teacherSubjects || []).map((s, i) => (
-                <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
+                <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                   <span style={{ fontWeight: 600, color: '#4f8ef7' }}>{s.subject}</span>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
                     {(s.classes||[]).map(c => <Tag key={c} color="green">{c}</Tag>)}
@@ -210,7 +210,7 @@ export default function Dashboard({ data, user }) {
               ['Low Stock Items',  lowInv.length,                                   lowInv.length > 0 ? '#ef4444' : 'var(--text-muted)'],
               ['Unread Messages',  unreadMsgs,                                       unreadMsgs > 0 ? '#f59e0b' : 'var(--text-muted)'],
             ].map(([l, v, c]) => (
-              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--text-sub)' }}>{l}</span>
                 <span style={{ fontWeight: 700, color: c }}>{v}</span>
               </div>
@@ -224,7 +224,7 @@ export default function Dashboard({ data, user }) {
 
 function StatCard({ icon, value, label, color }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', right: 14, top: 14, width: 34, height: 34, borderRadius: 8, background: color + '20', color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={icon} size={17} />
       </div>

@@ -303,7 +303,7 @@ export default function ClassRepairTool({ data, setData }) {
               </div>
               {repairs.map((repair, i) => (
                 <div key={i} style={{
-                  background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8,
+                  background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8,
                   padding: '12px 14px', marginBottom: 8,
                 }}>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

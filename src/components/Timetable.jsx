@@ -12,7 +12,7 @@ const TC = {
   break:    { bg: '#f59e0b20', border: '#f59e0b', text: '#f59e0b' },
   lunch:    { bg: '#10b98120', border: '#10b981', text: '#10b981' },
   assembly: { bg: '#7c3aed20', border: '#7c3aed', text: '#7c3aed' },
-  end:      { bg: '#64748b20', border: 'var(--text-muted)', text: 'var(--text-muted)' },
+  end:      { bg: 'var(--text-muted)20', border: 'var(--text-muted)', text: 'var(--text-muted)' },
 };
 
 // Subject colour palette — cycles for distinct visual identity per subject
@@ -513,7 +513,7 @@ export default function Timetable({ data, setData, user }) {
               {[...new Set(personalSessions.map(s => s.class))].map(cls => {
                 const cls_sessions = personalSessions.filter(s => s.class === cls);
                 return (
-                  <div key={cls} style={{ padding: '8px 0', borderBottom: '1px solid #2a3350', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <div key={cls} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ fontWeight: 500 }}>{cls}</span>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {[...new Set(cls_sessions.map(s => s.lesson))].map(sub => (
@@ -631,7 +631,7 @@ export default function Timetable({ data, setData, user }) {
                               <input
                                 value={slot?.subject || ''}
                                 onChange={e => updateCell(day, i, e.target.value)}
-                                style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid #2a3350', borderRadius: 4 }}
+                                style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}
                               />
                             ) : displayLabel ? (
                               <div style={{
@@ -707,7 +707,7 @@ export default function Timetable({ data, setData, user }) {
             <>
               <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-sub)', display: 'block', marginBottom: 6 }}>Class</label>
               <select value={genClass} onChange={e => setGenClass(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+                style={{ width: '100%', padding: '9px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
                 {classes.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </>
@@ -815,7 +815,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
         <thead>
           <tr>
             {['Subject', 'Per week', 'Allow double', 'Pref. time', 'Teacher', ''].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -825,31 +825,31 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
             const active = !!rules.find(r => r.subject === subject);
             return (
               <tr key={subject} style={{ opacity: active ? 1 : 0.45 }}>
-                <td style={{ padding: '6px 8px', borderBottom: '1px solid #2a3350', color: 'var(--text)', fontWeight: active ? 600 : 400 }}>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text)', fontWeight: active ? 600 : 400 }}>
                   {subject}
                 </td>
-                <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <input
                     type="number" min="1" max="10" value={rule.freq}
                     onChange={e => onUpsert(subject, { freq: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
-                    style={{ width: 54, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
+                    style={{ width: 54, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   />
                 </td>
-                <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <select
                     value={rule.allowDouble ? '1' : '0'}
                     onChange={e => onUpsert(subject, { allowDouble: e.target.value === '1' })}
-                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   >
                     <option value="0">No</option>
                     <option value="1">Yes</option>
                   </select>
                 </td>
-                <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <select
                     value={rule.pref || 'any'}
                     onChange={e => onUpsert(subject, { pref: e.target.value })}
-                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   >
                     <option value="any">Any</option>
                     <option value="morning">Morning</option>
@@ -857,11 +857,11 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
                     <option value="afternoon">Afternoon</option>
                   </select>
                 </td>
-                <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <select
                     value={rule.teacherId || ''}
                     onChange={e => onUpsert(subject, { teacherId: e.target.value })}
-                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12, maxWidth: 140 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12, maxWidth: 140 }}
                   >
                     <option value="">— None —</option>
                     {teachers.map(t => (
@@ -869,7 +869,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
                     ))}
                   </select>
                 </td>
-                <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   {active && (
                     <button
                       onClick={() => onRemove(subject)}
@@ -895,8 +895,8 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
 ───────────────────────────────────────────────────────────── */
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
 };
-const TH = { textAlign: 'left', padding: '10px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' };
-const TD = { padding: '8px 8px', borderBottom: '1px solid #2a3350', verticalAlign: 'middle' };
+const TH = { textAlign: 'left', padding: '10px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' };
+const TD = { padding: '8px 8px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle' };

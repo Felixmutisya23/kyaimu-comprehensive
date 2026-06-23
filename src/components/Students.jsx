@@ -568,7 +568,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                 const pd  = getPaid(s.id, curT, curY, data);
                 const pct = exp > 0 ? Math.round(pd / exp * 100) : 0;
                 return (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #1e2435' }}>
+                  <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={TS.td}>
                       {s.admNo
                         ? <span style={{ background: '#1d4ed820', color: '#60a5fa', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>{s.admNo}</span>
@@ -698,7 +698,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
         {!uploadDone ? (
           <>
             {/* Step 1 — Download template */}
-            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid var(--border)' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>
                 Step 1 — Download the Excel template
               </div>
@@ -712,7 +712,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             </div>
 
             {/* Step 2 — Upload filled file */}
-            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid var(--border)' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>
                 Step 2 — Upload your filled Excel or CSV file
               </div>
@@ -731,18 +731,18 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                 <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
                   Step 3 — Review & Import ({uploadRows.length} rows found)
                 </div>
-                <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
+                <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid var(--border)', borderRadius:8 }}>
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
                     <thead>
                       <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
                         {['Row','First Name','Last Name','Other Name',...(data.admissionSetting!=='auto'?['Adm No']:[]),'Class','DOB','Parent Name','Parent Phone','Year'].map(h=>(
-                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {uploadRows.map((row,i) => (
-                        <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
+                        <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
                           <td style={{ padding:'5px 10px', color:'var(--text-muted)' }}>{row.rowNum}</td>
                           <td style={{ padding:'5px 10px', color: row.firstName?'var(--text)':'#ef4444', fontWeight:row.firstName?400:700 }}>{row.firstName||'⚠ Missing'}</td>
                           <td style={{ padding:'5px 10px', color: row.lastName?'var(--text)':'#ef4444' }}>{row.lastName||'⚠ Missing'}</td>

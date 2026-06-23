@@ -402,7 +402,7 @@ export function LicenseGate({ license, data }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 20, padding: 40, maxWidth: 500, width: '92%', textAlign: 'center', boxShadow: '0 24px 80px #0008' }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 40, maxWidth: 500, width: '92%', textAlign: 'center', boxShadow: '0 24px 80px #0008' }}>
 
         <div style={{ fontSize: 48, marginBottom: 10 }}>🏫</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#4f8ef7', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -447,7 +447,7 @@ export function LicenseGate({ license, data }) {
               value={phone} onChange={e => setPhone(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && license.initiatePayment(phone, null)}
               placeholder="0712 345 678" type="tel"
-              style={{ width: '100%', padding: '12px 14px', marginBottom: 14, background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 10, color: 'var(--text)', fontSize: 16, boxSizing: 'border-box', letterSpacing: 1 }}
+              style={{ width: '100%', padding: '12px 14px', marginBottom: 14, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 16, boxSizing: 'border-box', letterSpacing: 1 }}
             />
             <button
               onClick={() => license.initiatePayment(phone, null)}
@@ -462,7 +462,7 @@ export function LicenseGate({ license, data }) {
                 This screen will unlock <strong>automatically</strong> once payment is confirmed.
               </div>
             )}
-            <div style={{ marginTop: 14, fontSize: 11, color: '#475569', textAlign: 'center' }}>
+            <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
               Powered by InstaSend · Secured M-Pesa STK Push
             </div>
           </div>
@@ -476,7 +476,7 @@ export function LicenseGate({ license, data }) {
               value={token} onChange={e => setToken(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && submitToken()}
               placeholder="EDU-KYAI-20251231-0300-XXXX"
-              style={{ width: '100%', padding: '12px 14px', marginBottom: 14, background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 10, color: '#7c3aed', fontSize: 14, fontFamily: 'monospace', boxSizing: 'border-box', letterSpacing: 1 }}
+              style={{ width: '100%', padding: '12px 14px', marginBottom: 14, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, color: '#7c3aed', fontSize: 14, fontFamily: 'monospace', boxSizing: 'border-box', letterSpacing: 1 }}
             />
             <button onClick={submitToken} disabled={!token.trim()} style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
               Activate Token
@@ -486,7 +486,7 @@ export function LicenseGate({ license, data }) {
                 {tokMsg}
               </div>
             )}
-            <div style={{ marginTop: 12, fontSize: 11, color: '#475569', lineHeight: 1.7 }}>
+            <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               Contact the system developer to get a token:<br/>
             📞 <strong style={{color:'var(--text)'}}>+254 758 568 804</strong> &nbsp;/&nbsp; <strong style={{color:'var(--text)'}}>+254 769 581 067</strong><br/>
             (WhatsApp or call — available Mon–Sat)
@@ -494,7 +494,7 @@ export function LicenseGate({ license, data }) {
           </div>
         )}
 
-        <div style={{ marginTop: 24, fontSize: 11, color: '#334155', lineHeight: 1.7, borderTop: '1px solid #1e2435', paddingTop: 16 }}>
+        <div style={{ marginTop: 24, fontSize: 11, color: 'var(--text-sub)', lineHeight: 1.7, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           🔒 Read-Only mode is active. <strong style={{ color: 'var(--text-muted)' }}>All your data is safe.</strong><br />
           Pay to resume full access for Term {license.currentTerm} {license.currentYear}.
         </div>
@@ -590,7 +590,7 @@ export function TokenGenerator({ data }) {
               onChange={e => setDevPass(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && checkPassword()}
               placeholder="Developer password"
-              style={{ flex: 1, padding: '8px 12px', background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}
+              style={{ flex: 1, padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}
             />
             <button onClick={checkPassword} style={{ padding: '8px 16px', background: '#7c3aed', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Unlock</button>
           </div>
@@ -602,12 +602,12 @@ export function TokenGenerator({ data }) {
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Expiry Date ({daysCount} days)</label>
               <input type="date" value={expiry} onChange={e => setExpiry(e.target.value)} min={new Date().toISOString().split('T')[0]}
-                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Max Students</label>
               <input type="number" value={seats} onChange={e => setSeats(Number(e.target.value))} min={1} max={9999}
-                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
 
@@ -617,7 +617,7 @@ export function TokenGenerator({ data }) {
               const d = new Date(); d.setDate(d.getDate() + days);
               return (
                 <button key={label} onClick={() => setExpiry(d.toISOString().split('T')[0])}
-                  style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 6, color: 'var(--text-sub)', fontSize: 11, cursor: 'pointer' }}>
+                  style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-sub)', fontSize: 11, cursor: 'pointer' }}>
                   {label}
                 </button>
               );

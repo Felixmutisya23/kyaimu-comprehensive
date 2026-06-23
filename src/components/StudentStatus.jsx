@@ -154,7 +154,7 @@ function RollCall({ data, setData, user, isPrincipal, myClass }) {
               { l: 'Absent',         v: absent,                c: '#ef4444' },
               { l: 'Taken By',       v: existingRoll.takenBy,  c: '#f59e0b' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14 }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
                 <div style={{ fontSize: v?.length > 10 ? 14 : 22, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
@@ -677,7 +677,7 @@ function StatusAlerts({ data, setData }) {
             Resolved Alerts ({resolved.length})
           </div>
           {resolved.slice(0, 5).map(a => (
-            <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 8, padding: '10px 14px', marginBottom: 6, opacity: 0.6 }}>
+            <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 6, opacity: 0.6 }}>
               <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{a.message}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Resolved: {a.resolvedDate || '—'}</div>
             </div>
@@ -700,6 +700,6 @@ function getAllClasses(data) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
 };

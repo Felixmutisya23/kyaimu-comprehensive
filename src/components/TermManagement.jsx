@@ -216,26 +216,26 @@ export default function TermManagement({ data, setData }) {
             <FormGroup label="Term Name">
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                 placeholder={`Term ${editing.term} ${editing.year}`}
-                style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </FormGroup>
             <FormRow>
               <FormGroup label="Start Date">
                 <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="End Date">
                 <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </FormRow>
             <FormRow>
               <FormGroup label="Midterm — Reporting Date" hint="Date students report back after midterm break">
                 <input type="date" value={form.midtermReportingDate} onChange={e => setForm({ ...form, midtermReportingDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="Next Term Opening Date" hint="Printed on end-of-term report forms">
                 <input type="date" value={form.nextTermOpeningDate} onChange={e => setForm({ ...form, nextTermOpeningDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </FormRow>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
@@ -326,7 +326,7 @@ export function PromotionPanel({ data, setData }) {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>✅ {preview.promotions.length} students will be promoted:</div>
             <div style={{ maxHeight: 200, overflowY: 'auto', background: 'var(--surface2)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               {preview.promotions.map((p, i) => (
-                <div key={i} style={{ fontSize: 12, color: 'var(--text)', padding: '4px 0', borderBottom: '1px solid #2a3350', display: 'flex', gap: 10 }}>
+                <div key={i} style={{ fontSize: 12, color: 'var(--text)', padding: '4px 0', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10 }}>
                   <span style={{ flex: 1 }}>{p.student.name}</span>
                   <span style={{ color: 'var(--text-muted)' }}>{p.from} → </span>
                   <span style={{ color: '#10b981', fontWeight: 700 }}>{p.to}</span>
@@ -334,7 +334,7 @@ export function PromotionPanel({ data, setData }) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setPreview(null)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text-sub)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+              <button onClick={() => setPreview(null)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-sub)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
               <button onClick={applyPromotion} disabled={running} style={{ padding: '8px 20px', background: '#10b981', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 {running ? 'Promoting...' : `✅ Confirm & Promote ${preview.promotions.length} Students`}
               </button>

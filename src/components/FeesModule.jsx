@@ -262,8 +262,8 @@ function printStudentStatement(student, data) {
         </tr>`;
         ftPayments.forEach(p => {
           bodyRows += `<tr>
-            <td style="padding:3px 8px 3px 20px;border:1px solid #eee;color:#64748b;font-size:11px">↳ ${p.date}</td>
-            <td style="padding:3px 8px;border:1px solid #eee;color:#64748b;font-size:11px">${ft.name}</td>
+            <td style="padding:3px 8px 3px 20px;border:1px solid #eee;color:var(--text-muted);font-size:11px">↳ ${p.date}</td>
+            <td style="padding:3px 8px;border:1px solid #eee;color:var(--text-muted);font-size:11px">${ft.name}</td>
             <td style="padding:3px 8px;border:1px solid #eee;font-size:11px">${p.studentClass||student.class}</td>
             <td style="padding:3px 8px;border:1px solid #eee;font-size:11px">Term ${p.term}</td>
             <td style="padding:3px 8px;border:1px solid #eee;font-size:11px">${p.method} — ${p.reference}</td>
@@ -357,7 +357,7 @@ function printFeeStructure(classes, data, selClass) {
         const catNote = !feeTypeAppliesTo(ft,'day') ? 'Boarders only' : !feeTypeAppliesTo(ft,'boarding') ? 'Day only' : '';
         rows += `<tr>
           <td style="padding:5px 8px;border:1px solid #ddd">${ft.name}${catNote?` <em style="color:#888;font-size:10px">(${catNote})</em>`:''}</td>
-          <td style="padding:5px 8px;border:1px solid #ddd;color:#64748b;font-size:11px">${ft.description||''}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd;color:var(--text-muted);font-size:11px">${ft.description||''}</td>
           <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">Term ${term}</td>
           <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-weight:700;color:${dayAmt?'#003399':'#aaa'}">${dayAmt?'KES '+Number(dayAmt).toLocaleString():'—'}</td>
           ${hasBoarding?`<td style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-weight:700;color:${boardAmt&&boardAmt!=dayAmt?'#7c3aed':'#003399'}">${boardAmt?'KES '+Number(boardAmt).toLocaleString():'—'}</td>`:''}
@@ -509,7 +509,7 @@ function FeeOverview({ data, setData, user, canManage }) {
           { l: 'Outstanding',                   v: `KES ${(totalExpected-totalCollected).toLocaleString()}`,c: '#ef4444' },
           { l: 'Defaulters',                    v: defaulters.length,                                       c: '#f59e0b' },
         ].map(({ l, v, c }) => (
-          <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 14 }}>
+          <div key={l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
           </div>
@@ -660,7 +660,7 @@ function ByFeeType({ data, setData, user, canManage }) {
               { l: 'Cleared',           v: cleared.length,          c: '#10b981' },
               { l: 'Pending',           v: pending.length,          c: '#ef4444' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
                 <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{v}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
@@ -977,7 +977,7 @@ function FeeStructure({ data, setData }) {
   return (
     <div>
       {/* ── Boarding Mode Banner ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 10, padding: '10px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px' }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>School Type</div>
           <div style={{ fontWeight: 700, fontSize: 14, color: boardingMode=='both'?'#a78bfa':boardingMode=='boarding_only'?'#60a5fa':'var(--text-sub)' }}>
@@ -1016,7 +1016,7 @@ function FeeStructure({ data, setData }) {
           {feeTypes.length == 0
             ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fee types yet. Add Tuition, Remedials, Sports Fee, etc.</p>
             : feeTypes.map(ft => (
-              <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
+              <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{ft.name}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1398,6 +1398,6 @@ function ParentView({ data, user }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
 };

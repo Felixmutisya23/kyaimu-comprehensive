@@ -295,7 +295,7 @@ export default function Teachers({ data, setData }) {
           {title} ({list.length})
         </div>
         {list.map(t => (
-          <div key={t.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16, marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div key={t.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <Avatar name={t.name} size={46} color={color} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -395,7 +395,7 @@ export default function Teachers({ data, setData }) {
             : getSubjectsForClasses(allClasses, data);
 
           return (
-            <div key={i} style={{ background: 'var(--surface2)', borderRadius: 8, padding: 12, marginBottom: 10, border: '1px solid #2a3350' }}>
+            <div key={i} style={{ background: 'var(--surface2)', borderRadius: 8, padding: 12, marginBottom: 10, border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Subject</div>
@@ -422,7 +422,7 @@ export default function Teachers({ data, setData }) {
 
               {levelGroups.map(group => (
                 <div key={group.key} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>
                     {group.label}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -453,7 +453,7 @@ export default function Teachers({ data, setData }) {
         })}
 
         <button onClick={addSubjectRow}
-          style={{ background: 'none', border: '1px dashed #2a3350', color: 'var(--text-muted)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 12, width: '100%', marginBottom: 8 }}>
+          style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--text-muted)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 12, width: '100%', marginBottom: 8 }}>
           + Add Another Subject
         </button>
       </>
@@ -496,7 +496,7 @@ export default function Teachers({ data, setData }) {
           { l: 'Non-Teaching',   v: data.teachers.filter(t => t.staffType === 'non_teaching').length, c: '#f59e0b' },
           { l: 'Class Teachers', v: data.teachers.filter(t => t.isClassTeacher).length,          c: '#7c3aed' },
         ].map(({ l, v, c }) => (
-          <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+          <div key={l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
           </div>
@@ -504,7 +504,7 @@ export default function Teachers({ data, setData }) {
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid #2a3350' }}>
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
           No staff found. Click "Add Staff Member" to get started.
         </div>
       )}
@@ -576,7 +576,7 @@ export default function Teachers({ data, setData }) {
         {/* Teaching-only fields */}
         {form.staffType === 'teaching' && (
           <>
-            <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0' }} />
+            <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0' }} />
             <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
               Teaching Assignment
             </div>
@@ -602,7 +602,7 @@ export default function Teachers({ data, setData }) {
         )}
 
         {/* Permissions */}
-        <div style={{ borderTop: '1px solid #2a3350', margin: '14px 0' }} />
+        <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0' }} />
         <div style={{ fontSize: 12, fontWeight: 600, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
           Permissions
         </div>
@@ -633,7 +633,7 @@ export default function Teachers({ data, setData }) {
       <Modal show={showStaffUpload} onClose={() => setShowStaffUpload(false)} title="Bulk Upload Staff Members" wide>
         {!staffUploadDone ? (
           <>
-            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid var(--border)' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>Step 1 — Download the Excel template</div>
               <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10 }}>
                 Fill in staff details. Columns: Name, Staff ID, Email, Phone, Department, Staff Type, Is Class Teacher, Class Teacher Of, Password.
@@ -644,7 +644,7 @@ export default function Teachers({ data, setData }) {
               </Btn>
             </div>
 
-            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid var(--border)' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>Step 2 — Upload your filled file</div>
               <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#4f8ef7', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
                 <Icon name="upload" size={13} /> Choose File (.xlsx / .csv)
@@ -657,18 +657,18 @@ export default function Teachers({ data, setData }) {
                 <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
                   Step 3 — Review & Import ({staffUploadRows.length} rows found)
                 </div>
-                <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
+                <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid var(--border)', borderRadius:8 }}>
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
                     <thead>
                       <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
                         {['Row','Name','Staff ID','Email','Phone','Dept','Type','Class Teacher'].map(h => (
-                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {staffUploadRows.map((row,i) => (
-                        <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
+                        <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
                           <td style={{ padding:'5px 10px', color:'var(--text-muted)' }}>{row.rowNum}</td>
                           <td style={{ padding:'5px 10px', color:row.name?'var(--text)':'#ef4444', fontWeight:row.name?400:700 }}>{row.name||'⚠ Missing'}</td>
                           <td style={{ padding:'5px 10px', color:row.staffId?'#4f8ef7':'#ef4444', fontFamily:'monospace' }}>{row.staffId||'⚠ Missing'}</td>

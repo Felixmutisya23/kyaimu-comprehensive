@@ -98,7 +98,7 @@ export function Kitchen({ data, setData }) {
             <>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Recent Transactions</div>
               {txHistory.slice(0, 4).map(tx => (
-                <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #2a3350' }}>
+                <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ color: 'var(--text-sub)' }}>{tx.item}</span>
                   <span style={{ color: tx.type == 'in' ? '#10b981' : '#ef4444', fontWeight: 600 }}>
                     {tx.type == 'in' ? '+' : '−'}{tx.qty}
@@ -113,7 +113,7 @@ export function Kitchen({ data, setData }) {
 
       {/* Inventory Table */}
       <Card noPad>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #2a3350' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
           <SectionTitle icon="chart">Kitchen Inventory</SectionTitle>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -468,7 +468,7 @@ export function Fees({ data, setData }) {
               { l: 'Outstanding',              v: `KES ${(totalExpected-totalCollected).toLocaleString()}`, c: '#ef4444' },
               { l: 'Defaulters',               v: defaulters.length,                          c: '#f59e0b' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16 }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
@@ -681,7 +681,7 @@ function FeeStructure({ data, setData }) {
           {feeTypes.length == 0 ? (
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fee types yet. Add Tuition Fee, Remedials, etc.</p>
           ) : feeTypes.map(ft => (
-            <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
+            <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{ft.name}</div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -1292,7 +1292,7 @@ export function Settings({ data, setData }) {
               {/* Live preview */}
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Live Preview</div>
-                <div style={{ background: '#fff', borderRadius: 12, padding: 14, display: 'inline-block' }}
+                <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 14, display: 'inline-block' }}
                   dangerouslySetInnerHTML={{ __html: renderSchoolStamp({ ...data, schoolStamp: stamp }, { size: 130 }) }} />
               </div>
             </div>
@@ -1315,7 +1315,7 @@ export function Settings({ data, setData }) {
               const isEditing = editingSubject && editingSubject.levelKey === key;
 
               return (
-                <div key={key} style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #2a3350', overflow: 'hidden' }}>
+                <div key={key} style={{ marginBottom: 16, borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
                   {/* Level header */}
                   <div style={{ background: '#1a2540', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#4f8ef7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{level.label}</span>
@@ -1324,7 +1324,7 @@ export function Settings({ data, setData }) {
                       <button
                         onClick={() => restoreDefaults(key)}
                         title="Restore CBC defaults for this level"
-                        style={{ background: 'none', border: '1px solid #2a3350', borderRadius: 5, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>
+                        style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>
                         Restore defaults
                       </button>
                     </div>
@@ -1412,7 +1412,7 @@ export function Settings({ data, setData }) {
                     {selSubLevel !== key && (
                       <button
                         onClick={() => { setSelSubLevel(key); setSubForm(''); }}
-                        style={{ background: 'none', border: '1px dashed #2a3350', color: 'var(--text-muted)', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11 }}>
+                        style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--text-muted)', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11 }}>
                         + Add subject to {level.label}
                       </button>
                     )}
@@ -1437,7 +1437,7 @@ export function Settings({ data, setData }) {
             {classGroups.map(g => {
               const fullNames = g.streams.length == 0 ? [g.name] : g.streams.map(s => `${g.name} ${s}`);
               return (
-                <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
+                <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{g.name}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -1475,7 +1475,7 @@ export function Settings({ data, setData }) {
               <Btn size="sm" variant="ghost" onClick={() => setShowBell(true)}><Icon name="add" size={12} /> Add Bell</Btn>
             </div>
             {(data.bells||[]).map(b => (
-              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
+              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ fontWeight: 700, minWidth: 48, color: TYPE_COLORS[b.type] || '#4f8ef7' }}>{b.time}</span>
                 <span style={{ flex: 1 }}>{b.label}</span>
                 <Tag color={b.type == 'lesson' ? 'blue' : b.type == 'break' ? 'amber' : b.type == 'lunch' ? 'green' : 'purple'}>{b.type}</Tag>
@@ -1494,47 +1494,47 @@ export function Settings({ data, setData }) {
                 <thead>
                   <tr style={{ background: 'var(--surface2)' }}>
                     {['Label','Min Score','Max Score','Points','Color'].map(h => (
-                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #2a3350' }}>{h}</th>
+                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, borderBottom: '1px solid var(--border)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(data.gradesConfig || GRADES_CBC).map((g, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #2a3350' }}>
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '5px 6px' }}>
                         <input value={g.label} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], label: e.target.value };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: g.color, fontWeight: 700 }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: g.color, fontWeight: 700 }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.scoreMin} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], scoreMin: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.scoreMax} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], scoreMax: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.points} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], points: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="color" value={g.color} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], color: e.target.value };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid #2a3350', borderRadius: 4, background: 'var(--surface2)', cursor: 'pointer' }} />
+                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface2)', cursor: 'pointer' }} />
                       </td>
                     </tr>
                   ))}
@@ -1561,7 +1561,7 @@ export function Settings({ data, setData }) {
               </Btn>
               <div>
                 <label style={{
-                  padding: '8px 16px', borderRadius: 8, border: '1px solid #2a3350',
+                  padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
                   background: 'transparent', color: 'var(--text-sub)', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
@@ -1703,7 +1703,7 @@ export function Settings({ data, setData }) {
         </Btn>
 
         {/* Gallery */}
-        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               📸 School Gallery
@@ -1717,7 +1717,7 @@ export function Settings({ data, setData }) {
           </div>
 
           {/* Upload area */}
-          <div style={{ background: 'var(--surface2)', borderRadius: 10, border: '1px dashed #2a3350', padding: 16, marginBottom: 14 }}>
+          <div style={{ background: 'var(--surface2)', borderRadius: 10, border: '1px dashed var(--border)', padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 value={newGallery.caption}
@@ -1768,7 +1768,7 @@ export function Settings({ data, setData }) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
               {(data.schoolGallery || []).map(photo => (
-                <div key={photo.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid #2a3350', background: 'var(--surface2)' }}>
+                <div key={photo.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface2)' }}>
                   <img
                     src={photo.url} alt={photo.caption || 'School photo'}
                     style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
@@ -1806,7 +1806,7 @@ export function Settings({ data, setData }) {
         </div>
 
         {/* Job Vacancies */}
-        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>💼 Job Vacancies</div>
             <Btn size="sm" onClick={() => setShowAddJob(true)}><Icon name="add" size={12} /> Post Job</Btn>
@@ -1814,7 +1814,7 @@ export function Settings({ data, setData }) {
           {(data.jobVacancies || []).length === 0
             ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No vacancies posted yet. Post a job and it will appear on your public page.</div>
             : (data.jobVacancies || []).map(job => (
-              <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
+              <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{job.title}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{job.description?.slice(0, 80)}{job.description?.length > 80 ? '...' : ''}</div>
@@ -1822,7 +1822,7 @@ export function Settings({ data, setData }) {
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setData(d => ({ ...d, jobVacancies: (d.jobVacancies||[]).map(j => j.id===job.id?{...j,active:!j.active}:j) }))}
-                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #2a3350', background: 'none', color: job.active?'#10b981':'var(--text-muted)', cursor: 'pointer' }}>
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: job.active?'#10b981':'var(--text-muted)', cursor: 'pointer' }}>
                     {job.active ? 'Active' : 'Hidden'}
                   </button>
                   <button onClick={() => removeJob(job.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
@@ -1832,7 +1832,7 @@ export function Settings({ data, setData }) {
         </div>
 
         {/* Required Documents */}
-        <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16 }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>📋 Required Documents for Student Enrollment</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
             Default: Birth certificate photocopy, Parent ID, Transfer letter (if applicable). Add extras your school requires.
@@ -1843,7 +1843,7 @@ export function Settings({ data, setData }) {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(data.customDocReqs || []).map(req => (
-              <span key={req} style={{ background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, padding: '3px 10px', fontSize: 12, color: 'var(--text-sub)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span key={req} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 10px', fontSize: 12, color: 'var(--text-sub)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {req}
                 <button onClick={() => removeDocReq(req)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>×</button>
               </span>
@@ -1954,6 +1954,6 @@ export function Settings({ data, setData }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' },
-  td:    { padding: '11px 14px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' },
+  td:    { padding: '11px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
 };

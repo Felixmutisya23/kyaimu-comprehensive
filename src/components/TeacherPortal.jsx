@@ -88,9 +88,9 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
         .tp-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; }
         .tp-overlay.open { display:block; }
         /* Sidebar */
-        .tp-sidebar { width:220px; background:#171b26; border-right:1px solid #2a3350; display:flex; flex-direction:column; flex-shrink:0; z-index:201; }
+        .tp-sidebar { width:220px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; z-index:201; }
         /* Hamburger */
-        .tp-hamburger { display:none; position:fixed; top:0; left:0; right:0; z-index:300; background:#171b26; border-bottom:1px solid #2a3350; padding:10px 14px; align-items:center; gap:12px; }
+        .tp-hamburger { display:none; position:fixed; top:0; left:0; right:0; z-index:300; background:var(--surface); border-bottom:1px solid var(--border); padding:10px 14px; align-items:center; gap:12px; }
         .tp-main { flex:1; overflow:auto; padding:24px; }
         /* Score input on mobile — big touch target */
         .score-input { width:72px; text-align:center; padding:6px 8px; font-size:14px; font-weight:700; }
@@ -106,9 +106,9 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
           /* marks table → card list on phones */
           .marks-table, .marks-table thead, .marks-table tbody, .marks-table th, .marks-table td, .marks-table tr { display:block; }
           .marks-table thead { display:none; }
-          .marks-table tbody tr { margin-bottom:10px; background:#1e2435; border-radius:10px; border:1px solid #2a3350; padding:10px 12px; }
+          .marks-table tbody tr { margin-bottom:10px; background:var(--border); border-radius:10px; border:1px solid var(--border); padding:10px 12px; }
           .marks-table td { padding:3px 0; border:none; display:flex; align-items:center; justify-content:space-between; }
-          .marks-table td::before { content:attr(data-label); font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600; }
+          .marks-table td::before { content:attr(data-label); font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; }
           .score-input { width:90px; padding:8px; font-size:16px; }
           .tp-page-title { font-size:17px !important; }
           .tp-stat-grid { grid-template-columns: repeat(2,1fr) !important; }
@@ -123,8 +123,8 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
         /* Bottom nav bar on phones */
         .tp-bottom-nav { display:none; }
         @media (max-width:700px) {
-          .tp-bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:#171b26; border-top:1px solid #2a3350; z-index:250; }
-          .tp-bottom-nav button { flex:1; padding:8px 4px 10px; background:none; border:none; color:#64748b; font-size:10px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; }
+          .tp-bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); z-index:250; }
+          .tp-bottom-nav button { flex:1; padding:8px 4px 10px; background:none; border:none; color:var(--text-muted); font-size:10px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; }
           .tp-bottom-nav button.active { color:#4f8ef7; }
           .tp-bottom-nav button span.ico { font-size:20px; }
         }
@@ -142,7 +142,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
 
       {/* Sidebar */}
       <aside className={`tp-sidebar ${navOpen ? 'open' : ''}`}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid #2a3350' }}>
+        <div style={{ padding: '20px 16px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Avatar name={user.name} size={40} color="#4f8ef7" />
             <div style={{ minWidth: 0 }}>
@@ -172,11 +172,11 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
             </button>
           ))}
         </div>
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #2a3350' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
           <button onClick={() => onLogout && onLogout()} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #ef444430', background: '#ef444410', color: '#ef4444', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
             ⏻ Logout
           </button>
-          <div style={{ fontSize: 10, color: '#475569', textAlign: 'center', marginTop: 6 }}>EduManage Pro · {data.schoolName}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', marginTop: 6 }}>EduManage Pro · {data.schoolName}</div>
         </div>
       </aside>
 
@@ -272,7 +272,7 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {timetableToday.map((l, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350', flexWrap: 'wrap' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#4f8ef7', minWidth: 60 }}>{l.time}</div>
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{l.subject}</div>
@@ -618,7 +618,7 @@ function TeacherMarks({ user, data, setData }) {
           {/* Desktop: table | Mobile: card list (via CSS) */}
           <table className="marks-table">
             <thead>
-              <tr style={{ background: 'var(--surface2)', borderBottom: '2px solid #2a3350' }}>
+              <tr style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--border)' }}>
                 <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>#</th>
                 <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Student</th>
                 <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Adm No</th>
@@ -634,7 +634,7 @@ function TeacherMarks({ user, data, setData }) {
                 const isChanged = hadPrior && numScore !== null && Number(original[st.name]) !== numScore;
                 const needsApproval = isChanged && !autoApproved();
                 return (
-                  <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
+                  <tr key={st.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td data-label="#" style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{i + 1}</td>
                     <td data-label="Student" style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--text)' }}>{st.name}</td>
                     <td data-label="Adm No" style={{ padding: '8px 10px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>{st.admNo}</td>
@@ -721,7 +721,7 @@ function TeacherResults({ user, data }) {
           <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No marks entered yet for this exam.</div></Card>
         ) : (
           <Card noPad style={{ overflowX: 'auto' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a3350', fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>
               {selExam.name} — {selClass} · Term {selExam.term} · {selExam.year}
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -739,7 +739,7 @@ function TeacherResults({ user, data }) {
                     const scores = visibleSubjects.map(sub => getScore(selExam.results?.[st.name]?.[sub]));
                     const total  = scores.reduce((a, v) => a + (v ?? 0), 0);
                     return (
-                      <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
+                      <tr key={st.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '9px 10px', color: 'var(--text-muted)', fontSize: 11 }}>{idx + 1}</td>
                         <td style={{ padding: '9px 10px', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap' }}>{st.name}</td>
                         {scores.map((score, si) => (
@@ -807,7 +807,7 @@ function TeacherClass({ user, data, setData }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filtered.map((st, i) => (
-              <div key={st.id} className="tp-student-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350' }}>
+              <div key={st.id} className="tp-student-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 22, textAlign: 'right' }}>{i + 1}</div>
                 <Avatar name={st.name} size={32} color="#4f8ef7" />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -968,7 +968,7 @@ function TeacherApprovals({ user, data, setData }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Recent History</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.map(r => (
-              <div key={r.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div key={r.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{r.studentName} — {r.subject}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.oldScore} → {r.newScore} · by {r.requestedByName} · {r.date}</div>
@@ -1005,7 +1005,7 @@ function TeacherNotifs({ user, data, setData }) {
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.read ? 'var(--border)' : '#4f8ef7', marginTop: 5, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: n.read ? 'var(--text-sub)' : 'var(--text)', lineHeight: 1.5 }}>{n.message}</div>
-                <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>From: {n.from} · {n.date}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>From: {n.from} · {n.date}</div>
               </div>
               {!n.read && <Btn size="sm" variant="ghost" onClick={() => markRead(n.id)} style={{ flexShrink: 0 }}>✓</Btn>}
             </div>
