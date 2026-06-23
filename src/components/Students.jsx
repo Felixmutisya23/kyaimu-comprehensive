@@ -376,7 +376,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               ['Year Joined', s.joined],
               ['Current Class', s.class],
             ].map(([l, v]) => (
-              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #e2e8f0', fontSize: 13 }}>
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--text-muted)' }}>{l}</span>
                 <span style={{ fontWeight: 500 }}>{v || '—'}</span>
               </div>
@@ -864,7 +864,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
 }
 
 const TS = {
-  table: { width:'100%',borderCollapse:'collapse',fontSize:13 },
-  th:    { textAlign:'left',padding:'10px 14px',fontSize:11,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc' },
-  td:    { padding:'10px 14px',borderBottom:'1px solid #f1f5f9',color:'#1e293b' },
+  table: { width:'100%', borderCollapse:'collapse', fontSize:13 },
+  th:    { textAlign:'left', padding:'10px 14px', fontSize:11, fontWeight:700, color:'var(--text-sub)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'1px solid var(--border)', background:'var(--surface2)' },
+  td:    { padding:'10px 14px', borderBottom:'1px solid var(--border)', color:'var(--text)' },
 };

@@ -957,7 +957,7 @@ export default function App() {
         }
         .edu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999; cursor: pointer; }
         .edu-top-bar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 997; background: #171b26; border-bottom: 1px solid #2a3350; padding: 0 14px; height: 52px; align-items: center; gap: 12px; }
-        .edu-hamburger-btn { display: none; background: none; border: none; color: #e2e8f0; font-size: 22px; cursor: pointer; padding: 6px; line-height: 1; }
+        .edu-hamburger-btn { display: none; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; padding: 6px; line-height: 1; }
         /* Make tables scroll on mobile */
         @media (max-width: 768px) {
           table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
