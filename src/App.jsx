@@ -28,7 +28,6 @@ import {
   loadLicenseFromCloud,
   getSubscription, upsertSubscription,
   supabaseClient,
-  findStudentBySlc,
 } from './supabase';
 
 /*
@@ -334,7 +333,12 @@ function SetupWizard({ data, setData, onDone }) {
 
 
 export default function App() {
-  const [data, setDataRaw]        = React.useState({ ...INITIAL_DATA });
+  // Restore saved theme preference from localStorage on startup
+  const savedTheme = localStorage.getItem('edu_theme');
+  const [data, setDataRaw] = React.useState({
+    ...INITIAL_DATA,
+    darkTheme: savedTheme ? savedTheme === 'dark' : true, // default dark
+  });
   const [user, setUser]           = React.useState(null);
   const [page, setPage]           = React.useState('dashboard');
   const [showTeacherRegister]     = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'register');
@@ -355,35 +359,44 @@ export default function App() {
   const isDark = data.darkTheme !== false;
   React.useEffect(() => {
     const dark = {
-      '--bg':          '#0f1117',
-      '--surface':     '#171b26',
-      '--surface2':    '#1e2435',
-      '--border':      '#2a3350',
-      '--text':        '#e2e8f0',
-      '--text-sub':    '#94a3b8',
-      '--text-muted':  '#64748b',
-      '--input-bg':    '#1e2435',
-      '--input-color': '#e2e8f0',
+      '--bg':          '#0a0d14',
+      '--surface':     '#13182b',
+      '--surface2':    '#1c2340',
+      '--border':      '#2e3a5c',
+      '--text':        '#f0f4ff',
+      '--text-sub':    '#b8c8e8',
+      '--text-muted':  '#7a90b8',
+      '--input-bg':    '#1c2340',
+      '--input-color': '#f0f4ff',
       '--accent':      '#4f8ef7',
       '--card-shadow': 'none',
+      '--table-header-bg':   '#1c2340',
+      '--table-header-text': '#f0f4ff',
+      '--table-row-alt':     '#141930',
+      '--table-row-hover':   '#1e2848',
     };
     const light = {
-      '--bg':          '#f0f4f8',
+      '--bg':          '#eef2f7',
       '--surface':     '#ffffff',
-      '--surface2':    '#f8fafc',
-      '--border':      '#d1dbe8',
-      '--text':        '#0f172a',
-      '--text-sub':    '#334155',
-      '--text-muted':  '#64748b',
+      '--surface2':    '#f0f4f9',
+      '--border':      '#b8c8dc',
+      '--text':        '#0a1628',
+      '--text-sub':    '#1e3a5f',
+      '--text-muted':  '#4a6080',
       '--input-bg':    '#ffffff',
-      '--input-color': '#0f172a',
-      '--accent':      '#2563eb',
-      '--card-shadow': '0 1px 4px rgba(0,0,0,0.08)',
+      '--input-color': '#0a1628',
+      '--accent':      '#1a56db',
+      '--card-shadow': '0 2px 8px rgba(0,0,0,0.12)',
+      '--table-header-bg':   '#1a56db',
+      '--table-header-text': '#ffffff',
+      '--table-row-alt':     '#f0f4f9',
+      '--table-row-hover':   '#dce8f5',
     };
     const vars = isDark ? dark : light;
     const root = document.documentElement;
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
     root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('edu_theme', isDark ? 'dark' : 'light');
     document.body.style.background = vars['--bg'];
     document.body.style.color      = vars['--text'];
   }, [isDark]);
@@ -632,24 +645,24 @@ export default function App() {
       onStudentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        let student = (data.students || []).find(s => String(s.slc || '').trim() === slcTrim);
+        // First check already-loaded data
+        let student = (data.students || []).find(s =>
+          String(s.slc || '').trim() === slcTrim
+        );
+        // If not found and we have a schoolId, reload from DB
         if (!student) {
           const schoolId = getLocalSchoolId();
           if (schoolId) {
             try {
               const freshData = await loadSchoolData(schoolId);
-              if (freshData) { setDataRaw(freshData); student = (freshData.students || []).find(s => String(s.slc || '').trim() === slcTrim); }
+              if (freshData) {
+                setDataRaw(freshData);
+                student = (freshData.students || []).find(s =>
+                  String(s.slc || '').trim() === slcTrim
+                );
+              }
             } catch(e) { console.error('SLC load error:', e); }
           }
-        }
-        if (!student) {
-          try {
-            const result = await findStudentBySlc(slcTrim);
-            if (result) {
-              const freshData = await loadSchoolData(result.schoolId);
-              if (freshData) { setDataRaw(freshData); setLocalSchoolId(result.schoolId); student = result.student; }
-            }
-          } catch(e) { console.error('SLC cross-school error:', e); }
         }
         if (student) { setStudentUser(student); return true; }
         return false;
@@ -657,24 +670,24 @@ export default function App() {
       onParentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        let student = (data.students || []).find(s => String(s.slc || '').trim() === slcTrim);
+        // First check already-loaded data
+        let student = (data.students || []).find(s =>
+          String(s.slc || '').trim() === slcTrim
+        );
+        // If not found, reload from DB
         if (!student) {
           const schoolId = getLocalSchoolId();
           if (schoolId) {
             try {
               const freshData = await loadSchoolData(schoolId);
-              if (freshData) { setDataRaw(freshData); student = (freshData.students || []).find(s => String(s.slc || '').trim() === slcTrim); }
+              if (freshData) {
+                setDataRaw(freshData);
+                student = (freshData.students || []).find(s =>
+                  String(s.slc || '').trim() === slcTrim
+                );
+              }
             } catch(e) { console.error('SLC parent load error:', e); }
           }
-        }
-        if (!student) {
-          try {
-            const result = await findStudentBySlc(slcTrim);
-            if (result) {
-              const freshData = await loadSchoolData(result.schoolId);
-              if (freshData) { setDataRaw(freshData); setLocalSchoolId(result.schoolId); student = result.student; }
-            }
-          } catch(e) { console.error('SLC parent cross-school error:', e); }
         }
         if (student) {
           setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id });
@@ -850,7 +863,7 @@ export default function App() {
 
   function renderPage() {
     if (!nav.find(n => n.id == page)) return <Dashboard data={data} setData={setData} user={user} />;
-    const props = { data, setData, user, isUnlocked: license.isUnlocked, flushSave: flushPendingSave };
+    const props = { data, setData, user, isUnlocked: license.isUnlocked };
     switch (page) {
       case 'dashboard':     return <Dashboard     {...props} />;
       case 'notifications': return <Notifications {...props} />;
@@ -1054,9 +1067,24 @@ export default function App() {
             {/* Manual refresh — force-reload the latest saved data from the server */}
             {user?.role == 'principal' && (
               <button onClick={reloadFromServer} disabled={reloading} title="Reload the latest saved data from the server"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: '#1e2435', border: '1px solid #2a3350', color: '#94a3b8', cursor: reloading ? 'default' : 'pointer', opacity: reloading ? 0.6 : 1 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-sub)', cursor: reloading ? 'default' : 'pointer', opacity: reloading ? 0.6 : 1 }}>
                 <span style={{ display: 'inline-block', transform: reloading ? 'rotate(360deg)' : 'none', transition: reloading ? 'transform 0.8s linear' : 'none' }}>⟳</span>
                 {reloading ? 'Refreshing…' : 'Refresh'}
+              </button>
+              {/* Theme toggle — always visible for ALL users */}
+              <button
+                onClick={() => setData(d => ({ ...d, darkTheme: !d.darkTheme }))}
+                title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, fontWeight: 700, padding: '4px 12px',
+                  borderRadius: 20, cursor: 'pointer',
+                  background: isDark ? '#f59e0b20' : '#1a56db20',
+                  border: isDark ? '1px solid #f59e0b50' : '1px solid #1a56db50',
+                  color: isDark ? '#f59e0b' : '#1a56db',
+                  transition: 'all 0.2s',
+                }}>
+                {isDark ? '☀ Light' : '🌙 Dark'}
               </button>
             )}
             {/* License status badge */}

@@ -26,7 +26,7 @@ function Field({ label, value, onChange, type='text', placeholder, hint, autoFoc
         style={focus ? {...IS.base,...IS.focused} : IS.base}
         onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}
       />
-      {hint && <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{hint}</div>}
+      {hint && <div style={{fontSize:11,color:'var(--text-sub)',marginTop:4}}>{hint}</div>}
     </div>
   );
 }
@@ -122,7 +122,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             boxShadow:'0 12px 32px #1e40af40',
           }}>E</div>
           <div style={{fontSize:22, fontWeight:800, color:'#1e293b', letterSpacing:-0.5}}>EduManage Pro</div>
-          <div style={{fontSize:13, color:'#94a3b8', marginTop:3}}>School Management System</div>
+          <div style={{fontSize:13, color:'var(--text-sub)', marginTop:3}}>School Management System</div>
         </div>
 
         {/* Tab switcher */}
@@ -135,7 +135,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             <button key={t.id} onClick={() => { setTab(t.id); reset(); }} style={{
               flex:1, padding:'10px 6px', border:'none', borderRadius:10, cursor:'pointer',
               background: tab===t.id ? 'linear-gradient(135deg,#1e40af,#7c3aed)' : 'transparent',
-              color: tab===t.id ? '#fff' : '#64748b',
+              color: tab===t.id ? '#fff' : 'var(--text-muted)',
               transition:'all 0.2s',
             }}>
               <div style={{fontSize:20, marginBottom:2}}>{t.emoji}</div>
@@ -154,7 +154,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             <div style={{fontSize:17, fontWeight:800, color:'#1e293b'}}>
               {TABS.find(t=>t.id===tab)?.label} Login
             </div>
-            <div style={{fontSize:13, color:'#94a3b8', marginTop:3}}>
+            <div style={{fontSize:13, color:'var(--text-sub)', marginTop:3}}>
               {TABS.find(t=>t.id===tab)?.sub}
             </div>
           </div>
@@ -242,9 +242,9 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             <button type="submit" disabled={submitDisabled} style={{
               width:'100%', padding:13, borderRadius:12, border:'none',
               background: submitDisabled
-                ? '#e2e8f0'
+                ? 'var(--text)'
                 : 'linear-gradient(135deg,#1e40af,#7c3aed)',
-              color: submitDisabled ? '#94a3b8' : '#fff',
+              color: submitDisabled ? 'var(--text-sub)' : '#fff',
               fontSize:15, fontWeight:700,
               cursor: submitDisabled ? 'not-allowed' : 'pointer',
               boxShadow: submitDisabled ? 'none' : '0 6px 20px #1e40af40',
@@ -258,7 +258,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
         {/* Footer links */}
         <div style={{
           display:'flex', justifyContent:'space-between', flexWrap:'wrap',
-          gap:8, fontSize:12, color:'#94a3b8', padding:'0 4px',
+          gap:8, fontSize:12, color:'var(--text-sub)', padding:'0 4px',
         }}>
           <span>
             New school?{' '}
@@ -285,7 +285,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
             <div style={{fontSize:18, fontWeight:800, color:'#1e293b', marginBottom:4}}>
               🏫 Register Your School
             </div>
-            <div style={{fontSize:13, color:'#64748b', marginBottom:22}}>
+            <div style={{fontSize:13, color:'var(--text-muted)', marginBottom:22}}>
               Set up your school on EduManage Pro
             </div>
             <form onSubmit={handleCreateSchool}>
@@ -321,7 +321,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
                 <button type="button" onClick={() => setShowCreate(false)} style={{
                   flex:1, padding:12, borderRadius:10,
                   border:'1.5px solid #e2e8f0', background:'transparent',
-                  color:'#64748b', fontSize:14, cursor:'pointer', fontWeight:600,
+                  color:'var(--text-muted)', fontSize:14, cursor:'pointer', fontWeight:600,
                 }}>
                   Cancel
                 </button>
@@ -339,7 +339,7 @@ export default function Login({ data, onLogin, onCreateSchool, onStudentLogin, o
         </div>
       )}
 
-      <style>{`input::placeholder { color: #94a3b8; }`}</style>
+      <style>{`input::placeholder { color: var(--text-muted); }`}</style>
     </div>
   );
 }

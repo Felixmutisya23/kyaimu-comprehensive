@@ -10,9 +10,9 @@ import { getStudentFeeSummary, getTotalPaidAllTime } from './FeesModule';
 const L = {
   bg:       '#f8fafc',
   card:     '#ffffff',
-  border:   '#e2e8f0',
+  border:   'var(--text)',
   text:     '#1e293b',
-  sub:      '#64748b',
+  sub:      'var(--text-muted)',
   primary:  '#1e40af',
   accent:   '#10b981',
   warning:  '#f59e0b',

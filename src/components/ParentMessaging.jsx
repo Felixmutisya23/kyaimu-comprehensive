@@ -216,19 +216,19 @@ export default function ParentMessaging({ data, setData, user }) {
         {[['broadcast','📢 Broadcast Message'],['results','📊 Send Results'],['logs','📋 Message Logs'],['config','⚙ SMS Setup']].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: tab === t ? '#4f8ef7' : '#1e2435', color: tab === t ? '#fff' : '#94a3b8', fontWeight: 600, fontSize: 13,
+            background: tab === t ? '#4f8ef7' : 'var(--surface2)', color: tab === t ? '#fff' : 'var(--text-sub)', fontWeight: 600, fontSize: 13,
           }}>{l}</button>
         ))}
       </div>
 
       {tab === 'broadcast' && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>
             Send Message to All Parents
           </div>
           <FormGroup label="Target Class">
             <select value={selClass} onChange={e => setSel(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.parentPhone).length} parents with phones)</option>
               {classes.map(c => {
                 const count = (data.students||[]).filter(s=>s.class===c&&s.parentPhone).length;
@@ -239,13 +239,13 @@ export default function ParentMessaging({ data, setData, user }) {
           <FormGroup label="Message">
             <textarea value={message} onChange={e => setMsg(e.target.value)} rows={5}
               placeholder={`Dear Parent/Guardian,\n\n[Your message here]\n\nRegards,\n${data.schoolName || 'School'} Administration`}
-              style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
           </FormGroup>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Btn onClick={broadcastMessage} disabled={sending || !message.trim()} style={{ background: '#10b981' }}>
               {sending ? '⏳ Sending...' : `📤 Send to ${uniquePhones.length} Parent(s)`}
             </Btn>
-            <span style={{ fontSize: 12, color: '#64748b' }}>{message.length} characters</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{message.length} characters</span>
           </div>
           {!getSMSGatewayConfig(data).apiKey && (
             <Alert type="warning" style={{ marginTop: 12 }}>
@@ -257,7 +257,7 @@ export default function ParentMessaging({ data, setData, user }) {
 
       {tab === 'results' && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>
             Send Exam Results to Parents — One Click
           </div>
           <Alert type="info">
@@ -265,7 +265,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </Alert>
           <FormGroup label="Select Exam" style={{ marginTop: 12 }}>
             <select value={selExam} onChange={e => setExam(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="">-- Select Exam --</option>
               {exams.map(e => (
                 <option key={e.id} value={e.id}>{e.name} · {e.class} · Term {e.term} {e.year}</option>
@@ -274,7 +274,7 @@ export default function ParentMessaging({ data, setData, user }) {
           </FormGroup>
           <FormGroup label="Filter by Class">
             <select value={selClass} onChange={e => setSel(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="ALL">All Classes</option>
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -300,23 +300,23 @@ export default function ParentMessaging({ data, setData, user }) {
       {tab === 'logs' && (
         <Card noPad>
           {logs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>No messages sent yet.</div>
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No messages sent yet.</div>
           ) : logs.map(log => (
             <div key={log.id} style={{ padding: '14px 18px', borderBottom: '1px solid #2a3350' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, fontSize: 13, color: '#e2e8f0' }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
                   {log.type === 'results' ? `📊 Results: ${log.examName}` : '📢 Broadcast'}
                 </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <Tag color={log.delivered ? 'green' : 'yellow'}>{log.delivered ? 'Delivered' : 'Manual'}</Tag>
-                  <span style={{ fontSize: 11, color: '#64748b' }}>{new Date(log.date).toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(log.date).toLocaleString()}</span>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {log.recipientCount} parents · {log.class} · By: {log.sentBy}
               </div>
               {log.message && (
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 4, fontStyle: 'italic' }}>
                   {log.message.substring(0, 100)}...
                 </div>
               )}
@@ -327,14 +327,14 @@ export default function ParentMessaging({ data, setData, user }) {
 
       {tab === 'config' && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 16 }}>SMS Gateway Configuration</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>SMS Gateway Configuration</div>
           <Alert type="info">
             Recommended: <strong>Africa's Talking</strong> — works best in Kenya. Sign up at africastalking.com.
             For testing, use "sandbox" as username.
           </Alert>
           <FormGroup label="SMS Provider" style={{ marginTop: 12 }}>
             <select value={smsConf.provider} onChange={e => setSmsConf({ ...smsConf, provider: e.target.value })}
-              style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="africastalking">Africa's Talking (Recommended)</option>
               <option value="manual">Manual / Print List (No API)</option>
             </select>
@@ -344,18 +344,18 @@ export default function ParentMessaging({ data, setData, user }) {
               <FormGroup label="Username">
                 <input value={smsConf.username || ''} onChange={e => setSmsConf({ ...smsConf, username: e.target.value })}
                   placeholder="your_username or sandbox"
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="API Key">
                 <input value={smsConf.apiKey || ''} onChange={e => setSmsConf({ ...smsConf, apiKey: e.target.value })}
                   placeholder="Your Africa's Talking API Key"
                   type="password"
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="Sender ID (max 11 chars)">
                 <input value={smsConf.senderId || ''} onChange={e => setSmsConf({ ...smsConf, senderId: e.target.value.slice(0,11) })}
                   placeholder="SchoolName"
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </>
           )}
