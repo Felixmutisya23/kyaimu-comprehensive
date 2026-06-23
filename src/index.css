@@ -1,41 +1,57 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Default CSS variables (dark theme) ── */
+/* ════════════════════════════════════════
+   DARK THEME (default)
+   High contrast — crystal clear indoors
+   and on well-lit screens
+════════════════════════════════════════ */
 :root {
-  --bg:          #0a0d14;
-  --surface:     #13182b;
-  --surface2:    #1c2340;
-  --border:      #2e3a5c;
-  --text:        #f0f4ff;
-  --text-sub:    #b8c8e8;
-  --text-muted:  #7a90b8;
-  --input-bg:    #1c2340;
-  --input-color: #f0f4ff;
+  --bg:          #0a0e1a;   /* deep navy-black page bg */
+  --surface:     #111827;   /* card / sidebar */
+  --surface2:    #1a2236;   /* inputs, table rows */
+  --border:      #2d3f5e;   /* visible borders */
+
+  /* TEXT — maximum contrast on dark */
+  --text:        #ffffff;   /* primary: pure white — no squinting */
+  --text-sub:    #c8d8f0;   /* secondary: bright blue-white */
+  --text-muted:  #8aabcc;   /* muted: clearly visible mid-blue */
+
+  --input-bg:    #1a2236;
+  --input-color: #ffffff;
   --accent:      #4f8ef7;
   --card-shadow: none;
-  --table-header-bg:   #1c2340;
-  --table-header-text: #f0f4ff;
-  --table-row-alt:     #141930;
-  --table-row-hover:   #1e2848;
+
+  --table-header-bg:   #1a2236;
+  --table-header-text: #ffffff;
+  --table-row-alt:     #111827;
+  --table-row-hover:   #1e2c45;
 }
 
-/* ── Light theme overrides ── */
+/* ════════════════════════════════════════
+   LIGHT THEME
+   Maximum contrast for outdoor / phone use
+   WCAG AAA compliant (7:1 contrast ratio)
+════════════════════════════════════════ */
 [data-theme="light"] {
-  --bg:          #eef2f7;
-  --surface:     #ffffff;
-  --surface2:    #f0f4f9;
-  --border:      #b8c8dc;
-  --text:        #0a1628;
-  --text-sub:    #1e3a5f;
-  --text-muted:  #4a6080;
+  --bg:          #ffffff;   /* pure white — maximum outdoor brightness */
+  --surface:     #ffffff;   /* cards: white */
+  --surface2:    #f3f6fa;   /* inputs, rows: very light grey */
+  --border:      #9aafc5;   /* borders: clearly visible */
+
+  /* TEXT — near-black for maximum contrast outdoors */
+  --text:        #050d1a;   /* primary: near-black — 19:1 contrast on white */
+  --text-sub:    #1a3557;   /* secondary: dark navy — 10:1 contrast */
+  --text-muted:  #3d5a7a;   /* muted: dark blue-grey — 7:1 contrast */
+
   --input-bg:    #ffffff;
-  --input-color: #0a1628;
-  --accent:      #1a56db;
-  --card-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  --table-header-bg:   #1a56db;
+  --input-color: #050d1a;
+  --accent:      #0d47c9;   /* deep blue — 7:1 on white */
+  --card-shadow: 0 2px 10px rgba(0,0,0,0.15);
+
+  --table-header-bg:   #0d47c9;
   --table-header-text: #ffffff;
-  --table-row-alt:     #f0f4f9;
-  --table-row-hover:   #dce8f5;
+  --table-row-alt:     #edf2f9;
+  --table-row-hover:   #d6e4f5;
 }
 
 html, body, #root { height: 100%; }
@@ -48,105 +64,10 @@ body {
   line-height: 1.5;
 }
 
-/* ── Light mode: fix all hardcoded dark backgrounds ── */
-[data-theme="light"] [style*="background: #0f1117"],
-[data-theme="light"] [style*="background:#0f1117"],
-[data-theme="light"] [style*="background: #171b26"],
-[data-theme="light"] [style*="background:#171b26"],
-[data-theme="light"] [style*="background: #1e2435"],
-[data-theme="light"] [style*="background:#1e2435"],
-[data-theme="light"] [style*="background: #252d42"],
-[data-theme="light"] [style*="background:#252d42"],
-[data-theme="light"] [style*="background: #16192a"],
-[data-theme="light"] [style*="background:#16192a"],
-[data-theme="light"] [style*="background: #0f1117"],
-[data-theme="light"] [style*="background: #13182b"],
-[data-theme="light"] [style*="background: #1c2340"],
-[data-theme="light"] [style*="background: #141930"] {
-  background: var(--surface) !important;
-  color: var(--text) !important;
-}
-
-/* ── Light mode: fix hardcoded dark text colors ── */
-[data-theme="light"] [style*="color: #e2e8f0"],
-[data-theme="light"] [style*="color:#e2e8f0"],
-[data-theme="light"] [style*="color: #f0f4ff"],
-[data-theme="light"] [style*="color:#f0f4ff"] {
-  color: var(--text) !important;
-}
-
-[data-theme="light"] [style*="color: #94a3b8"],
-[data-theme="light"] [style*="color:#94a3b8"],
-[data-theme="light"] [style*="color: #b8c8e8"],
-[data-theme="light"] [style*="color:#b8c8e8"] {
-  color: var(--text-sub) !important;
-}
-
-[data-theme="light"] [style*="color: #64748b"],
-[data-theme="light"] [style*="color:#64748b"],
-[data-theme="light"] [style*="color: #7a90b8"],
-[data-theme="light"] [style*="color:#7a90b8"] {
-  color: var(--text-muted) !important;
-}
-
-/* ── Light mode: fix borders ── */
-[data-theme="light"] [style*="border: 1px solid #2a3350"],
-[data-theme="light"] [style*="border:1px solid #2a3350"],
-[data-theme="light"] [style*="border: 1px solid #2e3a5c"],
-[data-theme="light"] [style*="border-color: #2a3350"] {
-  border-color: var(--border) !important;
-}
-
-/* ── Sidebar specific light mode ── */
-[data-theme="light"] nav,
-[data-theme="light"] aside {
-  background: var(--surface) !important;
-  border-right: 1px solid var(--border) !important;
-}
-
-[data-theme="light"] nav a,
-[data-theme="light"] nav button,
-[data-theme="light"] aside a,
-[data-theme="light"] aside button {
-  color: var(--text-sub) !important;
-}
-
-[data-theme="light"] nav a.active,
-[data-theme="light"] nav button.active {
-  color: var(--accent) !important;
-  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
-}
-
-/* ── Table header light mode ── */
-[data-theme="light"] th {
-  background: var(--table-header-bg) !important;
-  color: var(--table-header-text) !important;
-}
-
-[data-theme="light"] tr:nth-child(even) td {
-  background: var(--table-row-alt) !important;
-}
-
-[data-theme="light"] tr:hover td {
-  background: var(--table-row-hover) !important;
-}
-
-/* ── Modal overlay light mode ── */
-[data-theme="light"] [style*="rgba(0,0,0,0.6)"],
-[data-theme="light"] [style*="rgba(0, 0, 0, 0.6)"] {
-  background: rgba(10, 22, 40, 0.5) !important;
-}
-
-/* ── Scrollbars ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
 /* ── Forms ── */
 input, select, textarea {
   background: var(--input-bg);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   padding: 9px 12px;
   color: var(--input-color);
@@ -158,14 +79,39 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
-select option { background: var(--surface); color: var(--text); }
+select option {
+  background: var(--surface);
+  color: var(--text);
+}
 textarea { resize: vertical; }
 input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
-/* ── Print styles ── */
+/* ── Light mode: fix any remaining hardcoded dark surfaces ── */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Force light mode text on elements that still have dark hardcoded backgrounds */
+[data-theme="light"] [style*="background: #"] {
+  color: var(--text);
+}
+
+/* Table header always readable */
+[data-theme="light"] th {
+  background: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Print ── */
 @media print {
   body { background: #fff !important; color: #000 !important; }
   .no-print { display: none !important; }

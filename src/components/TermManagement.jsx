@@ -54,7 +54,7 @@ export function getCurrentTermInfo(data) {
 
 export function TermBadge({ data, style }) {
   const info = getCurrentTermInfo(data);
-  const colors = { active: '#10b981', upcoming: '#4f8ef7', ended: '#f59e0b', unknown: '#64748b' };
+  const colors = { active: '#10b981', upcoming: '#4f8ef7', ended: '#f59e0b', unknown: 'var(--text-muted)' };
   return (
     <span style={{
       padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -141,7 +141,7 @@ export default function TermManagement({ data, setData }) {
 
   const statusColors = {
     'active': '#10b981', 'upcoming': '#4f8ef7', 'ended': '#f59e0b',
-    'closed': '#64748b', 'not-set': '#ef4444', 'not-started': '#94a3b8',
+    'closed': 'var(--text-muted)', 'not-set': '#ef4444', 'not-started': 'var(--text-sub)',
   };
   const statusLabels = {
     'active': 'IN SESSION', 'upcoming': 'UPCOMING', 'ended': 'ENDED',
@@ -157,7 +157,7 @@ export default function TermManagement({ data, setData }) {
         {years.map(y => (
           <button key={y} onClick={() => setSelYear(y)} style={{
             padding: '6px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: selYear === y ? '#4f8ef7' : '#1e2435', color: selYear === y ? '#fff' : '#94a3b8', fontWeight: 600, fontSize: 13,
+            background: selYear === y ? '#4f8ef7' : 'var(--surface2)', color: selYear === y ? '#fff' : 'var(--text-sub)', fontWeight: 600, fontSize: 13,
           }}>{y}</button>
         ))}
       </div>
@@ -169,18 +169,18 @@ export default function TermManagement({ data, setData }) {
           return (
             <Card key={term.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Term {term.term} · {term.year}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Term {term.term} · {term.year}</div>
                 <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: col + '20', color: col, border: `1px solid ${col}30` }}>
                   {statusLabels[st]}
                 </span>
               </div>
 
               {term.startDate ? (
-                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 12, lineHeight: 1.8 }}>
-                  <div>📅 Start: <strong style={{ color: '#e2e8f0' }}>{term.startDate}</strong></div>
-                  <div>🏁 End: <strong style={{ color: '#e2e8f0' }}>{term.endDate}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 12, lineHeight: 1.8 }}>
+                  <div>📅 Start: <strong style={{ color: 'var(--text)' }}>{term.startDate}</strong></div>
+                  <div>🏁 End: <strong style={{ color: 'var(--text)' }}>{term.endDate}</strong></div>
                   {term.startDate && term.endDate && (
-                    <div>📆 Duration: <strong style={{ color: '#e2e8f0' }}>
+                    <div>📆 Duration: <strong style={{ color: 'var(--text)' }}>
                       {Math.ceil((new Date(term.endDate) - new Date(term.startDate)) / 86400000)} days
                     </strong></div>
                   )}
@@ -210,32 +210,32 @@ export default function TermManagement({ data, setData }) {
       {editing && (
         <div style={{ position: 'fixed', inset: 0, background: '#00000080', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <Card style={{ maxWidth: 400, width: '90%' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>
               Edit Term {editing.term} · {editing.year}
             </div>
             <FormGroup label="Term Name">
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                 placeholder={`Term ${editing.term} ${editing.year}`}
-                style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </FormGroup>
             <FormRow>
               <FormGroup label="Start Date">
                 <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="End Date">
                 <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </FormRow>
             <FormRow>
               <FormGroup label="Midterm — Reporting Date" hint="Date students report back after midterm break">
                 <input type="date" value={form.midtermReportingDate} onChange={e => setForm({ ...form, midtermReportingDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
               <FormGroup label="Next Term Opening Date" hint="Printed on end-of-term report forms">
                 <input type="date" value={form.nextTermOpeningDate} onChange={e => setForm({ ...form, nextTermOpeningDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', background: '#0f1117', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
               </FormGroup>
             </FormRow>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
@@ -310,9 +310,9 @@ export function PromotionPanel({ data, setData }) {
 
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ background: '#171b26', border: '1px solid #7c3aed30', borderRadius: 12, padding: 20 }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid #7c3aed30', borderRadius: 12, padding: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#7c3aed', marginBottom: 12 }}>🎓 Student Promotion</div>
-        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 16, lineHeight: 1.6 }}>
           At the end of Term 3, promote all active students to their next class.
         </div>
         {done && <div style={{ background: '#10b98115', border: '1px solid #10b98130', borderRadius: 8, padding: 12, marginBottom: 16, color: '#10b981', fontSize: 13 }}>✅ Promotion complete! All students moved to their next class.</div>}
@@ -324,17 +324,17 @@ export function PromotionPanel({ data, setData }) {
         {preview && (
           <>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>✅ {preview.promotions.length} students will be promoted:</div>
-            <div style={{ maxHeight: 200, overflowY: 'auto', background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ maxHeight: 200, overflowY: 'auto', background: 'var(--surface2)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               {preview.promotions.map((p, i) => (
-                <div key={i} style={{ fontSize: 12, color: '#e2e8f0', padding: '4px 0', borderBottom: '1px solid #2a3350', display: 'flex', gap: 10 }}>
+                <div key={i} style={{ fontSize: 12, color: 'var(--text)', padding: '4px 0', borderBottom: '1px solid #2a3350', display: 'flex', gap: 10 }}>
                   <span style={{ flex: 1 }}>{p.student.name}</span>
-                  <span style={{ color: '#64748b' }}>{p.from} → </span>
+                  <span style={{ color: 'var(--text-muted)' }}>{p.from} → </span>
                   <span style={{ color: '#10b981', fontWeight: 700 }}>{p.to}</span>
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setPreview(null)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #2a3350', borderRadius: 8, color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+              <button onClick={() => setPreview(null)} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text-sub)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
               <button onClick={applyPromotion} disabled={running} style={{ padding: '8px 20px', background: '#10b981', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 {running ? 'Promoting...' : `✅ Confirm & Promote ${preview.promotions.length} Students`}
               </button>

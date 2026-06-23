@@ -88,22 +88,22 @@ export function Kitchen({ data, setData }) {
               { l: 'Low Stock',   v: lowItems.length,                                   c: '#ef4444' },
               { l: 'OK Stock',    v: (data.inventory||[]).length - lowItems.length,           c: '#10b981' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ flex: 1, textAlign: 'center', background: '#1e2435', borderRadius: 8, padding: 12 }}>
+              <div key={l} style={{ flex: 1, textAlign: 'center', background: 'var(--surface2)', borderRadius: 8, padding: 12 }}>
                 <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>{l}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
               </div>
             ))}
           </div>
           {txHistory.length > 0 && (
             <>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>Recent Transactions</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Recent Transactions</div>
               {txHistory.slice(0, 4).map(tx => (
                 <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #2a3350' }}>
-                  <span style={{ color: '#94a3b8' }}>{tx.item}</span>
+                  <span style={{ color: 'var(--text-sub)' }}>{tx.item}</span>
                   <span style={{ color: tx.type == 'in' ? '#10b981' : '#ef4444', fontWeight: 600 }}>
                     {tx.type == 'in' ? '+' : '−'}{tx.qty}
                   </span>
-                  <span style={{ color: '#64748b' }}>{tx.date}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{tx.date}</span>
                 </div>
               ))}
             </>
@@ -127,7 +127,7 @@ export function Kitchen({ data, setData }) {
                 const low = i.current <= i.min;
                 return (
                   <tr key={i.id}>
-                    <td style={{ ...TS.td, fontWeight: 500, color: low ? '#ef4444' : '#e2e8f0' }}>{low ? '⚠ ' : ''}{i.name}</td>
+                    <td style={{ ...TS.td, fontWeight: 500, color: low ? '#ef4444' : 'var(--text)' }}>{low ? '⚠ ' : ''}{i.name}</td>
                     <td style={TS.td}>{i.current} {i.unit}</td>
                     <td style={TS.td}>{i.min} {i.unit}</td>
                     <td style={TS.td}>{i.max} {i.unit}</td>
@@ -210,8 +210,8 @@ export function Departments({ data, setData }) {
                 </div>
               </div>
               {staff.length > 0
-                ? <div style={{ fontSize: 12, color: '#64748b' }}>Staff: {staff.map(t => (t.name||'').split(' ')[0]).join(', ')}</div>
-                : <div style={{ fontSize: 12, color: '#64748b' }}>No staff assigned yet</div>}
+                ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Staff: {staff.map(t => (t.name||'').split(' ')[0]).join(', ')}</div>
+                : <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No staff assigned yet</div>}
               <div style={{ marginTop: 8 }}><Tag color="green">Active</Tag></div>
             </Card>
           );
@@ -432,13 +432,13 @@ export function Fees({ data, setData }) {
 
   const TAB_STYLE = (active) => ({
     padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-    background: active ? '#171b26' : 'transparent', color: active ? '#e2e8f0' : '#64748b',
+    background: active ? 'var(--surface)' : 'transparent', color: active ? 'var(--text)' : 'var(--text-muted)',
   });
 
   return (
     <div>
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 16, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, marginBottom: 16, width: 'fit-content' }}>
         {[['overview','Fee Overview'],['payments','Payment History'],['structure','Fee Structure']].map(([v,l]) => (
           <button key={v} onClick={() => setTab(v)} style={TAB_STYLE(tab == v)}>{l}</button>
         ))}
@@ -468,9 +468,9 @@ export function Fees({ data, setData }) {
               { l: 'Outstanding',              v: `KES ${(totalExpected-totalCollected).toLocaleString()}`, c: '#ef4444' },
               { l: 'Defaulters',               v: defaulters.length,                          c: '#f59e0b' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 16 }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{l}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
             ))}
           </div>
@@ -483,7 +483,7 @@ export function Fees({ data, setData }) {
                 </thead>
                 <tbody>
                   {filtered.length == 0 ? (
-                    <tr><td colSpan={9} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 28 }}>No students found.</td></tr>
+                    <tr><td colSpan={9} style={{ ...TS.td, textAlign: 'center', color: 'var(--text-muted)', padding: 28 }}>No students found.</td></tr>
                   ) : filtered.map(s => {
                     const { total, paid, balance, overpaid } = getStudentBalance(s, curTerm, curYear);
                     const pct = total > 0 ? Math.round(paid / total * 100) : 100;
@@ -528,7 +528,7 @@ export function Fees({ data, setData }) {
             <Btn onClick={() => setShowPay(true)}><Icon name="add" size={14} /> Record Payment</Btn>
           </div>
           {feePayments.length == 0 ? (
-            <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No payments recorded yet.</Card>
+            <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No payments recorded yet.</Card>
           ) : (
             <Card noPad>
               <div style={{ overflowX: 'auto' }}>
@@ -679,7 +679,7 @@ function FeeStructure({ data, setData }) {
             <Btn size="sm" onClick={() => setShowAddType(true)}><Icon name="add" size={12} /> Add</Btn>
           </div>
           {feeTypes.length == 0 ? (
-            <p style={{ color: '#64748b', fontSize: 13 }}>No fee types yet. Add Tuition Fee, Remedials, etc.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fee types yet. Add Tuition Fee, Remedials, etc.</p>
           ) : feeTypes.map(ft => (
             <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -690,9 +690,9 @@ function FeeStructure({ data, setData }) {
                     style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
                 </div>
               </div>
-              {ft.description && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{ft.description}</div>}
+              {ft.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{ft.description}</div>}
               {!ft.appliesToAll && ft.applicableClasses?.length > 0 && (
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Applies to: {ft.applicableClasses.join(', ')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>Applies to: {ft.applicableClasses.join(', ')}</div>
               )}
             </div>
           ))}
@@ -705,7 +705,7 @@ function FeeStructure({ data, setData }) {
             <Btn size="sm" onClick={() => setShowAddSchedule(true)} disabled={feeTypes.length == 0}><Icon name="add" size={12} /> Add</Btn>
           </div>
           {feeSchedule.length == 0 ? (
-            <p style={{ color: '#64748b', fontSize: 13 }}>No amounts set yet. First add fee types, then set amounts per class and term.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No amounts set yet. First add fee types, then set amounts per class and term.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ ...TS.table, fontSize: 12 }}>
@@ -749,14 +749,14 @@ function FeeStructure({ data, setData }) {
           </label>
           {!typeForm.appliesToAll && (
             <div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Select which classes this fee applies to:</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Select which classes this fee applies to:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {allClasses.map(c => (
                   <div key={c} onClick={() => toggleClass(c)} style={{
                     padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 500,
-                    background: typeForm.applicableClasses.includes(c) ? '#4f8ef7' : '#1e2435',
-                    color: typeForm.applicableClasses.includes(c) ? '#fff' : '#94a3b8',
-                    border: `1px solid ${typeForm.applicableClasses.includes(c) ? '#4f8ef7' : '#2a3350'}`,
+                    background: typeForm.applicableClasses.includes(c) ? '#4f8ef7' : 'var(--surface2)',
+                    color: typeForm.applicableClasses.includes(c) ? '#fff' : 'var(--text-sub)',
+                    border: `1px solid ${typeForm.applicableClasses.includes(c) ? '#4f8ef7' : 'var(--border)'}`,
                   }}>{c}</div>
                 ))}
               </div>
@@ -1201,7 +1201,7 @@ export function Settings({ data, setData }) {
     setEditingGroup(null);
   }
 
-  const TYPE_COLORS = { lesson: '#4f8ef7', break: '#f59e0b', lunch: '#10b981', assembly: '#7c3aed', end: '#64748b' };
+  const TYPE_COLORS = { lesson: '#4f8ef7', break: '#f59e0b', lunch: '#10b981', assembly: '#7c3aed', end: 'var(--text-muted)' };
   const classGroups = data.classGroups || [];
 
   return (
@@ -1245,11 +1245,11 @@ export function Settings({ data, setData }) {
               </FormGroup>
             </FormRow>
             {/* Live preview */}
-            <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 14px', marginBottom: 12, textAlign: 'center', fontSize: 12 }}>
+            <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, textAlign: 'center', fontSize: 12 }}>
               <div style={{ fontWeight: 700, color: '#4f8ef7', fontSize: 13, textTransform: 'uppercase' }}>{profile.schoolName || 'School Name'}</div>
-              {profile.schoolMotto && <div style={{ color: '#94a3b8', fontSize: 11 }}>{profile.schoolMotto}</div>}
+              {profile.schoolMotto && <div style={{ color: 'var(--text-sub)', fontSize: 11 }}>{profile.schoolMotto}</div>}
               {(profile.schoolPOBox || profile.schoolLocation) && (
-                <div style={{ color: '#64748b', fontSize: 11 }}>{[profile.schoolPOBox, profile.schoolLocation].filter(Boolean).join(', ')}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{[profile.schoolPOBox, profile.schoolLocation].filter(Boolean).join(', ')}</div>
               )}
             </div>
             <Btn variant="success" size="sm" onClick={saveProfile}><Icon name="check" size={13} /> Save School Profile</Btn>
@@ -1259,12 +1259,12 @@ export function Settings({ data, setData }) {
           <Card style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <SectionTitle icon="settings">🏛️ Official School Stamp</SectionTitle>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={stamp.enabled} onChange={e => setStamp({ ...stamp, enabled: e.target.checked })} />
                 Show on documents
               </label>
             </div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
               This seal appears automatically on student report forms, fee receipts, and leaving certificates.
               The date inside it always shows today's actual date — it updates itself automatically every time a
               document is printed, you never need to change it.
@@ -1291,7 +1291,7 @@ export function Settings({ data, setData }) {
 
               {/* Live preview */}
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Live Preview</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Live Preview</div>
                 <div style={{ background: '#fff', borderRadius: 12, padding: 14, display: 'inline-block' }}
                   dangerouslySetInnerHTML={{ __html: renderSchoolStamp({ ...data, schoolStamp: stamp }, { size: 130 }) }} />
               </div>
@@ -1303,7 +1303,7 @@ export function Settings({ data, setData }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <SectionTitle icon="exams">Curriculum Subjects</SectionTitle>
             </div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
               Edit or delete any subject — including the built-in CBC ones. Add extras your school offers.
               Changes apply to timetable rules and teacher assignments automatically.
             </div>
@@ -1320,11 +1320,11 @@ export function Settings({ data, setData }) {
                   <div style={{ background: '#1a2540', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#4f8ef7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{level.label}</span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ color: '#64748b', fontWeight: 400 }}>{allSubs.length} subjects</span>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{allSubs.length} subjects</span>
                       <button
                         onClick={() => restoreDefaults(key)}
                         title="Restore CBC defaults for this level"
-                        style={{ background: 'none', border: '1px solid #2a3350', borderRadius: 5, color: '#64748b', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>
+                        style={{ background: 'none', border: '1px solid #2a3350', borderRadius: 5, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>
                         Restore defaults
                       </button>
                     </div>
@@ -1348,7 +1348,7 @@ export function Settings({ data, setData }) {
                                   if (e.key === 'Enter') { renameSubject(key, s, editSubjectVal); setEditingSubject(null); }
                                   if (e.key === 'Escape') setEditingSubject(null);
                                 }}
-                                style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, width: 120, background: '#252d42', border: '1px solid #4f8ef7', color: '#e2e8f0' }}
+                                style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, width: 120, background: 'var(--surface2)', border: '1px solid #4f8ef7', color: 'var(--text)' }}
                               />
                               <button
                                 onClick={() => { renameSubject(key, s, editSubjectVal); setEditingSubject(null); }}
@@ -1357,7 +1357,7 @@ export function Settings({ data, setData }) {
                               </button>
                               <button
                                 onClick={() => setEditingSubject(null)}
-                                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}>
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}>
                                 ✕
                               </button>
                             </span>
@@ -1367,9 +1367,9 @@ export function Settings({ data, setData }) {
                         return (
                           <span key={s} style={{
                             fontSize: 11, padding: '2px 6px 2px 10px', borderRadius: 10,
-                            background: isExtra ? '#10b98120' : '#1e2435',
-                            color:      isExtra ? '#10b981'   : '#94a3b8',
-                            border:    `1px solid ${isExtra ? '#10b98140' : '#2a3350'}`,
+                            background: isExtra ? '#10b98120' : 'var(--surface2)',
+                            color:      isExtra ? '#10b981'   : 'var(--text-sub)',
+                            border:    `1px solid ${isExtra ? '#10b98140' : 'var(--border)'}`,
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                           }}>
                             {s}
@@ -1412,7 +1412,7 @@ export function Settings({ data, setData }) {
                     {selSubLevel !== key && (
                       <button
                         onClick={() => { setSelSubLevel(key); setSubForm(''); }}
-                        style={{ background: 'none', border: '1px dashed #2a3350', color: '#64748b', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11 }}>
+                        style={{ background: 'none', border: '1px dashed #2a3350', color: 'var(--text-muted)', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11 }}>
                         + Add subject to {level.label}
                       </button>
                     )}
@@ -1431,7 +1431,7 @@ export function Settings({ data, setData }) {
               <SectionTitle style={{ margin: 0 }}>Classes &amp; Streams</SectionTitle>
               <Btn size="sm" onClick={() => setShowAddClass(true)}><Icon name="add" size={12} /> Add Class</Btn>
             </div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
               Classes with multiple streams (e.g. East, West) are supported. Click streams to edit.
             </div>
             {classGroups.map(g => {
@@ -1440,7 +1440,7 @@ export function Settings({ data, setData }) {
                 <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{g.name}</span>
-                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                       {g.streams.length == 0 ? 'Single stream' : `${g.streams.length} streams`}
                     </span>
                     <button onClick={() => { setEditingGroup(g.id); setEditStreamsVal(g.streams.join(', ')); }}
@@ -1479,7 +1479,7 @@ export function Settings({ data, setData }) {
                 <span style={{ fontWeight: 700, minWidth: 48, color: TYPE_COLORS[b.type] || '#4f8ef7' }}>{b.time}</span>
                 <span style={{ flex: 1 }}>{b.label}</span>
                 <Tag color={b.type == 'lesson' ? 'blue' : b.type == 'break' ? 'amber' : b.type == 'lunch' ? 'green' : 'purple'}>{b.type}</Tag>
-                {b.duration > 0 && <span style={{ fontSize: 11, color: '#64748b', minWidth: 40 }}>{b.duration}min</span>}
+                {b.duration > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 40 }}>{b.duration}min</span>}
                 <button onClick={() => removeBell(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
             ))}
@@ -1488,13 +1488,13 @@ export function Settings({ data, setData }) {
           {/* CBC Scale - Editable */}
           <Card>
             <SectionTitle icon="chart">CBC Grading Scale</SectionTitle>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Edit score ranges, points and labels. Changes apply immediately to all reports.</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Edit score ranges, points and labels. Changes apply immediately to all reports.</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
-                  <tr style={{ background: '#1e2435' }}>
+                  <tr style={{ background: 'var(--surface2)' }}>
                     {['Label','Min Score','Max Score','Points','Color'].map(h => (
-                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #2a3350' }}>{h}</th>
+                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #2a3350' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1506,35 +1506,35 @@ export function Settings({ data, setData }) {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], label: e.target.value };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: g.color, fontWeight: 700 }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: g.color, fontWeight: 700 }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.scoreMin} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], scoreMin: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.scoreMax} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], scoreMax: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="number" value={g.points} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], points: Number(e.target.value) };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 60, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0' }} />
+                        }} style={{ width: 60, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)' }} />
                       </td>
                       <td style={{ padding: '5px 6px' }}>
                         <input type="color" value={g.color} onChange={e => {
                           const gc = [...(data.gradesConfig || GRADES_CBC)];
                           gc[i] = { ...gc[i], color: e.target.value };
                           setData(d => ({ ...d, gradesConfig: gc }));
-                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid #2a3350', borderRadius: 4, background: '#1e2435', cursor: 'pointer' }} />
+                        }} style={{ width: 40, height: 28, padding: 2, border: '1px solid #2a3350', borderRadius: 4, background: 'var(--surface2)', cursor: 'pointer' }} />
                       </td>
                     </tr>
                   ))}
@@ -1551,7 +1551,7 @@ export function Settings({ data, setData }) {
           {/* Data Backup & Restore */}
           <Card style={{ marginTop: 16 }}>
             <SectionTitle icon="download">Data Backup &amp; Restore</SectionTitle>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14, lineHeight: 1.7 }}>
               Download a full backup of all school data (students, fees, exams, staff, settings).
               Restore from a backup file if you move to a new computer or browser.
             </div>
@@ -1562,7 +1562,7 @@ export function Settings({ data, setData }) {
               <div>
                 <label style={{
                   padding: '8px 16px', borderRadius: 8, border: '1px solid #2a3350',
-                  background: 'transparent', color: '#94a3b8', fontSize: 13, fontWeight: 600,
+                  background: 'transparent', color: 'var(--text-sub)', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
                   <Icon name="add" size={14} /> Restore from Backup
@@ -1570,7 +1570,7 @@ export function Settings({ data, setData }) {
                 </label>
               </div>
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 10, background: '#1e2435', borderRadius: 6, padding: '8px 12px' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, background: 'var(--surface2)', borderRadius: 6, padding: '8px 12px' }}>
               ⚠ Restoring a backup will replace ALL current data. Always download a fresh backup before restoring.
             </div>
           </Card>
@@ -1578,7 +1578,7 @@ export function Settings({ data, setData }) {
           {/* ── ADMISSION SETTINGS ─────────────────── */}
           <Card style={{ marginTop: 16 }}>
             <SectionTitle icon="settings">Admission Number Settings</SectionTitle>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14, lineHeight: 1.7 }}>
               Choose how admission numbers work for your school.
             </div>
 
@@ -1588,20 +1588,20 @@ export function Settings({ data, setData }) {
               { value: 'mixed',  label: 'Type C — Mixed', desc: 'Some students have admission numbers, some do not. Field is optional. System assigns a hidden internal ID where blank.' },
             ].map(opt => (
               <div key={opt.value} onClick={() => setAdmSettings(s => ({ ...s, admissionSetting: opt.value }))}
-                style={{ border: `1.5px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#2a3350'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', background: admSettings.admissionSetting === opt.value ? '#4f8ef710' : 'transparent' }}>
+                style={{ border: `1.5px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'var(--border)'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', background: admSettings.admissionSetting === opt.value ? '#4f8ef710' : 'transparent' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#2a3350'}`, background: admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'transparent', flexShrink: 0 }} />
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'var(--border)'}`, background: admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'transparent', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: admSettings.admissionSetting === opt.value ? '#4f8ef7' : '#e2e8f0' }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{opt.desc}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: admSettings.admissionSetting === opt.value ? '#4f8ef7' : 'var(--text)' }}>{opt.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{opt.desc}</div>
                   </div>
                 </div>
               </div>
             ))}
 
             {(admSettings.admissionSetting === 'auto' || admSettings.admissionSetting === 'mixed') && (
-              <div style={{ background: '#1e2435', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>
+              <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-sub)', marginBottom: 10 }}>
                   Auto-assign format: <span style={{ color: '#4f8ef7' }}>{(admSettings.schoolCode||'KJS').toUpperCase()}/001/{admSettings.schoolCodeYear||'2019'}</span>
                 </div>
                 <FormRow>
@@ -1627,21 +1627,21 @@ export function Settings({ data, setData }) {
           {/* ── THEME TOGGLE ───────────────────────── */}
           <Card style={{ marginTop: 16 }}>
             <SectionTitle icon="settings">Theme Preference</SectionTitle>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14 }}>
               Switch between dark and light theme for the admin/teacher interface.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[{ v: true, label: '🌙 Dark', desc: 'Dark navy theme' }, { v: false, label: '☀️ Light', desc: 'Clean light theme' }].map(t => (
                   <div key={String(t.v)} onClick={() => { setDarkTheme(t.v); setData(d => ({ ...d, darkTheme: t.v })); }}
-                    style={{ border: `1.5px solid ${darkTheme === t.v ? '#4f8ef7' : '#2a3350'}`, borderRadius: 10, padding: '12px 20px', cursor: 'pointer', background: darkTheme === t.v ? '#4f8ef710' : 'transparent', textAlign: 'center' }}>
+                    style={{ border: `1.5px solid ${darkTheme === t.v ? '#4f8ef7' : 'var(--border)'}`, borderRadius: 10, padding: '12px 20px', cursor: 'pointer', background: darkTheme === t.v ? '#4f8ef710' : 'transparent', textAlign: 'center' }}>
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{t.label.split(' ')[0]}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: darkTheme === t.v ? '#4f8ef7' : '#94a3b8' }}>{t.label.split(' ')[1]}</div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>{t.desc}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: darkTheme === t.v ? '#4f8ef7' : 'var(--text-sub)' }}>{t.label.split(' ')[1]}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.desc}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 Current: <strong style={{ color: darkTheme ? '#4f8ef7' : '#f59e0b' }}>{darkTheme ? 'Dark Theme' : 'Light Theme'}</strong>
               </div>
             </div>
@@ -1652,7 +1652,7 @@ export function Settings({ data, setData }) {
       {/* ── PUBLIC PAGE SETTINGS (full width) ──────── */}
       <Card style={{ marginTop: 16 }}>
         <SectionTitle icon="globe">🌐 Public School Page</SectionTitle>
-        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16, lineHeight: 1.7 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 16, lineHeight: 1.7 }}>
           This is your school's public website — anyone can view it without logging in.
           {pubPage.schoolSlug && (
             <span> Your public URL: <a href={`/school/${pubPage.schoolSlug}`} target="_blank" rel="noreferrer"
@@ -1672,7 +1672,7 @@ export function Settings({ data, setData }) {
                 style={{ opacity: data.slugLocked ? 0.5 : 1 }}
               />
               {data.slugLocked && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>⚠ Slug is locked — it has been shared publicly. Contact support to change it.</div>}
-              {!data.slugLocked && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Will be locked once you save and share the link.</div>}
+              {!data.slugLocked && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Will be locked once you save and share the link.</div>}
             </FormGroup>
             <FormGroup label="School Phone">
               <input value={pubPage.schoolPhone} onChange={e => setPubPage(p => ({ ...p, schoolPhone: e.target.value }))} placeholder="e.g. 0712345678" />
@@ -1705,19 +1705,19 @@ export function Settings({ data, setData }) {
         {/* Gallery */}
         <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               📸 School Gallery
-              <span style={{ fontSize: 11, fontWeight: 400, color: '#64748b', marginLeft: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
                 {(data.schoolGallery || []).length}/20 photos
               </span>
             </div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
               Max 20 photos · Each under 3MB · JPEG, PNG, WebP
             </div>
           </div>
 
           {/* Upload area */}
-          <div style={{ background: '#1e2435', borderRadius: 10, border: '1px dashed #2a3350', padding: 16, marginBottom: 14 }}>
+          <div style={{ background: 'var(--surface2)', borderRadius: 10, border: '1px dashed #2a3350', padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 value={newGallery.caption}
@@ -1727,7 +1727,7 @@ export function Settings({ data, setData }) {
               />
               <label style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
-                background: galleryUploading || (data.schoolGallery||[]).length >= 20 ? '#2a3350' : 'linear-gradient(135deg,#1e40af,#7c3aed)',
+                background: galleryUploading || (data.schoolGallery||[]).length >= 20 ? 'var(--border)' : 'linear-gradient(135deg,#1e40af,#7c3aed)',
                 color: '#fff', borderRadius: 8,
                 cursor: galleryUploading || (data.schoolGallery||[]).length >= 20 ? 'not-allowed' : 'pointer',
                 fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', border: 'none',
@@ -1748,7 +1748,7 @@ export function Settings({ data, setData }) {
                 />
               </label>
             </div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
               📌 Photos are uploaded directly to cloud storage and appear on your public school page permanently.
               You can select multiple photos at once.
             </div>
@@ -1762,21 +1762,21 @@ export function Settings({ data, setData }) {
 
           {/* Photo grid */}
           {(data.schoolGallery || []).length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: '#64748b', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
               No photos yet. Click "Upload Photos from Computer" to add your first photo.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
               {(data.schoolGallery || []).map(photo => (
-                <div key={photo.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid #2a3350', background: '#1e2435' }}>
+                <div key={photo.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid #2a3350', background: 'var(--surface2)' }}>
                   <img
                     src={photo.url} alt={photo.caption || 'School photo'}
                     style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
-                    onError={e => { e.target.style.background = '#2a3350'; e.target.style.height = '100px'; }}
+                    onError={e => { e.target.style.background = 'var(--border)'; e.target.style.height = '100px'; }}
                   />
                   {/* Caption */}
                   {photo.caption && (
-                    <div style={{ padding: '4px 8px', fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--text-sub)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {photo.caption}
                     </div>
                   )}
@@ -1808,21 +1808,21 @@ export function Settings({ data, setData }) {
         {/* Job Vacancies */}
         <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>💼 Job Vacancies</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>💼 Job Vacancies</div>
             <Btn size="sm" onClick={() => setShowAddJob(true)}><Icon name="add" size={12} /> Post Job</Btn>
           </div>
           {(data.jobVacancies || []).length === 0
-            ? <div style={{ fontSize: 12, color: '#64748b' }}>No vacancies posted yet. Post a job and it will appear on your public page.</div>
+            ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No vacancies posted yet. Post a job and it will appear on your public page.</div>
             : (data.jobVacancies || []).map(job => (
               <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{job.title}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{job.description?.slice(0, 80)}{job.description?.length > 80 ? '...' : ''}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{job.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{job.description?.slice(0, 80)}{job.description?.length > 80 ? '...' : ''}</div>
                   {job.deadline && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Deadline: {job.deadline}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setData(d => ({ ...d, jobVacancies: (d.jobVacancies||[]).map(j => j.id===job.id?{...j,active:!j.active}:j) }))}
-                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #2a3350', background: 'none', color: job.active?'#10b981':'#64748b', cursor: 'pointer' }}>
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #2a3350', background: 'none', color: job.active?'#10b981':'var(--text-muted)', cursor: 'pointer' }}>
                     {job.active ? 'Active' : 'Hidden'}
                   </button>
                   <button onClick={() => removeJob(job.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
@@ -1833,8 +1833,8 @@ export function Settings({ data, setData }) {
 
         {/* Required Documents */}
         <div style={{ borderTop: '1px solid #2a3350', paddingTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>📋 Required Documents for Student Enrollment</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>📋 Required Documents for Student Enrollment</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
             Default: Birth certificate photocopy, Parent ID, Transfer letter (if applicable). Add extras your school requires.
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -1843,7 +1843,7 @@ export function Settings({ data, setData }) {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(data.customDocReqs || []).map(req => (
-              <span key={req} style={{ background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, padding: '3px 10px', fontSize: 12, color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span key={req} style={{ background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, padding: '3px 10px', fontSize: 12, color: 'var(--text-sub)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {req}
                 <button onClick={() => removeDocReq(req)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>×</button>
               </span>
@@ -1924,7 +1924,7 @@ export function Settings({ data, setData }) {
 
         {/* Live preview + subjects info */}
         {newClassName && (
-          <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
+          <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--text-sub)', marginBottom: 12 }}>
             <div style={{ marginBottom: 6 }}>
               <strong>Preview:</strong>{' '}
               {newStreams.trim()
@@ -1935,7 +1935,7 @@ export function Settings({ data, setData }) {
               <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4 }}>
                 ✓ {CURRICULUM_LEVELS[newClassLevel].label}
               </div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                 Auto subjects: {CURRICULUM_LEVELS[newClassLevel].subjects.slice(0, 4).join(', ')}
                 {CURRICULUM_LEVELS[newClassLevel].subjects.length > 4 ? ` + ${CURRICULUM_LEVELS[newClassLevel].subjects.length - 4} more` : ''}
               </div>
@@ -1954,6 +1954,6 @@ export function Settings({ data, setData }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: '#1e2435' },
-  td:    { padding: '11px 14px', borderBottom: '1px solid #2a3350', color: '#e2e8f0' },
+  th:    { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' },
+  td:    { padding: '11px 14px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
 };

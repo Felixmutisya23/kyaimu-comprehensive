@@ -136,20 +136,20 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ color:'#94a3b8', fontSize:16 }}>Loading school information...</div>
+      <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ color:'var(--text-sub)', fontSize:16 }}>Loading school information...</div>
       </div>
     );
   }
 
   if (step === 3) {
     return (
-      <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-        <div style={{ background:'#171b26', border:'1px solid #2a3350', borderRadius:16, padding:40, maxWidth:480, width:'100%', textAlign:'center' }}>
+      <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div style={{ background:'var(--surface)', border:'1px solid #2a3350', borderRadius:16, padding:40, maxWidth:480, width:'100%', textAlign:'center' }}>
           <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
           <div style={{ fontSize:22, fontWeight:800, color:'#10b981', marginBottom:12 }}>Registration Submitted!</div>
-          <div style={{ fontSize:14, color:'#94a3b8', lineHeight:1.7, marginBottom:24 }}>
-            Your registration has been sent to <strong style={{ color:'#e2e8f0' }}>{data.schoolName}</strong> administrator for approval.<br/><br/>
+          <div style={{ fontSize:14, color:'var(--text-sub)', lineHeight:1.7, marginBottom:24 }}>
+            Your registration has been sent to <strong style={{ color:'var(--text)' }}>{data.schoolName}</strong> administrator for approval.<br/><br/>
             You will be able to log in once your account is approved.
           </div>
           <Btn onClick={onBack} variant="ghost">← Back to Login</Btn>
@@ -159,24 +159,24 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#171b26', border:'1px solid #2a3350', borderRadius:16, padding:32, maxWidth:600, width:'100%' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'var(--surface)', border:'1px solid #2a3350', borderRadius:16, padding:32, maxWidth:600, width:'100%' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:24 }}>
           <div style={{ fontSize:30, marginBottom:6 }}>👩‍🏫</div>
-          <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0' }}>Teacher Registration</div>
+          <div style={{ fontSize:20, fontWeight:800, color:'var(--text)' }}>Teacher Registration</div>
           <div style={{ fontSize:13, color:'#4f8ef7', marginTop:2 }}>{data.schoolName || 'School'}</div>
           {/* Steps */}
           <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:14 }}>
             {['Personal Details','Teaching Info'].map((label, i) => (
               <React.Fragment key={i}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <div style={{ width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, background: step > i+1 ? '#10b981' : step === i+1 ? '#4f8ef7' : '#2a3350', color:'#fff' }}>
+                  <div style={{ width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, background: step > i+1 ? '#10b981' : step === i+1 ? '#4f8ef7' : 'var(--border)', color:'#fff' }}>
                     {step > i+1 ? '✓' : i+1}
                   </div>
-                  <span style={{ fontSize:12, color: step === i+1 ? '#4f8ef7' : '#64748b' }}>{label}</span>
+                  <span style={{ fontSize:12, color: step === i+1 ? '#4f8ef7' : 'var(--text-muted)' }}>{label}</span>
                 </div>
-                {i < 1 && <span style={{ color:'#2a3350' }}>→</span>}
+                {i < 1 && <span style={{ color:'var(--border)' }}>→</span>}
               </React.Fragment>
             ))}
           </div>
@@ -229,7 +229,7 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                 <div style={{ fontSize:11, fontWeight:700, color:'#4f8ef7', textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Teaching Assignment</div>
 
                 {/* Class teacher toggle */}
-                <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', fontSize:13, marginBottom:14, padding:'10px 14px', background:'#1e2435', borderRadius:8 }}>
+                <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', fontSize:13, marginBottom:14, padding:'10px 14px', background:'var(--surface2)', borderRadius:8 }}>
                   <input type="checkbox" checked={form.isClassTeacher} onChange={e => setForm({...form, isClassTeacher:e.target.checked, classTeacherOf:''})} />
                   I am a class teacher (responsible for one specific class/stream)
                 </label>
@@ -242,7 +242,7 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                   </FormGroup>
                 )}
 
-                <div style={{ fontSize:13, color:'#94a3b8', marginBottom:10 }}>
+                <div style={{ fontSize:13, color:'var(--text-sub)', marginBottom:10 }}>
                   Add each subject you teach and select the classes you teach it in:
                 </div>
 
@@ -255,10 +255,10 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                       : [];
 
                   return (
-                    <div key={i} style={{ background:'#1e2435', borderRadius:10, padding:14, marginBottom:10, border:'1px solid #2a3350' }}>
+                    <div key={i} style={{ background:'var(--surface2)', borderRadius:10, padding:14, marginBottom:10, border:'1px solid #2a3350' }}>
                       <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:10 }}>
                         <div style={{ flex:1 }}>
-                          <div style={{ fontSize:11, color:'#64748b', marginBottom:4 }}>Subject</div>
+                          <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:4 }}>Subject</div>
                           <select value={row.subject} onChange={e => updateRow(i, 'subject', e.target.value)} style={{ width:'100%' }}>
                             <option value="">Select subject...</option>
                             {availSubs.map(s => <option key={s} value={s}>{s}</option>)}
@@ -269,7 +269,7 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                         )}
                       </div>
 
-                      <div style={{ fontSize:11, color:'#64748b', marginBottom:8 }}>
+                      <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:8 }}>
                         Classes I teach <strong>{row.subject || 'this subject'}</strong> in:
                       </div>
 
@@ -284,9 +284,9 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                               {levelClasses.map(c => (
                                 <div key={c} onClick={() => toggleClass(i, c)} style={{
                                   padding:'4px 10px', borderRadius:6, fontSize:12, cursor:'pointer', fontWeight:500, userSelect:'none',
-                                  background: row.classes.includes(c) ? '#4f8ef7' : '#252d42',
-                                  color: row.classes.includes(c) ? '#fff' : '#94a3b8',
-                                  border: `1px solid ${row.classes.includes(c) ? '#4f8ef7' : '#2a3350'}`,
+                                  background: row.classes.includes(c) ? '#4f8ef7' : 'var(--surface2)',
+                                  color: row.classes.includes(c) ? '#fff' : 'var(--text-sub)',
+                                  border: `1px solid ${row.classes.includes(c) ? '#4f8ef7' : 'var(--border)'}`,
                                 }}>{c}</div>
                               ))}
                             </div>
@@ -296,12 +296,12 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
                     </div>
                   );
                 })}
-                <button onClick={addSubjectRow} style={{ background:'none', border:'1px dashed #2a3350', color:'#64748b', borderRadius:8, padding:'8px 16px', cursor:'pointer', fontSize:12, width:'100%', marginBottom:8 }}>
+                <button onClick={addSubjectRow} style={{ background:'none', border:'1px dashed #2a3350', color:'var(--text-muted)', borderRadius:8, padding:'8px 16px', cursor:'pointer', fontSize:12, width:'100%', marginBottom:8 }}>
                   + Add Another Subject
                 </button>
               </>
             ) : (
-              <div style={{ padding:20, textAlign:'center', color:'#94a3b8' }}>
+              <div style={{ padding:20, textAlign:'center', color:'var(--text-sub)' }}>
                 <div style={{ fontSize:32, marginBottom:8 }}>🏢</div>
                 <div>Non-Teaching Staff — no subject assignments needed.</div>
               </div>
@@ -342,15 +342,15 @@ export function PendingTeacherApprovals({ data, setData }) {
   }
 
   return (
-    <div style={{ background:'#171b26', border:'1px solid #f59e0b40', borderRadius:12, padding:16, marginBottom:20 }}>
+    <div style={{ background:'var(--surface)', border:'1px solid #f59e0b40', borderRadius:12, padding:16, marginBottom:20 }}>
       <div style={{ fontSize:14, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>⏳ Pending Teacher Registrations ({pending.length})</div>
-      <div style={{ fontSize:12, color:'#64748b', marginBottom:12 }}>These teachers registered and are waiting for your approval before they can log in.</div>
+      <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:12 }}>These teachers registered and are waiting for your approval before they can log in.</div>
       {pending.map(t => (
-        <div key={t.id} style={{ background:'#1e2435', borderRadius:10, padding:14, marginBottom:10, border:'1px solid #f59e0b30' }}>
+        <div key={t.id} style={{ background:'var(--surface2)', borderRadius:10, padding:14, marginBottom:10, border:'1px solid #f59e0b30' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:10 }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#e2e8f0' }}>{t.name}</div>
-              <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>{t.email} {t.phone && `· ${t.phone}`} · {t.dept}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{t.name}</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>{t.email} {t.phone && `· ${t.phone}`} · {t.dept}</div>
               {t.isClassTeacher && <div style={{ fontSize:11, color:'#10b981', marginTop:4 }}>Class Teacher of: {t.classTeacherOf}</div>}
               {(t.subjects||[]).length > 0 && (
                 <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:8 }}>
@@ -390,13 +390,13 @@ export function InviteLinkGenerator({ data }) {
   }
 
   return (
-    <div style={{ background:'#1e2435', border:'1px solid #4f8ef730', borderRadius:10, padding:16, marginBottom:20 }}>
+    <div style={{ background:'var(--surface2)', border:'1px solid #4f8ef730', borderRadius:10, padding:16, marginBottom:20 }}>
       <div style={{ fontSize:13, fontWeight:600, color:'#4f8ef7', marginBottom:4 }}>🔗 Teacher Self-Registration Link</div>
-      <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+      <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10 }}>
         Share this link with your teachers. When they open it, they will see your school's classes grouped by level (Lower Primary, Upper Primary, JSS etc.) and can select exactly which classes and subjects they teach. You will get a notification to approve them.
       </div>
       <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-        <input readOnly value={link} style={{ flex:1, minWidth:200, fontSize:11, fontFamily:'monospace', color:'#94a3b8', background:'#0f1117', border:'1px solid #2a3350', borderRadius:6, padding:'8px 10px' }} />
+        <input readOnly value={link} style={{ flex:1, minWidth:200, fontSize:11, fontFamily:'monospace', color:'var(--text-sub)', background:'var(--bg)', border:'1px solid #2a3350', borderRadius:6, padding:'8px 10px' }} />
         <Btn variant="ghost" size="sm" onClick={copy}>{copied ? '✅ Copied!' : '📋 Copy Link'}</Btn>
       </div>
     </div>

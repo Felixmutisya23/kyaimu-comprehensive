@@ -11,9 +11,9 @@ const C = {
   primary:   '#1e40af',
   accent:    '#10b981',
   text:      '#1e293b',
-  sub:       '#64748b',
+  sub:       'var(--text-muted)',
   light:     '#f8fafc',
-  border:    '#e2e8f0',
+  border:    'var(--text)',
   white:     '#ffffff',
   gradient:  'linear-gradient(135deg,#1e40af 0%,#7c3aed 100%)',
 };
@@ -371,7 +371,7 @@ export default function PublicPage({ data, onLoginClick }) {
       </Section>
 
       {/* ── FOOTER ──────────────────────────────────────── */}
-      <footer style={{ background:'#0f172a',color:'#94a3b8',padding:'40px 24px',textAlign:'center' }}>
+      <footer style={{ background:'#0f172a',color:'var(--text-sub)',padding:'40px 24px',textAlign:'center' }}>
         <div style={{ maxWidth:1100,margin:'0 auto' }}>
           <div style={{ fontSize:18,fontWeight:800,color:'#fff',marginBottom:6 }}>{data.schoolName}</div>
           {data.schoolMotto && <div style={{ fontSize:13,marginBottom:16,fontStyle:'italic' }}>"{data.schoolMotto}"</div>}

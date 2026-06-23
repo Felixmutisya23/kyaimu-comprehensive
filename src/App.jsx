@@ -182,12 +182,12 @@ function Notifications({ data, setData, user }) {
           {pendingApprovals.map(r => (
             <div key={r.id} style={{ background: '#f59e0b10', border: '1px solid #f59e0b40', borderRadius: 10, padding: 16, marginBottom: 10 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Edit Request — {r.studentName}</div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 2 }}>Subject: <strong>{r.subject}</strong></div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 2 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 2 }}>Subject: <strong>{r.subject}</strong></div>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 2 }}>
                 Score change: <span style={{ color: '#ef4444' }}>{r.oldScore}</span> → <span style={{ color: '#10b981' }}>{r.newScore}</span>
               </div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 10 }}>Requested by: {r.requestedByName} · {r.date}</div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 10 }}>Requested by: {r.requestedByName} · {r.date}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
                 Class Teacher: <span style={{ color: r.approvals?.classTeacher ? (r.approvals?.classTeacher == 'approved' ? '#10b981' : '#ef4444') : '#f59e0b' }}>
                   {r.approvals?.classTeacher || 'Pending'}
                 </span>
@@ -213,17 +213,17 @@ function Notifications({ data, setData, user }) {
         Notifications {unread > 0 && <span style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '2px 7px', borderRadius: 10, marginLeft: 8 }}>{unread}</span>}
       </div>
       {myNotifs.length == 0 ? (
-        <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 32, textAlign: 'center', color: '#64748b' }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
           No notifications yet.
         </div>
       ) : [...myNotifs].reverse().map(n => (
         <div key={n.id} onClick={() => markRead(n.id)} style={{
-          background: '#171b26', border: `1px solid ${n.read ? '#2a3350' : '#4f8ef740'}`,
-          borderLeft: `4px solid ${n.read ? '#2a3350' : '#4f8ef7'}`,
+          background: 'var(--surface)', border: `1px solid ${n.read ? 'var(--border)' : '#4f8ef740'}`,
+          borderLeft: `4px solid ${n.read ? 'var(--border)' : '#4f8ef7'}`,
           borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer',
         }}>
-          <div style={{ fontSize: 13, color: n.read ? '#94a3b8' : '#e2e8f0', marginBottom: 4 }}>{n.message}</div>
-          <div style={{ fontSize: 11, color: '#64748b' }}>{n.date} {!n.read && <span style={{ color: '#4f8ef7', fontWeight: 600 }}>· New</span>}</div>
+          <div style={{ fontSize: 13, color: n.read ? 'var(--text-sub)' : 'var(--text)', marginBottom: 4 }}>{n.message}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{n.date} {!n.read && <span style={{ color: '#4f8ef7', fontWeight: 600 }}>· New</span>}</div>
         </div>
       ))}
     </div>
@@ -255,76 +255,76 @@ function SetupWizard({ data, setData, onDone }) {
 
   const inp = (val, onChange, ph) => ({
     value: val, onChange: e => onChange(e.target.value), placeholder: ph,
-    style: { width: '100%', padding: '10px 13px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
+    style: { width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
     onFocus: e => { e.target.style.borderColor = '#4f8ef7'; },
-    onBlur:  e => { e.target.style.borderColor = '#2a3350'; },
+    onBlur:  e => { e.target.style.borderColor = 'var(--border)'; },
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 560 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ width: 60, height: 60, borderRadius: 14, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 26, fontWeight: 800, color: '#fff' }}>E</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>EduManage Pro</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Welcome! Set up your school — takes 2 minutes.</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>EduManage Pro</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Welcome! Set up your school — takes 2 minutes.</div>
         </div>
-        <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 16, padding: 28 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 16, padding: 28 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#4f8ef7', marginBottom: 16 }}>🏫 School Information</div>
           <div style={{ display: 'grid', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Name *</label>
+              <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Name *</label>
               <input {...inp(form.schoolName, v => setForm({...form, schoolName: v}), 'e.g. Kiriene Day Primary School')} autoFocus />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Motto</label>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Motto</label>
                 <input {...inp(form.schoolMotto, v => setForm({...form, schoolMotto: v}), 'e.g. Strive To Excel')} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Type</label>
-                <select value={form.schoolType} onChange={e => setForm({...form, schoolType: e.target.value})} style={{ width: '100%', padding: '10px 13px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>School Type</label>
+                <select value={form.schoolType} onChange={e => setForm({...form, schoolType: e.target.value})} style={{ width: '100%', padding: '10px 13px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
                   {['Primary','Junior Secondary','Secondary','Combined'].map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>P.O. Box</label>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>P.O. Box</label>
                 <input {...inp(form.schoolPOBox, v => setForm({...form, schoolPOBox: v}), 'e.g. P.O. Box 159-60607')} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>Town / Location</label>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>Town / Location</label>
                 <input {...inp(form.schoolLocation, v => setForm({...form, schoolLocation: v}), 'e.g. Mikinduri')} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>County</label>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>County</label>
                 <input {...inp(form.schoolCounty, v => setForm({...form, schoolCounty: v}), 'e.g. Tharaka Nithi')} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>Principal Name</label>
+                <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>Principal Name</label>
                 <input {...inp(form.principalName, v => setForm({...form, principalName: v}), 'e.g. Agnes Njoroge')} />
               </div>
             </div>
             {form.schoolName && (
-              <div style={{ background: '#1e2435', borderRadius: 8, padding: '10px 14px', textAlign: 'center', fontSize: 12 }}>
+              <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center', fontSize: 12 }}>
                 <div style={{ fontWeight: 700, color: '#4f8ef7', fontSize: 14, textTransform: 'uppercase' }}>{form.schoolName}</div>
-                {form.schoolMotto && <div style={{ color: '#94a3b8' }}>{form.schoolMotto}</div>}
-                {(form.schoolPOBox || form.schoolLocation) && <div style={{ color: '#64748b' }}>{[form.schoolPOBox, form.schoolLocation].filter(Boolean).join(', ')}</div>}
+                {form.schoolMotto && <div style={{ color: 'var(--text-sub)' }}>{form.schoolMotto}</div>}
+                {(form.schoolPOBox || form.schoolLocation) && <div style={{ color: 'var(--text-muted)' }}>{[form.schoolPOBox, form.schoolLocation].filter(Boolean).join(', ')}</div>}
                 <div style={{ fontSize: 10, color: '#4f8ef7', marginTop: 4 }}>This is how it will appear on all printed reports</div>
               </div>
             )}
             <div>
-              <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5, fontWeight: 500 }}>Admin Password (leave blank to keep default: admin123)</label>
+              <label style={{ fontSize: 12, color: 'var(--text-sub)', display: 'block', marginBottom: 5, fontWeight: 500 }}>Admin Password (leave blank to keep default: admin123)</label>
               <input type="password" {...inp(form.newPass, v => setForm({...form, newPass: v}), 'New password or leave blank')} />
             </div>
           </div>
           <button onClick={save} disabled={!form.schoolName.trim()}
-            style={{ width: '100%', marginTop: 20, padding: 12, borderRadius: 8, border: 'none', background: form.schoolName.trim() ? '#4f8ef7' : '#2a3350', color: '#fff', fontSize: 14, fontWeight: 600, cursor: form.schoolName.trim() ? 'pointer' : 'not-allowed' }}>
+            style={{ width: '100%', marginTop: 20, padding: 12, borderRadius: 8, border: 'none', background: form.schoolName.trim() ? '#4f8ef7' : 'var(--border)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: form.schoolName.trim() ? 'pointer' : 'not-allowed' }}>
             Save &amp; Open Dashboard →
           </button>
-          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: '#64748b' }}>You can update all details anytime from Settings</div>
+          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>You can update all details anytime from Settings</div>
         </div>
       </div>
     </div>
@@ -359,38 +359,38 @@ export default function App() {
   const isDark = data.darkTheme !== false;
   React.useEffect(() => {
     const dark = {
-      '--bg':          '#0a0d14',
-      '--surface':     '#13182b',
-      '--surface2':    '#1c2340',
-      '--border':      '#2e3a5c',
-      '--text':        '#f0f4ff',
-      '--text-sub':    '#b8c8e8',
-      '--text-muted':  '#7a90b8',
-      '--input-bg':    '#1c2340',
-      '--input-color': '#f0f4ff',
+      '--bg':          '#0a0e1a',
+      '--surface':     '#111827',
+      '--surface2':    '#1a2236',
+      '--border':      '#2d3f5e',
+      '--text':        '#ffffff',
+      '--text-sub':    '#c8d8f0',
+      '--text-muted':  '#8aabcc',
+      '--input-bg':    '#1a2236',
+      '--input-color': '#ffffff',
       '--accent':      '#4f8ef7',
       '--card-shadow': 'none',
-      '--table-header-bg':   '#1c2340',
-      '--table-header-text': '#f0f4ff',
-      '--table-row-alt':     '#141930',
-      '--table-row-hover':   '#1e2848',
+      '--table-header-bg':   '#1a2236',
+      '--table-header-text': '#ffffff',
+      '--table-row-alt':     '#111827',
+      '--table-row-hover':   '#1e2c45',
     };
     const light = {
-      '--bg':          '#eef2f7',
+      '--bg':          '#ffffff',
       '--surface':     '#ffffff',
-      '--surface2':    '#f0f4f9',
-      '--border':      '#b8c8dc',
-      '--text':        '#0a1628',
-      '--text-sub':    '#1e3a5f',
-      '--text-muted':  '#4a6080',
+      '--surface2':    '#f3f6fa',
+      '--border':      '#9aafc5',
+      '--text':        '#050d1a',
+      '--text-sub':    '#1a3557',
+      '--text-muted':  '#3d5a7a',
       '--input-bg':    '#ffffff',
-      '--input-color': '#0a1628',
-      '--accent':      '#1a56db',
-      '--card-shadow': '0 2px 8px rgba(0,0,0,0.12)',
-      '--table-header-bg':   '#1a56db',
+      '--input-color': '#050d1a',
+      '--accent':      '#0d47c9',
+      '--card-shadow': '0 2px 10px rgba(0,0,0,0.15)',
+      '--table-header-bg':   '#0d47c9',
       '--table-header-text': '#ffffff',
-      '--table-row-alt':     '#f0f4f9',
-      '--table-row-hover':   '#dce8f5',
+      '--table-row-alt':     '#edf2f9',
+      '--table-row-hover':   '#d6e4f5',
     };
     const vars = isDark ? dark : light;
     const root = document.documentElement;
@@ -601,10 +601,10 @@ export default function App() {
 
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0d14', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 48 }}>🏫</div>
       <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
-      <div style={{ color: '#64748b', fontSize: 13 }}>Loading school data...</div>
+      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading school data...</div>
       {dbError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, maxWidth: 300, textAlign: 'center' }}>{dbError}</div>}
     </div>
   );
@@ -893,18 +893,18 @@ export default function App() {
       {showDevPanel && (
         <div style={{ position: 'fixed', inset: 0, background: '#0008', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={e => { if (e.target == e.currentTarget) setShowDevPanel(false); }}>
-          <div style={{ background: '#0f1117', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg)', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 2 }}>🛠 Developer Panel</div>
-                <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Only you can see this, Felix</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Only you can see this, Felix</div>
               </div>
               <button onClick={() => setShowDevPanel(false)}
-                style={{ background: '#1e2435', border: '1px solid #2a3350', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                style={{ background: 'var(--surface2)', border: '1px solid #2a3350', color: 'var(--text-sub)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
             <TokenGenerator data={data} />
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#1e2435', borderRadius: 10, fontSize: 11, color: '#475569', textAlign: 'center' }}>
-              Press <kbd style={{ background: '#0f1117', border: '1px solid #2a3350', borderRadius: 4, padding: '1px 6px', color: '#7c3aed', fontFamily: 'monospace' }}>felix</kbd> again anywhere to close
+            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, fontSize: 11, color: '#475569', textAlign: 'center' }}>
+              Press <kbd style={{ background: 'var(--bg)', border: '1px solid #2a3350', borderRadius: 4, padding: '1px 6px', color: '#7c3aed', fontFamily: 'monospace' }}>felix</kbd> again anywhere to close
             </div>
           </div>
         </div>
@@ -913,9 +913,9 @@ export default function App() {
       {(saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'pending') && !saveError && (
         <div style={{
           position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
-          background: saveStatus === 'saved' ? '#10b981' : '#171b26',
+          background: saveStatus === 'saved' ? '#10b981' : 'var(--surface)',
           border: saveStatus === 'saved' ? 'none' : '1px solid #2a3350',
-          color: saveStatus === 'saved' ? '#fff' : '#94a3b8',
+          color: saveStatus === 'saved' ? '#fff' : 'var(--text-sub)',
           padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600,
           boxShadow: '0 4px 20px #0006', display: 'flex', alignItems: 'center', gap: 8,
         }}>
@@ -926,7 +926,7 @@ export default function App() {
       {loggingOut && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15,17,23,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
           <div style={{ width: 36, height: 36, border: '3px solid #2a3350', borderTopColor: '#4f8ef7', borderRadius: '50%', animation: 'edu-spin 0.8s linear infinite' }} />
-          <div style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 600 }}>Saving your changes…</div>
+          <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600 }}>Saving your changes…</div>
           <style>{`@keyframes edu-spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
@@ -974,20 +974,20 @@ export default function App() {
       <div className="edu-top-bar">
         <button className="edu-hamburger-btn" onClick={() => setCollapsed(v => !v)}>☰</button>
         <div style={{ width: 28, height: 28, borderRadius: 6, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>E</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{PAGE_TITLES[page] || page}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{PAGE_TITLES[page] || page}</div>
         {myNotifUnread > 0 && <div style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{myNotifUnread}</div>}
       </div>
       {/* SIDEBAR */}
-      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: '#171b26', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
+      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: 'var(--surface)', borderRight: '1px solid #2a3350', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
         <div style={{ padding: '14px 12px', borderBottom: '1px solid #2a3350', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#fff', flexShrink: 0 }}>E</div>
           {!collapsed && (
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#4f8ef7' }}>EduManage Pro</div>
-              <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.schoolName}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.schoolName}</div>
             </div>
           )}
-          <button onClick={() => setCollapsed(!collapsed)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4, flexShrink: 0, fontSize: 14 }}>
+          <button onClick={() => setCollapsed(!collapsed)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, flexShrink: 0, fontSize: 14 }}>
             {collapsed ? '→' : '←'}
           </button>
         </div>
@@ -1000,20 +1000,20 @@ export default function App() {
                 {user.role == 'principal' ? 'Principal' : user.role == 'class_teacher' ? 'Class Teacher' : user.role == 'subject_teacher' ? 'Subject Teacher' : 'Non-Teaching Staff'}
               </span>
             </div>
-            {user.classTeacherOf && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, paddingLeft: 16 }}>Class Teacher: {user.classTeacherOf}</div>}
-            {user.dept && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, paddingLeft: 16 }}>{user.dept} Department</div>}
+            {user.classTeacherOf && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, paddingLeft: 16 }}>Class Teacher: {user.classTeacherOf}</div>}
+            {user.dept && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, paddingLeft: 16 }}>{user.dept} Department</div>}
           </div>
         )}
 
         <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
           {sections.map(sec => (
             <div key={sec}>
-              {!collapsed && <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', padding: '8px 14px 4px', textTransform: 'uppercase', letterSpacing: 1 }}>{sec}</div>}
+              {!collapsed && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', padding: '8px 14px 4px', textTransform: 'uppercase', letterSpacing: 1 }}>{sec}</div>}
               {nav.filter(n => n.section == sec).map(n => {
                 const active = page == n.id;
                 return (
                   <div key={n.id} onClick={() => { setPage(n.id); if (window.innerWidth < 768) setCollapsed(true); }} title={collapsed ? n.label : undefined}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '11px 0' : '9px 14px', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', fontSize: 13, color: active ? '#4f8ef7' : '#94a3b8', background: active ? '#1e2435' : 'transparent', borderLeft: active ? '3px solid #4f8ef7' : '3px solid transparent', fontWeight: active ? 600 : 400, transition: 'all 0.12s' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '11px 0' : '9px 14px', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', fontSize: 13, color: active ? '#4f8ef7' : 'var(--text-sub)', background: active ? 'var(--surface2)' : 'transparent', borderLeft: active ? '3px solid #4f8ef7' : '3px solid transparent', fontWeight: active ? 600 : 400, transition: 'all 0.12s' }}
                     onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#1e243570'; }}
                     onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                   >
@@ -1032,8 +1032,8 @@ export default function App() {
             <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{initials}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
-                <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
               </div>
               <button onClick={logoutPrincipal} title="Sign out"
                 style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, fontSize: 13, fontWeight: 700, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -1042,7 +1042,7 @@ export default function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-              <button onClick={logoutPrincipal} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>⏻</button>
+              <button onClick={logoutPrincipal} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>⏻</button>
             </div>
           )}
         </div>
@@ -1050,13 +1050,13 @@ export default function App() {
 
       {/* MAIN */}
       <main className="edu-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
-        <header style={{ background: '#171b26', borderBottom: '1px solid #2a3350', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <header style={{ background: 'var(--surface)', borderBottom: '1px solid #2a3350', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={() => setCollapsed(c => !c)}
-              style={{ background: 'none', border: 'none', color: '#e2e8f0', cursor: 'pointer', fontSize: 20, padding: 4, borderRadius: 6 }}>☰</button>
+              style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 20, padding: 4, borderRadius: 6 }}>☰</button>
             <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#e2e8f0' }}>{PAGE_TITLES[page] || page}</div>
-            <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{PAGE_TITLES[page] || page}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ display: 'none' }} className="edu-desktop-label">{data.schoolName} · </span>
               {new Date().toLocaleDateString('en-KE', { weekday: 'short', month: 'short', day: 'numeric' })}
               <TermBadge data={data} />
@@ -1118,7 +1118,7 @@ export default function App() {
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, border: `2px solid ${roleColor}40`, flexShrink: 0 }}>{initials}</div>
           </div>
         </header>
-        <div className="edu-page-content" style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#0f1117' }}>
+        <div className="edu-page-content" style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
           {renderPage()}
         </div>
       </main>

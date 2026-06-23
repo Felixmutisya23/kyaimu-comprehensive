@@ -434,13 +434,13 @@ export default function FeesModule({ data, setData, user, isUnlocked = true }) {
   const TAB_S = (active) => ({
     padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
     fontSize: 13, fontWeight: 500,
-    background: active ? '#171b26' : 'transparent',
-    color:      active ? '#e2e8f0' : '#64748b',
+    background: active ? 'var(--surface)' : 'transparent',
+    color:      active ? 'var(--text)' : 'var(--text-muted)',
   });
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 18, width: 'fit-content', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, marginBottom: 18, width: 'fit-content', flexWrap: 'wrap' }}>
         {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={TAB_S(tab == t.id)}>{t.label}</button>)}
       </div>
 
@@ -509,9 +509,9 @@ function FeeOverview({ data, setData, user, canManage }) {
           { l: 'Outstanding',                   v: `KES ${(totalExpected-totalCollected).toLocaleString()}`,c: '#ef4444' },
           { l: 'Defaulters',                    v: defaulters.length,                                       c: '#f59e0b' },
         ].map(({ l, v, c }) => (
-          <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 14 }}>
+          <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{l}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
           </div>
         ))}
       </div>
@@ -525,7 +525,7 @@ function FeeOverview({ data, setData, user, canManage }) {
             </tr></thead>
             <tbody>
               {filtered.length == 0
-                ? <tr><td colSpan={hasBoarding?9:8} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 28 }}>No students found.</td></tr>
+                ? <tr><td colSpan={hasBoarding?9:8} style={{ ...TS.td, textAlign: 'center', color: 'var(--text-muted)', padding: 28 }}>No students found.</td></tr>
                 : filtered.map(s => {
                   const exp  = getTotalExpected(s, filterTerm, filterYear, data);
                   const paid = getPaid(s.id, filterTerm, filterYear, data);
@@ -648,7 +648,7 @@ function ByFeeType({ data, setData, user, canManage }) {
       </div>
 
       {!selFeeType ? (
-        <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+        <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
           Select a fee type above to view the payment status list.
           {feeTypes.length == 0 && <div style={{ marginTop: 12 }}>No fee types added yet. Go to <strong>Fee Structure</strong> tab first.</div>}
         </Card>
@@ -660,9 +660,9 @@ function ByFeeType({ data, setData, user, canManage }) {
               { l: 'Cleared',           v: cleared.length,          c: '#10b981' },
               { l: 'Pending',           v: pending.length,          c: '#ef4444' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
                 <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{v}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{l}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
             ))}
           </div>
@@ -752,7 +752,7 @@ function PaymentHistory({ data, setData, user, canManage }) {
       </div>
 
       {payments.length == 0
-        ? <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No payments found.</Card>
+        ? <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No payments found.</Card>
         : (
           <Card style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
@@ -873,8 +873,8 @@ function RecordPaymentModal({ show, onClose, data, setData, defaultStudent }) {
           {applicableFeeTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
         {selStudent && form.feeTypeId && expectedAmt !== null && (
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-            Expected for Term {form.term} {form.year}: <strong style={{ color: expectedAmt > 0 ? '#4f8ef7' : '#94a3b8' }}>{expectedAmt > 0 ? `KES ${expectedAmt.toLocaleString()}` : 'Not scheduled'}</strong>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            Expected for Term {form.term} {form.year}: <strong style={{ color: expectedAmt > 0 ? '#4f8ef7' : 'var(--text-sub)' }}>{expectedAmt > 0 ? `KES ${expectedAmt.toLocaleString()}` : 'Not scheduled'}</strong>
           </div>
         )}
       </FormGroup>
@@ -977,13 +977,13 @@ function FeeStructure({ data, setData }) {
   return (
     <div>
       {/* ── Boarding Mode Banner ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: '#1e2435', border: '1px solid #2a3350', borderRadius: 10, padding: '10px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 10, padding: '10px 16px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>School Type</div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: boardingMode=='both'?'#a78bfa':boardingMode=='boarding_only'?'#60a5fa':'#94a3b8' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>School Type</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: boardingMode=='both'?'#a78bfa':boardingMode=='boarding_only'?'#60a5fa':'var(--text-sub)' }}>
             {boardingMode=='both'?'🏠🚶 Mixed: Day & Boarding':boardingMode=='boarding_only'?'🏠 Boarding School Only':'🚶 Day School Only'}
           </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
             {boardingMode=='day_only'    && 'All students are day scholars — one fee schedule per fee type.'}
             {boardingMode=='boarding_only'&& 'All students board — one fee schedule per fee type.'}
             {boardingMode=='both'        && 'Students in the same class may be day scholars or boarders and pay different amounts.'}
@@ -1014,7 +1014,7 @@ function FeeStructure({ data, setData }) {
             <Btn size="sm" onClick={() => setShowAddType(true)}><Icon name="add" size={12} /> Add Type</Btn>
           </div>
           {feeTypes.length == 0
-            ? <p style={{ color: '#64748b', fontSize: 13 }}>No fee types yet. Add Tuition, Remedials, Sports Fee, etc.</p>
+            ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fee types yet. Add Tuition, Remedials, Sports Fee, etc.</p>
             : feeTypes.map(ft => (
               <div key={ft.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1036,8 +1036,8 @@ function FeeStructure({ data, setData }) {
                       style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
                   </div>
                 </div>
-                {ft.description && <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>{ft.description}</div>}
-                {!ft.appliesToAll && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Applies to: {(ft.applicableClasses||[]).join(', ')}</div>}
+                {ft.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{ft.description}</div>}
+                {!ft.appliesToAll && <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>Applies to: {(ft.applicableClasses||[]).join(', ')}</div>}
               </div>
             ))
           }
@@ -1050,7 +1050,7 @@ function FeeStructure({ data, setData }) {
             <Btn size="sm" onClick={() => setShowAddSched(true)} disabled={feeTypes.length == 0}><Icon name="add" size={12} /> Set Amount</Btn>
           </div>
           {feeSchedule.length == 0
-            ? <p style={{ color: '#64748b', fontSize: 13 }}>No amounts set. First add fee types, then set amounts per class and term.</p>
+            ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No amounts set. First add fee types, then set amounts per class and term.</p>
             : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={TS.table}>
@@ -1092,7 +1092,7 @@ function FeeStructure({ data, setData }) {
 
       {/* ── Boarding Setup Modal ── */}
       <Modal show={showBoardingSetup} onClose={() => setShowBoardingSetup(false)} title="School Boarding Configuration">
-        <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 16 }}>
           This setting controls how the fee system handles student categories. Choose the option that matches your school.
         </p>
         {[
@@ -1102,11 +1102,11 @@ function FeeStructure({ data, setData }) {
         ].map(opt => (
           <div key={opt.id} onClick={() => saveBoardingMode(opt.id)} style={{
             padding: '14px 16px', borderRadius: 10, marginBottom: 10, cursor: 'pointer',
-            border: `2px solid ${boardingMode==opt.id?'#4f8ef7':'#2a3350'}`,
-            background: boardingMode==opt.id?'#1a2a4a':'#171b26',
+            border: `2px solid ${boardingMode==opt.id?'#4f8ef7':'var(--border)'}`,
+            background: boardingMode==opt.id?'#1a2a4a':'var(--surface)',
           }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{opt.icon} {opt.title}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{opt.desc}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{opt.desc}</div>
             {boardingMode==opt.id && <div style={{ fontSize: 11, color: '#4f8ef7', marginTop: 6 }}>✓ Currently selected</div>}
           </div>
         ))}
@@ -1133,14 +1133,14 @@ function FeeStructure({ data, setData }) {
           </label>
           {!typeForm.appliesToAll && (
             <div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Select specific classes:</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Select specific classes:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {(getAllClasses(data)||[]).map(c => (
                   <div key={c} onClick={() => toggleClass(c)} style={{
                     padding: '3px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 500,
-                    background: typeForm.applicableClasses.includes(c) ? '#4f8ef7' : '#252d42',
-                    color:      typeForm.applicableClasses.includes(c) ? '#fff'    : '#94a3b8',
-                    border: `1px solid ${typeForm.applicableClasses.includes(c) ? '#4f8ef7' : '#2a3350'}`,
+                    background: typeForm.applicableClasses.includes(c) ? '#4f8ef7' : 'var(--surface2)',
+                    color:      typeForm.applicableClasses.includes(c) ? '#fff'    : 'var(--text-sub)',
+                    border: `1px solid ${typeForm.applicableClasses.includes(c) ? '#4f8ef7' : 'var(--border)'}`,
                   }}>{c}</div>
                 ))}
               </div>
@@ -1160,15 +1160,15 @@ function FeeStructure({ data, setData }) {
                 <div key={opt.label} onClick={() => setTypeForm({ ...typeForm, applicableCategories: opt.id })}
                   style={{
                     padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                    background: JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#4f8ef7' : '#252d42',
-                    color:      JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#fff'    : '#94a3b8',
-                    border: `1px solid ${JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#4f8ef7' : '#2a3350'}`,
+                    background: JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#4f8ef7' : 'var(--surface2)',
+                    color:      JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#fff'    : 'var(--text-sub)',
+                    border: `1px solid ${JSON.stringify(typeForm.applicableCategories) == JSON.stringify(opt.id) ? '#4f8ef7' : 'var(--border)'}`,
                   }}>
                   {opt.label}
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
               Example: "Boarding Charges" applies to boarders only; "Tuition Fee" applies to all.
             </div>
           </FormGroup>
@@ -1182,11 +1182,11 @@ function FeeStructure({ data, setData }) {
             <span><strong>This is an Optional Fee</strong> — only charged to specific students</span>
           </label>
           {typeForm.isOptional && (
-            <div style={{ background: '#1e2435', border: '1px solid #4f8ef760', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            <div style={{ background: 'var(--surface2)', border: '1px solid #4f8ef760', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8 }}>
                 Optional fees are assigned per-student. After creating this fee type, go to each student's profile to enroll them.
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Fee Type:</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Fee Type:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                 {[
                   { val: 'transport', label: '🚌 Transport', desc: 'School bus/van pickup' },
@@ -1201,22 +1201,22 @@ function FeeStructure({ data, setData }) {
                     title={opt.desc}
                     style={{
                       padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                      background: typeForm.optionalType === opt.val ? '#4f8ef7' : '#252d42',
-                      color:      typeForm.optionalType === opt.val ? '#fff'    : '#94a3b8',
-                      border: `1px solid ${typeForm.optionalType === opt.val ? '#4f8ef7' : '#2a3350'}`,
+                      background: typeForm.optionalType === opt.val ? '#4f8ef7' : 'var(--surface2)',
+                      color:      typeForm.optionalType === opt.val ? '#fff'    : 'var(--text-sub)',
+                      border: `1px solid ${typeForm.optionalType === opt.val ? '#4f8ef7' : 'var(--border)'}`,
                     }}>
                     {opt.label}
                   </div>
                 ))}
               </div>
               {typeForm.optionalType === 'transport' && (
-                <div style={{ fontSize: 11, color: '#64748b' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   💡 You can set different amounts per route/zone in the Fee Schedule after creating this fee type.
                 </div>
               )}
               {typeForm.optionalType === 'lunch' && (
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>Lunch charged:</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Lunch charged:</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[
                       { val: 'term',  label: 'Per term (fixed amount)' },
@@ -1271,7 +1271,7 @@ function FeeStructure({ data, setData }) {
                 <option value="day">🚶 Day Scholars only</option>
                 <option value="boarding">🏠 Boarders only</option>
               </select>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                 Set different amounts for day vs boarders by adding two entries.
               </div>
             </FormGroup>
@@ -1309,7 +1309,7 @@ function ParentView({ data, user }) {
   const child = myChildren.find(s => s.id == selChild);
 
   if (myChildren.length == 0) {
-    return <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No students linked to your account. Contact the school office.</Card>;
+    return <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No students linked to your account. Contact the school office.</Card>;
   }
 
   const feeTypes = data.feeTypes || [];
@@ -1326,9 +1326,9 @@ function ParentView({ data, user }) {
           {myChildren.map(c => (
             <div key={c.id} onClick={() => { setSelChild(c.id); setSelFT(''); setSelTerm(''); }}
               style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 500, fontSize: 13,
-                background: selChild==c.id?'#4f8ef7':'#1e2435',
-                color:      selChild==c.id?'#fff':'#94a3b8',
-                border: `1px solid ${selChild==c.id?'#4f8ef7':'#2a3350'}` }}>
+                background: selChild==c.id?'#4f8ef7':'var(--surface2)',
+                color:      selChild==c.id?'#fff':'var(--text-sub)',
+                border: `1px solid ${selChild==c.id?'#4f8ef7':'var(--border)'}` }}>
               {c.name} — {c.class}
             </div>
           ))}
@@ -1344,7 +1344,7 @@ function ParentView({ data, user }) {
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{child.name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{child.admNo} · {child.class} · {CAT_LABELS[studentCategory(child)]||'Day Scholar'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{child.admNo} · {child.class} · {CAT_LABELS[studentCategory(child)]||'Day Scholar'}</div>
               </div>
             </div>
           </Card>
@@ -1369,7 +1369,7 @@ function ParentView({ data, user }) {
                 <thead><tr>{['Date','Fee Type','Class','Term','Year','Method','Reference','Amount'].map(h => <th key={h} style={TS.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {payments.length == 0
-                    ? <tr><td colSpan={8} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 24 }}>No payment records found for selected filters.</td></tr>
+                    ? <tr><td colSpan={8} style={{ ...TS.td, textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No payment records found for selected filters.</td></tr>
                     : [...payments].reverse().map(p => {
                       const ft = feeTypes.find(f => f.id == p.feeTypeId);
                       return (
@@ -1398,6 +1398,6 @@ function ParentView({ data, user }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: '#1e2435', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: '#e2e8f0' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
 };

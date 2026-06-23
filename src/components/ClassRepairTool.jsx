@@ -271,7 +271,7 @@ export default function ClassRepairTool({ data, setData }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <strong>⚠ {issues.length} class setup issue{issues.length > 1 ? 's' : ''} detected</strong>
-              <div style={{ fontSize: 11, marginTop: 3, color: '#94a3b8' }}>
+              <div style={{ fontSize: 11, marginTop: 3, color: 'var(--text-sub)' }}>
                 {issues.map((iss, i) => <div key={i}>• {iss.description}</div>)}
               </div>
             </div>
@@ -298,12 +298,12 @@ export default function ClassRepairTool({ data, setData }) {
             </Alert>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
                 Issues found — select which to fix:
               </div>
               {repairs.map((repair, i) => (
                 <div key={i} style={{
-                  background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8,
+                  background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8,
                   padding: '12px 14px', marginBottom: 8,
                 }}>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
@@ -315,9 +315,9 @@ export default function ClassRepairTool({ data, setData }) {
                       <div style={{ fontSize: 12, fontWeight: 600, color: repair.type === 'MERGE' ? '#f59e0b' : '#4f8ef7', marginBottom: 3 }}>
                         {repair.type === 'MERGE' ? '🔀 Merge Duplicate Groups' : '✏️ Fix Class Name'}
                       </div>
-                      <div style={{ fontSize: 12, color: '#94a3b8' }}>{repair.description}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{repair.description}</div>
                       {repair.type === 'MERGE' && (
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                           All students and marks from the duplicate group will be relinked to the correct group.
                           Streams will be combined automatically.
                         </div>
@@ -346,25 +346,25 @@ export default function ClassRepairTool({ data, setData }) {
             </Alert>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
                 The following changes will be applied:
               </div>
               {repairs.filter(r => r.enabled).map((repair, i) => (
                 <div key={i} style={{
-                  background: '#1e2435', border: '1px solid #f59e0b40', borderRadius: 8,
+                  background: 'var(--surface2)', border: '1px solid #f59e0b40', borderRadius: 8,
                   padding: '12px 14px', marginBottom: 8,
                 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
                     {repair.type === 'MERGE' ? '🔀' : '✏️'} {repair.description}
                   </div>
                   {repair.type === 'MERGE' && (
-                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                       Streams from all groups will be merged into "{repair.keepGroup.name}".
                       Every student, exam, timetable entry, and teacher assignment referencing the duplicate class names will be updated.
                     </div>
                   )}
                   {repair.type === 'RENAME' && (
-                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                       All records referencing "{repair.group.name} ..." will be updated to "{repair.newName} ...".
                     </div>
                   )}
@@ -386,13 +386,13 @@ export default function ClassRepairTool({ data, setData }) {
             <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981', marginBottom: 6 }}>Repair Complete</div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 20 }}>
                 All class references have been updated. The data has been saved automatically.
               </div>
             </div>
-            <div style={{ background: '#1e2435', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontFamily: 'monospace', fontSize: 12 }}>
+            <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontFamily: 'monospace', fontSize: 12 }}>
               {log.map((line, i) => (
-                <div key={i} style={{ color: line.startsWith('✅') ? '#10b981' : line.startsWith('📊') ? '#4f8ef7' : '#64748b', marginBottom: 2 }}>
+                <div key={i} style={{ color: line.startsWith('✅') ? '#10b981' : line.startsWith('📊') ? '#4f8ef7' : 'var(--text-muted)', marginBottom: 2 }}>
                   {line || <br />}
                 </div>
               ))}

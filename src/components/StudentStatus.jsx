@@ -28,13 +28,13 @@ export default function StudentStatus({ data, setData, user }) {
   const TAB_S = (active) => ({
     padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
     fontSize: 13, fontWeight: 500,
-    background: active ? '#171b26' : 'transparent',
-    color: active ? '#e2e8f0' : '#64748b',
+    background: active ? 'var(--surface)' : 'transparent',
+    color: active ? 'var(--text)' : 'var(--text-muted)',
   });
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 18, width: 'fit-content', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, marginBottom: 18, width: 'fit-content', flexWrap: 'wrap' }}>
         {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={TAB_S(tab === t.id)}>{t.label}</button>)}
       </div>
 
@@ -154,9 +154,9 @@ function RollCall({ data, setData, user, isPrincipal, myClass }) {
               { l: 'Absent',         v: absent,                c: '#ef4444' },
               { l: 'Taken By',       v: existingRoll.takenBy,  c: '#f59e0b' },
             ].map(({ l, v, c }) => (
-              <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 14 }}>
+              <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14 }}>
                 <div style={{ fontSize: v?.length > 10 ? 14 : 22, fontWeight: 700, color: c, marginBottom: 4 }}>{v}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{l}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
               </div>
             ))}
           </div>
@@ -186,7 +186,7 @@ function RollCall({ data, setData, user, isPrincipal, myClass }) {
           </Card>
         </div>
       ) : (
-        <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+        <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
           No roll call taken yet for {selClass} — Term {selTerm} {selYear}.
           <br /><br />
           <Btn onClick={startRollCall} disabled={classStudents.length === 0}>Take Roll Call Now</Btn>
@@ -218,13 +218,13 @@ function RollCall({ data, setData, user, isPrincipal, myClass }) {
                   <td style={{ ...TS.td, display: 'flex', gap: 8 }}>
                     <button onClick={() => setRollResult(r => ({ ...r, [s.id]: true }))} style={{
                       padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 12,
-                      background: rollResult[s.id] === true ? '#10b981' : '#1e2435',
-                      color: rollResult[s.id] === true ? '#fff' : '#64748b',
+                      background: rollResult[s.id] === true ? '#10b981' : 'var(--surface2)',
+                      color: rollResult[s.id] === true ? '#fff' : 'var(--text-muted)',
                     }}>✓ Present</button>
                     <button onClick={() => setRollResult(r => ({ ...r, [s.id]: false }))} style={{
                       padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 12,
-                      background: rollResult[s.id] === false ? '#ef4444' : '#1e2435',
-                      color: rollResult[s.id] === false ? '#fff' : '#64748b',
+                      background: rollResult[s.id] === false ? '#ef4444' : 'var(--surface2)',
+                      color: rollResult[s.id] === false ? '#fff' : 'var(--text-muted)',
                     }}>✗ Absent</button>
                   </td>
                 </tr>
@@ -328,7 +328,7 @@ function Permissions({ data, setData, user, isPrincipal, myClass }) {
       </div>
 
       {permissions.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No permission records found.</Card>
+        <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No permission records found.</Card>
       ) : (
         <Card style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
@@ -343,10 +343,10 @@ function Permissions({ data, setData, user, isPrincipal, myClass }) {
                       <td style={TS.td}>{p.studentClass}</td>
                       <td style={{ ...TS.td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.reason}</td>
                       <td style={TS.td}>{p.dateGiven}</td>
-                      <td style={{ ...TS.td, color: isOverdue ? '#ef4444' : '#e2e8f0', fontWeight: isOverdue ? 700 : 400 }}>
+                      <td style={{ ...TS.td, color: isOverdue ? '#ef4444' : 'var(--text)', fontWeight: isOverdue ? 700 : 400 }}>
                         {p.dateReturn} {isOverdue && '⚠'}
                       </td>
-                      <td style={{ ...TS.td, color: '#94a3b8' }}>{p.approvedBy}</td>
+                      <td style={{ ...TS.td, color: 'var(--text-sub)' }}>{p.approvedBy}</td>
                       <td style={TS.td}>
                         {p.returned
                           ? <Tag color="green">✓ Returned {p.returnDate}</Tag>
@@ -464,12 +464,12 @@ function Withdrawals({ data, setData, user, isPrincipal }) {
 
   const TAB_S = (active) => ({
     padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-    background: active ? '#171b26' : 'transparent', color: active ? '#e2e8f0' : '#64748b',
+    background: active ? 'var(--surface)' : 'transparent', color: active ? 'var(--text)' : 'var(--text-muted)',
   });
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 14, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, marginBottom: 14, width: 'fit-content' }}>
         <button style={TAB_S(tab==='active')} onClick={() => setTab('active')}>Active Students ({activeStudents.length})</button>
         <button style={TAB_S(tab==='removed')} onClick={() => setTab('removed')}>
           Withdrawn / Expelled ({removedStudents.length})
@@ -517,7 +517,7 @@ function Withdrawals({ data, setData, user, isPrincipal }) {
       {tab === 'removed' && (
         <Card style={{ padding: 0, overflow: 'hidden' }}>
           {removedStudents.length === 0
-            ? <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No withdrawn or expelled students.</div>
+            ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No withdrawn or expelled students.</div>
             : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={TS.table}>
@@ -640,7 +640,7 @@ function StatusAlerts({ data, setData }) {
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>{alerts.length} active alert(s)</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{alerts.length} active alert(s)</div>
       </div>
 
       {alerts.length === 0 && overduePerms.length === 0 ? (
@@ -651,7 +651,7 @@ function StatusAlerts({ data, setData }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {alerts.map(a => (
             <div key={a.id} style={{
-              background: '#171b26', border: `1px solid ${a.type==='absence'||a.type==='absent_rollcall'||a.type==='overdue_permission' ? '#ef444440' : '#f59e0b40'}`,
+              background: 'var(--surface)', border: `1px solid ${a.type==='absence'||a.type==='absent_rollcall'||a.type==='overdue_permission' ? '#ef444440' : '#f59e0b40'}`,
               borderLeft: `4px solid ${a.type==='withdrawal' ? '#f59e0b' : '#ef4444'}`,
               borderRadius: 10, padding: '14px 16px',
             }}>
@@ -659,10 +659,10 @@ function StatusAlerts({ data, setData }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                     <Tag color={typeColors[a.type] || 'red'}>{typeLabels[a.type] || a.type}</Tag>
-                    <span style={{ fontSize: 12, color: '#64748b' }}>{a.date}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.date}</span>
                   </div>
-                  <div style={{ fontSize: 13, color: '#e2e8f0', marginBottom: 4 }}>{a.message}</div>
-                  {a.studentClass && <div style={{ fontSize: 12, color: '#94a3b8' }}>Class: {a.studentClass}</div>}
+                  <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>{a.message}</div>
+                  {a.studentClass && <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>Class: {a.studentClass}</div>}
                 </div>
                 <Btn size="sm" variant="success" onClick={() => resolve(a.id)}>✓ Resolve</Btn>
               </div>
@@ -673,13 +673,13 @@ function StatusAlerts({ data, setData }) {
 
       {resolved.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
             Resolved Alerts ({resolved.length})
           </div>
           {resolved.slice(0, 5).map(a => (
-            <div key={a.id} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 8, padding: '10px 14px', marginBottom: 6, opacity: 0.6 }}>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>{a.message}</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Resolved: {a.resolvedDate || '—'}</div>
+            <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 8, padding: '10px 14px', marginBottom: 6, opacity: 0.6 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{a.message}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Resolved: {a.resolvedDate || '—'}</div>
             </div>
           ))}
         </div>
@@ -700,6 +700,6 @@ function getAllClasses(data) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: '#1e2435', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: '#e2e8f0' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
 };

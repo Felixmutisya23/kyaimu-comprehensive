@@ -361,7 +361,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               <Avatar name={s.name} size={52} color="#1e40af" />
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>{s.name}</div>
-                <div style={{ color: '#64748b', fontSize: 12 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                   {admMode !== 'mixed' || s.admNo ? `Adm: ${s.admNo} · ` : ''}{s.class}
                 </div>
                 <div style={{ fontSize: 11, color: '#10b981', marginTop: 3 }}>
@@ -377,7 +377,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               ['Current Class', s.class],
             ].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #e2e8f0', fontSize: 13 }}>
-                <span style={{ color: '#64748b' }}>{l}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{l}</span>
                 <span style={{ fontWeight: 500 }}>{v || '—'}</span>
               </div>
             ))}
@@ -394,16 +394,16 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             <Card>
               <SectionTitle icon="fees">Fee Account</SectionTitle>
               {!s.fees?.total ? (
-                <div style={{ color: '#64748b', fontSize: 13 }}>No fee record set. Go to Fees module to assign.</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fee record set. Go to Fees module to assign.</div>
               ) : (
                 <>
                   <div style={{ fontSize: 28, fontWeight: 700, color: pct >= 100 ? '#10b981' : pct > 50 ? '#f59e0b' : '#ef4444', marginBottom: 4 }}>
                     KES {s.fees.paid.toLocaleString()}
                   </div>
-                  <div style={{ color: '#64748b', fontSize: 12, marginBottom: 10 }}>of KES {s.fees.total.toLocaleString()} total</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 10 }}>of KES {s.fees.total.toLocaleString()} total</div>
                   <ProgressBar pct={pct} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 10 }}>
-                    <span style={{ color: '#64748b' }}>Balance: KES {(s.fees.total - s.fees.paid).toLocaleString()}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Balance: KES {(s.fees.total - s.fees.paid).toLocaleString()}</span>
                     <Tag color={pct >= 100 ? 'green' : pct > 50 ? 'amber' : 'red'}>
                       {pct >= 100 ? 'Paid' : pct > 50 ? 'Partial' : 'Arrears'}
                     </Tag>
@@ -412,7 +412,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
               )}
             </Card>
           ) : (
-            <Card style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13 }}>
+            <Card style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
                 Fee information restricted to Finance Office and Principal.
@@ -425,7 +425,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           <Card style={{ marginBottom: 16 }}>
             <SectionTitle icon="alert">Disciplinary Cases</SectionTitle>
             {s.cases.length === 0
-              ? <p style={{ color: '#64748b', fontSize: 13 }}>No cases on record. ✓</p>
+              ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No cases on record. ✓</p>
               : s.cases.map((c, i) => <Alert key={i} type="warning"><Icon name="alert" size={14} />{c}</Alert>)}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input value={caseText} onChange={e => setCaseText(e.target.value)} placeholder="Log a new case..." style={{ flex: 1 }} />
@@ -437,7 +437,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
         <Card>
           <SectionTitle icon="exams">Academic Performance</SectionTitle>
           {exams.length === 0
-            ? <p style={{ color: '#64748b', fontSize: 13 }}>No exam records yet.</p>
+            ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No exam records yet.</p>
             : exams.map(ex => {
               const res = ex.results[s.name];
               if (!res) return null;
@@ -572,9 +572,9 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                     <td style={TS.td}>
                       {s.admNo
                         ? <span style={{ background: '#1d4ed820', color: '#60a5fa', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>{s.admNo}</span>
-                        : <span style={{ color: '#64748b', fontSize: 11 }}>—</span>}
+                        : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
                     </td>
-                    <td style={{ ...TS.td, fontWeight: 700, fontSize: 13, color: '#f1f5f9', letterSpacing: 0.3 }}>
+                    <td style={{ ...TS.td, fontWeight: 700, fontSize: 13, color: 'var(--text)', letterSpacing: 0.3 }}>
                       {(s.name || '').toUpperCase()}
                     </td>
                     <td style={{ ...TS.td, fontSize: 12 }}>
@@ -594,7 +594,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                               <ProgressBar pct={pct} />
                               <span style={{ fontSize: 11, color: pct >= 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444', fontWeight: 700 }}>{pct}%</span>
                             </div>
-                          : <span style={{ fontSize: 11, color: '#64748b' }}>Not set</span>}
+                          : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Not set</span>}
                       </td>
                     )}
                     <td style={TS.td}>
@@ -613,7 +613,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                 );
               })}
               {filtered.length===0&&(
-                <tr><td colSpan={8} style={{...TS.td,textAlign:'center',color:'#64748b',padding:28}}>No students found.</td></tr>
+                <tr><td colSpan={8} style={{...TS.td,textAlign:'center',color:'var(--text-muted)',padding:28}}>No students found.</td></tr>
               )}
             </tbody>
           </table>
@@ -636,7 +636,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
         <FormGroup label="Other Name (optional)">
           <input value={form.otherName} onChange={e=>setForm({...form,otherName:e.target.value})} placeholder="e.g. Mwangi (middle or clan name)" />
         </FormGroup>
-        <div style={{fontSize:11,color:'#64748b',marginBottom:14,padding:'6px 10px',background:'#f0f9ff',borderRadius:6}}>
+        <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,padding:'6px 10px',background:'#f0f9ff',borderRadius:6}}>
           Full name preview: <strong>{buildStudentName(form.firstName,form.lastName,form.otherName)||'—'}</strong>
         </div>
 
@@ -698,11 +698,11 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
         {!uploadDone ? (
           <>
             {/* Step 1 — Download template */}
-            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>
                 Step 1 — Download the Excel template
               </div>
-              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10 }}>
                 Fill in student details in the template. Column names must stay the same.
                 Admission Number column {data.admissionSetting === 'auto' ? 'is NOT included (auto-assigned)' : data.admissionSetting === 'mixed' ? 'is optional' : 'is required'}.
               </div>
@@ -712,11 +712,11 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             </div>
 
             {/* Step 2 — Upload filled file */}
-            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>
                 Step 2 — Upload your filled Excel or CSV file
               </div>
-              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10 }}>
                 Supported formats: .xlsx, .xls, .csv
               </div>
               <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#4f8ef7', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
@@ -728,7 +728,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             {/* Preview parsed rows */}
             {uploadRows.length > 0 && (
               <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
                   Step 3 — Review & Import ({uploadRows.length} rows found)
                 </div>
                 <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
@@ -736,23 +736,23 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
                     <thead>
                       <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
                         {['Row','First Name','Last Name','Other Name',...(data.admissionSetting!=='auto'?['Adm No']:[]),'Class','DOB','Parent Name','Parent Phone','Year'].map(h=>(
-                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'#64748b', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {uploadRows.map((row,i) => (
                         <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
-                          <td style={{ padding:'5px 10px', color:'#64748b' }}>{row.rowNum}</td>
-                          <td style={{ padding:'5px 10px', color: row.firstName?'#e2e8f0':'#ef4444', fontWeight:row.firstName?400:700 }}>{row.firstName||'⚠ Missing'}</td>
-                          <td style={{ padding:'5px 10px', color: row.lastName?'#e2e8f0':'#ef4444' }}>{row.lastName||'⚠ Missing'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.otherName||'—'}</td>
-                          {data.admissionSetting!=='auto' && <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.admNo||'—'}</td>}
-                          <td style={{ padding:'5px 10px', color: row.class?'#e2e8f0':'#ef4444' }}>{row.class||'⚠ Missing'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.dob||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.parentName||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.parentPhone||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.joined||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-muted)' }}>{row.rowNum}</td>
+                          <td style={{ padding:'5px 10px', color: row.firstName?'var(--text)':'#ef4444', fontWeight:row.firstName?400:700 }}>{row.firstName||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color: row.lastName?'var(--text)':'#ef4444' }}>{row.lastName||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.otherName||'—'}</td>
+                          {data.admissionSetting!=='auto' && <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.admNo||'—'}</td>}
+                          <td style={{ padding:'5px 10px', color: row.class?'var(--text)':'#ef4444' }}>{row.class||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.dob||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.parentName||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.parentPhone||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.joined||'—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -782,17 +782,17 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
             <div style={{ fontSize:56, marginBottom:16 }}>
               {uploadSummary?.added > 0 ? '✅' : '⚠️'}
             </div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0', marginBottom:8 }}>
+            <div style={{ fontSize:20, fontWeight:800, color:'var(--text)', marginBottom:8 }}>
               Upload Complete
             </div>
-            <div style={{ fontSize:14, color:'#94a3b8', marginBottom:20 }}>
+            <div style={{ fontSize:14, color:'var(--text-sub)', marginBottom:20 }}>
               <span style={{ color:'#10b981', fontWeight:700 }}>{uploadSummary?.added} students added</span>
               {uploadSummary?.skipped > 0 && <span style={{ color:'#f59e0b' }}> · {uploadSummary.skipped} rows skipped</span>}
             </div>
             {uploadErrors.length > 0 && (
-              <div style={{ background:'#1e2435', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:160, overflowY:'auto' }}>
+              <div style={{ background:'var(--surface2)', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:160, overflowY:'auto' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>Skipped rows:</div>
-                {uploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'#64748b', marginBottom:2 }}>• {e}</div>)}
+                {uploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'var(--text-muted)', marginBottom:2 }}>• {e}</div>)}
               </div>
             )}
             <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
@@ -820,7 +820,7 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
           <FormGroup label="Other Name (optional)">
             <input value={editForm.otherName} onChange={e=>setEditForm({...editForm,otherName:e.target.value})} />
           </FormGroup>
-          <div style={{fontSize:11,color:'#64748b',marginBottom:14,padding:'6px 10px',background:'#f0f9ff',borderRadius:6}}>
+          <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,padding:'6px 10px',background:'#f0f9ff',borderRadius:6}}>
             Full name preview: <strong>{buildStudentName(editForm.firstName,editForm.lastName,editForm.otherName)||'—'}</strong>
           </div>
           {admMode==='manual' && (
@@ -865,6 +865,6 @@ export default function Students({ data, setData, user, isUnlocked = true }) {
 
 const TS = {
   table: { width:'100%',borderCollapse:'collapse',fontSize:13 },
-  th:    { textAlign:'left',padding:'10px 14px',fontSize:11,fontWeight:600,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc' },
+  th:    { textAlign:'left',padding:'10px 14px',fontSize:11,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc' },
   td:    { padding:'10px 14px',borderBottom:'1px solid #f1f5f9',color:'#1e293b' },
 };

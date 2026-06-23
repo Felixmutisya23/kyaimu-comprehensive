@@ -387,7 +387,7 @@ export default function Exams({ data, setData, user, flushSave }) {
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(null); }}
-          style={{ width: 160, padding: '8px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+          style={{ width: 160, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
           {accessibleClasses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {classExams.length > 0 && (() => {
@@ -401,9 +401,9 @@ export default function Exams({ data, setData, user, flushSave }) {
           const years = Object.keys(byYear).sort((a, b) => b - a); // newest first
           return (
             <select value={selExamId || ''} onChange={e => setSelExamId(Number(e.target.value) || null)}
-              style={{ width: 260, padding: '8px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+              style={{ width: 260, padding: '8px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               {years.map(yr => (
-                <optgroup key={yr} label={`── ${yr} ──`} style={{ color: '#94a3b8', fontSize: 11 }}>
+                <optgroup key={yr} label={`── ${yr} ──`} style={{ color: 'var(--text-sub)', fontSize: 11 }}>
                   {byYear[yr].map(e => (
                     <option key={e.id} value={e.id}>
                       Term {e.term} · {e.name}
@@ -508,7 +508,7 @@ export default function Exams({ data, setData, user, flushSave }) {
       {/* Grade key */}
       <Card style={{ marginBottom: 16, padding: '10px 16px' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#64748b', marginRight: 4 }}>CBC:</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 4 }}>CBC:</span>
           {GRADES_CBC.map(g => (
             <span key={g.label} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: g.color + '20', color: g.color, border: `1px solid ${g.color}30` }}>
               {g.label} {g.scoreMin}–{g.scoreMax} ({g.points}pts)
@@ -522,7 +522,7 @@ export default function Exams({ data, setData, user, flushSave }) {
         <Card noPad>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #2a3350', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{selExam.name} — {selClass}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {isClassTeacher ? 'Viewing all subjects for your class' : !isPrincipal ? `Showing: ${visibleSubjects.join(', ')}` : 'Full results view'}
             </div>
           </div>
@@ -542,7 +542,7 @@ export default function Exams({ data, setData, user, flushSave }) {
                 {ranked.map(s => (
                   <tr key={s.id}>
                     <td style={TS.td}>
-                      <span style={{ fontWeight: 700, color: s.streamPos <= 3 ? '#f59e0b' : '#e2e8f0' }}>
+                      <span style={{ fontWeight: 700, color: s.streamPos <= 3 ? '#f59e0b' : 'var(--text)' }}>
                         {s.streamPos <= 3 ? ['🥇', '🥈', '🥉'][s.streamPos - 1] : s.streamPos}
                       </span>
                     </td>
@@ -557,7 +557,7 @@ export default function Exams({ data, setData, user, flushSave }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                             <span title={col.type === 'group' ? col.components.map(c => `${c}: ${getScore(s.results[c]) ?? '—'}`).join(', ') : ''}
                               style={{ color: col.type === 'group' ? '#4f8ef7' : 'inherit', fontWeight: col.type === 'group' ? 700 : 'inherit' }}>
-                              {score ?? <span style={{ color: '#64748b' }}>—</span>}
+                              {score ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
                             </span>
                             {score !== null && canEdit && (
                               <button onClick={() => openEditRequest(s.name, col.subject || col.name, score, selExam.id)}
@@ -573,11 +573,11 @@ export default function Exams({ data, setData, user, flushSave }) {
                         <td style={TS.td}>{s.mean}</td>
                         <td style={TS.td}><GradeBadge score={s.mean} /></td>
                         <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>
-                          {s.overallPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.overallOf}</span>
+                          {s.overallPos}<span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>/{s.overallOf}</span>
                         </td>
                         {hasStreams && (
                           <td style={{ ...TS.td, fontWeight: 700, color: '#4f8ef7' }}>
-                            {s.streamPos}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/{s.streamOf}</span>
+                            {s.streamPos}<span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>/{s.streamOf}</span>
                           </td>
                         )}
                       </>
@@ -592,7 +592,7 @@ export default function Exams({ data, setData, user, flushSave }) {
                   </tr>
                 ))}
                 {ranked.length === 0 && (
-                  <tr><td colSpan={visibleSubjects.length + 7} style={{ ...TS.td, textAlign: 'center', color: '#64748b', padding: 32 }}>
+                  <tr><td colSpan={visibleSubjects.length + 7} style={{ ...TS.td, textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
                     No students found. {enterableSubjects.length > 0 ? 'Click "Enter My Scores" to add marks.' : ''}
                   </td></tr>
                 )}
@@ -601,7 +601,7 @@ export default function Exams({ data, setData, user, flushSave }) {
           </div>
         </Card>
       ) : (
-        <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+        <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
           {classExams.length === 0
             ? `No exams for ${selClass} yet.${(isPrincipal || isClassTeacher) ? ' Click "New Exam" to create one.' : ''}`
             : 'Select an exam to view results.'}
@@ -619,12 +619,12 @@ export default function Exams({ data, setData, user, flushSave }) {
         }).sort((a, b) => b.avg - a.avg);
         return (
           <Card style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📊 Subjects Ranked: Best → Weakest</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>📊 Subjects Ranked: Best → Weakest</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {subStats.map((s, i) => (
-                <div key={s.sub} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c32' : '#64748b' }}>#{i + 1}</span>
-                  <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>{s.sub}</span>
+                <div key={s.sub} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--text-sub)' : i === 2 ? '#cd7c32' : 'var(--text-muted)' }}>#{i + 1}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{s.sub}</span>
                   <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: s.avg >= 60 ? '#10b98130' : s.avg >= 43 ? '#4f8ef730' : s.avg >= 25 ? '#f59e0b30' : '#ef444430', color: s.avg >= 60 ? '#10b981' : s.avg >= 43 ? '#4f8ef7' : s.avg >= 25 ? '#f59e0b' : '#ef4444' }}>
                     {s.avg}
                   </span>
@@ -644,7 +644,7 @@ export default function Exams({ data, setData, user, flushSave }) {
             {myPending.map(r => (
               <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
                 <span style={{ fontWeight: 500 }}>{r.studentName}</span> — {r.subject}: {r.oldScore} → {r.newScore}
-                <span style={{ marginLeft: 12, fontSize: 11, color: '#64748b' }}>
+                <span style={{ marginLeft: 12, fontSize: 11, color: 'var(--text-muted)' }}>
                   Class Teacher: <span style={{ color: r.approvals.classTeacher === 'approved' ? '#10b981' : '#f59e0b' }}>{r.approvals.classTeacher || 'Pending'}</span>
                   &nbsp;· Principal: <span style={{ color: r.approvals.principal === 'approved' ? '#10b981' : '#f59e0b' }}>{r.approvals.principal || 'Pending'}</span>
                 </span>
@@ -751,7 +751,7 @@ export default function Exams({ data, setData, user, flushSave }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {DEFAULT_EXAM_NAMES.map(n => (
               <button key={n} onClick={() => setExamForm(f => ({ ...f, name: n, customName: '' }))}
-                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : '#2a3350'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : '#1e2435', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : 'var(--border)'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : 'var(--surface2)', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : 'var(--text-sub)', fontSize: 12, cursor: 'pointer' }}>
                 {n}
               </button>
             ))}
@@ -762,8 +762,8 @@ export default function Exams({ data, setData, user, flushSave }) {
             placeholder={examForm.name ? `Selected: "${examForm.name}" — or type a custom name` : 'Or type a custom exam name...'}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-            Final name: <strong style={{ color: '#e2e8f0' }}>{examForm.customName || examForm.name || '(none selected)'}</strong>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Final name: <strong style={{ color: 'var(--text)' }}>{examForm.customName || examForm.name || '(none selected)'}</strong>
           </div>
         </FormGroup>
 
@@ -791,7 +791,7 @@ export default function Exams({ data, setData, user, flushSave }) {
         {/* All classes tick */}
         {isPrincipal && (
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
               <input type="checkbox" checked={examForm.forAllClasses} onChange={e => setExamForm(f => ({ ...f, forAllClasses: e.target.checked, selectedStreams: [] }))} />
               Apply to ALL classes (creates one exam per class)
             </label>
@@ -812,16 +812,16 @@ export default function Exams({ data, setData, user, flushSave }) {
                   </select>
                   {hasStreams && (
                     <div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>This class has streams — select which streams this exam covers:</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>This class has streams — select which streams this exam covers:</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: '#e2e8f0' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text)' }}>
                           <input type="checkbox"
                             checked={examForm.selectedStreams.length === siblings.length}
                             onChange={e => setExamForm(f => ({ ...f, selectedStreams: e.target.checked ? [...siblings] : [f.class] }))}
                           /> All Streams
                         </label>
                         {siblings.map(s => (
-                          <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: '#e2e8f0' }}>
+                          <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text)' }}>
                             <input type="checkbox"
                               checked={examForm.selectedStreams.includes(s) || (examForm.selectedStreams.length === 0 && s === examForm.class)}
                               onChange={e => {
@@ -860,7 +860,7 @@ export default function Exams({ data, setData, user, flushSave }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {DEFAULT_EXAM_NAMES.map(n => (
               <button key={n} onClick={() => setExamForm(f => ({ ...f, name: n, customName: '' }))}
-                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : '#2a3350'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : '#1e2435', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${examForm.name === n && !examForm.customName ? '#4f8ef7' : 'var(--border)'}`, background: examForm.name === n && !examForm.customName ? '#4f8ef720' : 'var(--surface2)', color: examForm.name === n && !examForm.customName ? '#4f8ef7' : 'var(--text-sub)', fontSize: 12, cursor: 'pointer' }}>
                 {n}
               </button>
             ))}
@@ -939,10 +939,10 @@ export default function Exams({ data, setData, user, flushSave }) {
         </Alert>
         {editTarget && (
           <>
-            <div style={{ background: '#1e2435', borderRadius: 8, padding: 14, marginBottom: 16, fontSize: 13 }}>
-              <div><span style={{ color: '#64748b' }}>Student:</span> <strong>{editTarget.studentName}</strong></div>
-              <div><span style={{ color: '#64748b' }}>Subject:</span> <strong>{editTarget.subject}</strong></div>
-              <div><span style={{ color: '#64748b' }}>Current Score:</span> <strong style={{ color: '#f59e0b' }}>{editTarget.currentScore}</strong></div>
+            <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: 14, marginBottom: 16, fontSize: 13 }}>
+              <div><span style={{ color: 'var(--text-muted)' }}>Student:</span> <strong>{editTarget.studentName}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Subject:</span> <strong>{editTarget.subject}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Current Score:</span> <strong style={{ color: '#f59e0b' }}>{editTarget.currentScore}</strong></div>
             </div>
             <FormGroup label="New Score (0 – 100)">
               <input type="number" min={0} max={100} value={editNewScore} onChange={e => setEditNewScore(e.target.value)} autoFocus />
@@ -963,6 +963,6 @@ export default function Exams({ data, setData, user, flushSave }) {
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: '#1e2435', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: '#e2e8f0' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
 };

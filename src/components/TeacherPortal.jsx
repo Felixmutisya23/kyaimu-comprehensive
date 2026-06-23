@@ -81,7 +81,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
   function navigate(id) { setPage(id); setNavOpen(false); }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#0f1117', position: 'relative' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', position: 'relative' }}>
       {/* ── RESPONSIVE STYLES ── */}
       <style>{`
         /* Mobile nav overlay */
@@ -135,9 +135,9 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
 
       {/* Mobile top bar */}
       <div className="tp-hamburger">
-        <button onClick={() => setNavOpen(v => !v)} style={{ background: 'none', border: 'none', color: '#e2e8f0', fontSize: 22, cursor: 'pointer', padding: 2 }}>☰</button>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{NAV.find(n => n.id === page)?.icon} {NAV.find(n => n.id === page)?.label}</div>
-        <div style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b' }}>{data.schoolName}</div>
+        <button onClick={() => setNavOpen(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: 22, cursor: 'pointer', padding: 2 }}>☰</button>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{NAV.find(n => n.id === page)?.icon} {NAV.find(n => n.id === page)?.label}</div>
+        <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>{data.schoolName}</div>
       </div>
 
       {/* Sidebar */}
@@ -146,11 +146,11 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Avatar name={user.name} size={40} color="#4f8ef7" />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
               <div style={{ fontSize: 11, color: '#4f8ef7' }}>{user.staffId}</div>
               {isClassTeacher && <div style={{ fontSize: 10, color: '#10b981', marginTop: 2 }}>Class Teacher · {myClass}</div>}
               {!isClassTeacher && user.canEnterAllMarks && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>Secretary · All Access</div>}
-              {!isClassTeacher && !user.canEnterAllMarks && user.staffType === 'teaching' && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Subject Teacher</div>}
+              {!isClassTeacher && !user.canEnterAllMarks && user.staffType === 'teaching' && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Subject Teacher</div>}
               {pendingApprovals.length > 0 && (
                 <div onClick={() => navigate('approvals')} style={{ fontSize: 10, color: '#fff', background: '#ef4444', borderRadius: 6, padding: '2px 6px', marginTop: 4, display: 'inline-block', cursor: 'pointer', fontWeight: 700 }}>
                   ✅ {pendingApprovals.length} mark{pendingApprovals.length > 1 ? 's' : ''} to approve
@@ -165,7 +165,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
               width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
               padding: '11px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', marginBottom: 4,
               background: page === n.id ? '#4f8ef720' : 'transparent',
-              color: page === n.id ? '#4f8ef7' : '#94a3b8',
+              color: page === n.id ? '#4f8ef7' : 'var(--text-sub)',
               fontSize: 14, fontWeight: page === n.id ? 600 : 400,
             }}>
               <span style={{ fontSize: 18 }}>{n.icon}</span> {n.label}
@@ -225,14 +225,14 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
     { label: isClassTeacher ? 'My Students' : 'Classes I Teach', value: isClassTeacher ? myStudents.length : myClasses.length, color: '#4f8ef7', icon: isClassTeacher ? '👨‍🎓' : '🏫', page: isClassTeacher ? 'class' : null },
     { label: 'Subjects', value: mySubjects.length, color: '#10b981', icon: '📚', page: 'marks' },
     { label: "Today's Lessons", value: timetableToday.length, color: '#f59e0b', icon: '📅', page: 'lessons' },
-    { label: 'Notifications', value: myNotifs.length, color: myNotifs.length > 0 ? '#ef4444' : '#64748b', icon: '🔔', page: 'notifs' },
+    { label: 'Notifications', value: myNotifs.length, color: myNotifs.length > 0 ? '#ef4444' : 'var(--text-muted)', icon: '🔔', page: 'notifs' },
   ];
 
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <div className="tp-page-title" style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>Good {greeting}, {(user.name||'').split(' ')[0]} 👋</div>
-        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{today}</div>
+        <div className="tp-page-title" style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>Good {greeting}, {(user.name||'').split(' ')[0]} 👋</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{today}</div>
         {isClassTeacher && <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>Class Teacher · {myClass}</div>}
         {user.canEnterAllMarks && !isClassTeacher && <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>You have access to enter marks for all classes and subjects.</div>}
       </div>
@@ -246,10 +246,10 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
 
       <div className="tp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 20 }}>
         {stats.map(s => (
-          <div key={s.label} onClick={() => s.page && setPage(s.page)} style={{ background: '#171b26', border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px', cursor: s.page ? 'pointer' : 'default' }}>
+          <div key={s.label} onClick={() => s.page && setPage(s.page)} style={{ background: 'var(--surface)', border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px', cursor: s.page ? 'pointer' : 'default' }}>
             <div style={{ fontSize: 26 }}>{s.icon}</div>
             <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -268,15 +268,15 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
       <Card style={{ marginBottom: 14 }}>
         <SectionTitle icon="clock">Today's Lessons</SectionTitle>
         {timetableToday.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13, padding: '12px 0' }}>No lessons today or timetable not set up yet.</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '12px 0' }}>No lessons today or timetable not set up yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {timetableToday.map((l, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350', flexWrap: 'wrap' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#4f8ef7', minWidth: 60 }}>{l.time}</div>
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{l.subject}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{l.class}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{l.subject}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l.class}</div>
                 </div>
                 <Tag color="blue">{l.class}</Tag>
               </div>
@@ -290,8 +290,8 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
           <SectionTitle icon="book">My Subject Assignments</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {mySubjects.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#1e2435', borderRadius: 8, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', flex: 1, minWidth: 120 }}>{s.subject}</div>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', flex: 1, minWidth: 120 }}>{s.subject}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {(s.classes||[]).map(c => <Tag key={c} color="blue">{c}</Tag>)}
                 </div>
@@ -331,9 +331,9 @@ function TeacherLessons({ user, data }) {
 
   return (
     <div>
-      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>📅 My Lessons / Timetable</div>
+      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>📅 My Lessons / Timetable</div>
       {mySlots.length === 0 ? (
-        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No timetable entries yet. Contact your administrator.</div></Card>
+        <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No timetable entries yet. Contact your administrator.</div></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {byDay.filter(d => d.slots.length > 0).map(({ day, slots }) => (
@@ -341,9 +341,9 @@ function TeacherLessons({ user, data }) {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#4f8ef7', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{day}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {slots.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 10px', background: '#1e2435', borderRadius: 8, flexWrap: 'wrap' }}>
+                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 10px', background: 'var(--surface2)', borderRadius: 8, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', minWidth: 60 }}>{s.time}</div>
-                    <div style={{ fontSize: 13, color: '#e2e8f0', flex: 1 }}>{s.subject}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{s.subject}</div>
                     <Tag color="blue">{s.class}</Tag>
                   </div>
                 ))}
@@ -519,7 +519,7 @@ function TeacherMarks({ user, data, setData }) {
   }
 
   if (availableClasses.length === 0) {
-    return <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No classes assigned. Contact your administrator.</div></Card>;
+    return <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No classes assigned. Contact your administrator.</div></Card>;
   }
 
   /* Step indicators */
@@ -529,16 +529,16 @@ function TeacherMarks({ user, data, setData }) {
 
   return (
     <div>
-      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>✏️ Enter Marks</div>
+      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>✏️ Enter Marks</div>
 
       {/* STEP 1 – Class */}
       <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 1 — Select Class</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 1 — Select Class</div>
         <div className="tp-pick-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {availableClasses.map(cls => (
             <button key={cls} onClick={() => changeClass(cls)} style={{
-              padding: '10px 18px', borderRadius: 8, border: `2px solid ${selClass === cls ? '#4f8ef7' : '#2a3350'}`,
-              background: selClass === cls ? '#4f8ef720' : '#1e2435', color: selClass === cls ? '#4f8ef7' : '#94a3b8',
+              padding: '10px 18px', borderRadius: 8, border: `2px solid ${selClass === cls ? '#4f8ef7' : 'var(--border)'}`,
+              background: selClass === cls ? '#4f8ef720' : 'var(--surface2)', color: selClass === cls ? '#4f8ef7' : 'var(--text-sub)',
               cursor: 'pointer', fontSize: 14, fontWeight: selClass === cls ? 700 : 400,
               minHeight: 44, /* touch target */
             }}>{cls}</button>
@@ -549,15 +549,15 @@ function TeacherMarks({ user, data, setData }) {
       {/* STEP 2 – Subject */}
       {step1done && (
         <Card style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 2 — Select Subject</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 2 — Select Subject</div>
           {classSubjects.length === 0 ? (
-            <div style={{ color: '#64748b', fontSize: 13 }}>No subjects found for {selClass}. Contact your administrator.</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No subjects found for {selClass}. Contact your administrator.</div>
           ) : (
             <div className="tp-pick-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {classSubjects.map(sub => (
                 <button key={sub} onClick={() => changeSubject(sub)} style={{
-                  padding: '10px 16px', borderRadius: 8, border: `2px solid ${selSubject === sub ? '#10b981' : '#2a3350'}`,
-                  background: selSubject === sub ? '#10b98120' : '#1e2435', color: selSubject === sub ? '#10b981' : '#94a3b8',
+                  padding: '10px 16px', borderRadius: 8, border: `2px solid ${selSubject === sub ? '#10b981' : 'var(--border)'}`,
+                  background: selSubject === sub ? '#10b98120' : 'var(--surface2)', color: selSubject === sub ? '#10b981' : 'var(--text-sub)',
                   cursor: 'pointer', fontSize: 13, fontWeight: selSubject === sub ? 700 : 400,
                   minHeight: 44,
                 }}>{sub}</button>
@@ -570,21 +570,21 @@ function TeacherMarks({ user, data, setData }) {
       {/* STEP 3 – Exam */}
       {step1done && step2done && (
         <Card style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 3 — Select Exam</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Step 3 — Select Exam</div>
           {classExams.length === 0 ? (
-            <div style={{ color: '#64748b', fontSize: 13 }}>No exams created yet for {selClass}. Ask the administrator to create exams first.</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No exams created yet for {selClass}. Ask the administrator to create exams first.</div>
           ) : (
             <div className="tp-pick-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {classExams.map(e => (
                 <button key={e.id} onClick={() => changeExam(String(e.id))} style={{
-                  padding: '10px 16px', borderRadius: 8, border: `2px solid ${selExamId === String(e.id) ? '#7c3aed' : '#2a3350'}`,
-                  background: selExamId === String(e.id) ? '#7c3aed20' : '#1e2435',
-                  color: selExamId === String(e.id) ? '#a78bfa' : '#94a3b8',
+                  padding: '10px 16px', borderRadius: 8, border: `2px solid ${selExamId === String(e.id) ? '#7c3aed' : 'var(--border)'}`,
+                  background: selExamId === String(e.id) ? '#7c3aed20' : 'var(--surface2)',
+                  color: selExamId === String(e.id) ? '#a78bfa' : 'var(--text-sub)',
                   cursor: 'pointer', fontSize: 13, fontWeight: selExamId === String(e.id) ? 700 : 400,
                   minHeight: 44, textAlign: 'left',
                 }}>
                   <div>{e.name}</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Term {e.term} · {e.year}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Term {e.term} · {e.year}</div>
                 </button>
               ))}
             </div>
@@ -597,8 +597,8 @@ function TeacherMarks({ user, data, setData }) {
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{selSubject} — {selClass}</div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{selExam.name} · Term {selExam.term} · {selExam.year}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selSubject} — {selClass}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selExam.name} · Term {selExam.term} · {selExam.year}</div>
             </div>
             <Btn variant="success" onClick={saveMarks} style={{ minHeight: 44, fontSize: 15 }}>{saved ? '✅ Saved!' : '💾 Save Marks'}</Btn>
           </div>
@@ -618,12 +618,12 @@ function TeacherMarks({ user, data, setData }) {
           {/* Desktop: table | Mobile: card list (via CSS) */}
           <table className="marks-table">
             <thead>
-              <tr style={{ background: '#1e2435', borderBottom: '2px solid #2a3350' }}>
-                <th style={{ padding: '10px 10px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>#</th>
-                <th style={{ padding: '10px 10px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Student</th>
-                <th style={{ padding: '10px 10px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Adm No</th>
+              <tr style={{ background: 'var(--surface2)', borderBottom: '2px solid #2a3350' }}>
+                <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>#</th>
+                <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Student</th>
+                <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Adm No</th>
                 <th style={{ padding: '10px 10px', textAlign: 'center', color: '#4f8ef7', fontSize: 11, fontWeight: 700 }}>Score (0–100)</th>
-                <th style={{ padding: '10px 10px', textAlign: 'center', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Grade</th>
+                <th style={{ padding: '10px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Grade</th>
               </tr>
             </thead>
             <tbody>
@@ -635,9 +635,9 @@ function TeacherMarks({ user, data, setData }) {
                 const needsApproval = isChanged && !autoApproved();
                 return (
                   <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
-                    <td data-label="#" style={{ padding: '8px 10px', color: '#64748b' }}>{i + 1}</td>
-                    <td data-label="Student" style={{ padding: '8px 10px', fontWeight: 600, color: '#e2e8f0' }}>{st.name}</td>
-                    <td data-label="Adm No" style={{ padding: '8px 10px', color: '#64748b', fontFamily: 'monospace', fontSize: 12 }}>{st.admNo}</td>
+                    <td data-label="#" style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{i + 1}</td>
+                    <td data-label="Student" style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--text)' }}>{st.name}</td>
+                    <td data-label="Adm No" style={{ padding: '8px 10px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>{st.admNo}</td>
                     <td data-label="Score" style={{ padding: '6px 10px', textAlign: 'center' }}>
                       <input
                         type="number" min={0} max={100}
@@ -645,12 +645,12 @@ function TeacherMarks({ user, data, setData }) {
                         inputMode="numeric"
                         onChange={e => { setScores(p => ({ ...p, [st.name]: e.target.value })); setSaved(false); }}
                         className="score-input"
-                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: '#0f1117', border: `2px solid ${needsApproval ? '#f59e0b' : '#2a3350'}`, color: '#e2e8f0' }}
+                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: 'var(--bg)', border: `2px solid ${needsApproval ? '#f59e0b' : 'var(--border)'}`, color: 'var(--text)' }}
                       />
                       {needsApproval && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 3 }}>needs approval</div>}
                     </td>
                     <td data-label="Grade" style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      {numScore !== null ? <GradeBadge score={numScore} /> : <span style={{ color: '#2a3350' }}>—</span>}
+                      {numScore !== null ? <GradeBadge score={numScore} /> : <span style={{ color: 'var(--border)' }}>—</span>}
                     </td>
                   </tr>
                 );
@@ -665,7 +665,7 @@ function TeacherMarks({ user, data, setData }) {
       )}
 
       {step1done && step2done && step3done && classStudents.length === 0 && (
-        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No students in {selClass} yet.</div></Card>
+        <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No students in {selClass} yet.</div></Card>
       )}
     </div>
   );
@@ -697,7 +697,7 @@ function TeacherResults({ user, data }) {
 
   return (
     <div>
-      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>📊 View Results</div>
+      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>📊 View Results</div>
 
       <div className="tp-select-row" style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelExamId(''); }} style={{ minWidth: 140, padding: '10px 12px', fontSize: 14, borderRadius: 8, minHeight: 44 }}>
@@ -718,19 +718,19 @@ function TeacherResults({ user, data }) {
 
       {selExam ? (
         visibleSubjects.length === 0 ? (
-          <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No marks entered yet for this exam.</div></Card>
+          <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No marks entered yet for this exam.</div></Card>
         ) : (
           <Card noPad style={{ overflowX: 'auto' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a3350', fontWeight: 600, color: '#e2e8f0', fontSize: 14 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a3350', fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>
               {selExam.name} — {selClass} · Term {selExam.term} · {selExam.year}
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 400 }}>
                 <thead>
-                  <tr style={{ background: '#1e2435' }}>
-                    <th style={{ padding: '10px 10px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>#</th>
-                    <th style={{ padding: '10px 10px', textAlign: 'left', color: '#64748b', fontSize: 11, fontWeight: 600 }}>Name</th>
-                    {visibleSubjects.map(s => <th key={s} style={{ padding: '10px 8px', textAlign: 'center', color: '#64748b', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>{s}</th>)}
+                  <tr style={{ background: 'var(--surface2)' }}>
+                    <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>#</th>
+                    <th style={{ padding: '10px 10px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Name</th>
+                    {visibleSubjects.map(s => <th key={s} style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>{s}</th>)}
                     {canSeeAll && <th style={{ padding: '10px 10px', textAlign: 'center', color: '#10b981', fontSize: 11, fontWeight: 700 }}>Total</th>}
                   </tr>
                 </thead>
@@ -740,11 +740,11 @@ function TeacherResults({ user, data }) {
                     const total  = scores.reduce((a, v) => a + (v ?? 0), 0);
                     return (
                       <tr key={st.id} style={{ borderBottom: '1px solid #2a3350' }}>
-                        <td style={{ padding: '9px 10px', color: '#64748b', fontSize: 11 }}>{idx + 1}</td>
-                        <td style={{ padding: '9px 10px', fontWeight: 500, color: '#e2e8f0', whiteSpace: 'nowrap' }}>{st.name}</td>
+                        <td style={{ padding: '9px 10px', color: 'var(--text-muted)', fontSize: 11 }}>{idx + 1}</td>
+                        <td style={{ padding: '9px 10px', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap' }}>{st.name}</td>
                         {scores.map((score, si) => (
                           <td key={si} style={{ padding: '9px 8px', textAlign: 'center' }}>
-                            {score !== null ? <span style={{ fontWeight: 700, color: score >= 60 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444' }}>{score}</span> : <span style={{ color: '#2a3350' }}>—</span>}
+                            {score !== null ? <span style={{ fontWeight: 700, color: score >= 60 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444' }}>{score}</span> : <span style={{ color: 'var(--border)' }}>—</span>}
                           </td>
                         ))}
                         {canSeeAll && <td style={{ padding: '9px 10px', textAlign: 'center', fontWeight: 700, color: '#4f8ef7' }}>{total}</td>}
@@ -757,7 +757,7 @@ function TeacherResults({ user, data }) {
           </Card>
         )
       ) : (
-        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>Select a class and exam to view results.</div></Card>
+        <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Select a class and exam to view results.</div></Card>
       )}
     </div>
   );
@@ -793,7 +793,7 @@ function TeacherClass({ user, data, setData }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-        <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>👩‍🏫 My Class — {user.classTeacherOf}</div>
+        <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>👩‍🏫 My Class — {user.classTeacherOf}</div>
         <Btn onClick={openAdd} style={{ minHeight: 44 }}>+ Add Student</Btn>
       </div>
 
@@ -803,16 +803,16 @@ function TeacherClass({ user, data, setData }) {
           <input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, minWidth: 0, width: 180 }} />
         </div>
         {filtered.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>{search ? 'No match.' : 'No students yet. Click "+ Add Student".'}</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{search ? 'No match.' : 'No students yet. Click "+ Add Student".'}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filtered.map((st, i) => (
-              <div key={st.id} className="tp-student-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#1e2435', borderRadius: 8, border: '1px solid #2a3350' }}>
-                <div style={{ fontSize: 12, color: '#64748b', minWidth: 22, textAlign: 'right' }}>{i + 1}</div>
+              <div key={st.id} className="tp-student-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid #2a3350' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 22, textAlign: 'right' }}>{i + 1}</div>
                 <Avatar name={st.name} size={32} color="#4f8ef7" />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.name}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>Adm: {st.admNo} · {st.gender}{st.parentPhone && ` · 📱 ${st.parentPhone}`}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Adm: {st.admNo} · {st.gender}{st.parentPhone && ` · 📱 ${st.parentPhone}`}</div>
                 </div>
                 <Tag color={!st.status || st.status === 'active' ? 'green' : 'red'}>{st.status || 'active'}</Tag>
                 <Btn size="sm" variant="ghost" onClick={() => openEdit(st)} style={{ minWidth: 36, minHeight: 36 }}>✏️</Btn>
@@ -934,23 +934,23 @@ function TeacherApprovals({ user, data, setData }) {
 
   return (
     <div>
-      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>
+      <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>
         ✅ Approve Mark Edits
       </div>
 
       {pending.length === 0 ? (
-        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No pending mark edit requests right now.</div></Card>
+        <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No pending mark edit requests right now.</div></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           {pending.map(r => (
             <Card key={r.id} style={{ borderColor: '#f59e0b40', background: '#f59e0b08' }}>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#e2e8f0', marginBottom: 6 }}>{r.studentName}</div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>Subject: <strong style={{ color: '#e2e8f0' }}>{r.subject}</strong></div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 6 }}>{r.studentName}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 4 }}>Subject: <strong style={{ color: 'var(--text)' }}>{r.subject}</strong></div>
+              <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 4 }}>
                 Score change: <span style={{ color: '#ef4444', fontWeight: 700 }}>{r.oldScore}</span> → <span style={{ color: '#10b981', fontWeight: 700 }}>{r.newScore}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>Requested by {r.requestedByName} · {r.date}</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Requested by {r.requestedByName} · {r.date}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 <span>Class Teacher: <strong style={{ color: r.approvals?.classTeacher === 'approved' ? '#10b981' : r.approvals?.classTeacher === 'rejected' ? '#ef4444' : '#f59e0b' }}>{r.approvals?.classTeacher || 'Pending'}</strong></span>
                 <span>Principal: <strong style={{ color: r.approvals?.principal === 'approved' ? '#10b981' : r.approvals?.principal === 'rejected' ? '#ef4444' : '#f59e0b' }}>{r.approvals?.principal || 'Pending'}</strong></span>
               </div>
@@ -965,13 +965,13 @@ function TeacherApprovals({ user, data, setData }) {
 
       {history.length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Recent History</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Recent History</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.map(r => (
-              <div key={r.id} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div key={r.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>{r.studentName} — {r.subject}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{r.oldScore} → {r.newScore} · by {r.requestedByName} · {r.date}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{r.studentName} — {r.subject}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.oldScore} → {r.newScore} · by {r.requestedByName} · {r.date}</div>
                 </div>
                 <Tag color={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Tag>
               </div>
@@ -993,18 +993,18 @@ function TeacherNotifs({ user, data, setData }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-        <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>🔔 Notifications {unread > 0 && <span style={{ fontSize: 14, background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>{unread}</span>}</div>
+        <div className="tp-page-title" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>🔔 Notifications {unread > 0 && <span style={{ fontSize: 14, background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>{unread}</span>}</div>
         {unread > 0 && <Btn variant="ghost" size="sm" onClick={markAllRead}>Mark all read</Btn>}
       </div>
       {myNotifs.length === 0 ? (
-        <Card><div style={{ color: '#64748b', padding: 24, textAlign: 'center' }}>No notifications yet.</div></Card>
+        <Card><div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No notifications yet.</div></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {myNotifs.map(n => (
-            <div key={n.id} style={{ background: '#171b26', border: `1px solid ${n.read ? '#2a3350' : '#4f8ef750'}`, borderRadius: 10, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.read ? '#2a3350' : '#4f8ef7', marginTop: 5, flexShrink: 0 }} />
+            <div key={n.id} style={{ background: 'var(--surface)', border: `1px solid ${n.read ? 'var(--border)' : '#4f8ef750'}`, borderRadius: 10, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.read ? 'var(--border)' : '#4f8ef7', marginTop: 5, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: n.read ? '#94a3b8' : '#e2e8f0', lineHeight: 1.5 }}>{n.message}</div>
+                <div style={{ fontSize: 13, color: n.read ? 'var(--text-sub)' : 'var(--text)', lineHeight: 1.5 }}>{n.message}</div>
                 <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>From: {n.from} · {n.date}</div>
               </div>
               {!n.read && <Btn size="sm" variant="ghost" onClick={() => markRead(n.id)} style={{ flexShrink: 0 }}>✓</Btn>}

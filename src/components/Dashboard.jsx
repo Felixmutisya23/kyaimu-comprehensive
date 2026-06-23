@@ -34,7 +34,7 @@ export default function Dashboard({ data, user }) {
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
           Welcome back, {(user.name||'').split(' ')[0]} 👋
         </h2>
-        <p style={{ color: '#64748b', fontSize: 13 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           {myClass && <span style={{ marginLeft: 10 }}>· Class Teacher: <strong style={{ color: '#4f8ef7' }}>{myClass}</strong></span>}
         </p>
@@ -107,7 +107,7 @@ export default function Dashboard({ data, user }) {
           <Card>
             <SectionTitle icon="fees">Fee Collection Overview</SectionTitle>
             <div style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 5 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-sub)', marginBottom: 5 }}>
                 <span>Overall</span>
                 <span>KES {paidFees.toLocaleString()} / {totalFees.toLocaleString()}</span>
               </div>
@@ -117,9 +117,9 @@ export default function Dashboard({ data, user }) {
               const pct = Math.round((s.fees?.paid || 0) / (s.fees?.total || 1) * 100);
               return (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #2a3350' }}>
-                  <div style={{ width: 100, fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                  <div style={{ width: 100, fontSize: 12, color: 'var(--text-sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                   <ProgressBar pct={pct} />
-                  <span style={{ fontSize: 11, color: '#64748b', minWidth: 32 }}>{pct}%</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32 }}>{pct}%</span>
                 </div>
               );
             })}
@@ -135,11 +135,11 @@ export default function Dashboard({ data, user }) {
               const low = i.current <= i.min;
               return (
                 <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #2a3350' }}>
-                  <div style={{ width: 120, fontSize: 12, color: low ? '#ef4444' : '#94a3b8', fontWeight: low ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ width: 120, fontSize: 12, color: low ? '#ef4444' : 'var(--text-sub)', fontWeight: low ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {low ? '⚠ ' : ''}{i.name}
                   </div>
                   <ProgressBar pct={pct} color={low ? '#ef4444' : pct > 60 ? '#10b981' : '#f59e0b'} />
-                  <span style={{ fontSize: 11, color: '#64748b', minWidth: 48, textAlign: 'right' }}>{i.current}{i.unit}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 48, textAlign: 'right' }}>{i.current}{i.unit}</span>
                 </div>
               );
             })}
@@ -151,11 +151,11 @@ export default function Dashboard({ data, user }) {
           <Card>
             <SectionTitle icon="students">My Class — {myClass}</SectionTitle>
             {myStudents.length == 0
-              ? <p style={{ color: '#64748b', fontSize: 13 }}>No students in {myClass} yet. Add them from Students.</p>
+              ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No students in {myClass} yet. Add them from Students.</p>
               : myStudents.map(s => (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a3350', fontSize: 13, alignItems: 'center' }}>
                   <span style={{ fontWeight: 500 }}>{s.name}</span>
-                  <span style={{ color: '#64748b', fontSize: 12 }}>{s.admNo}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.admNo}</span>
                   {s.cases.length > 0 ? <Tag color="red">{s.cases.length} case{s.cases.length > 1 ? 's' : ''}</Tag> : <Tag color="green">Clear</Tag>}
                 </div>
               ))}
@@ -167,7 +167,7 @@ export default function Dashboard({ data, user }) {
           <Card>
             <SectionTitle icon="timetable">My Teaching Schedule</SectionTitle>
             {(user.teacherSubjects || []).length == 0
-              ? <p style={{ color: '#64748b', fontSize: 13 }}>No subjects assigned to you yet.</p>
+              ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No subjects assigned to you yet.</p>
               : (user.teacherSubjects || []).map((s, i) => (
                 <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
                   <span style={{ fontWeight: 600, color: '#4f8ef7' }}>{s.subject}</span>
@@ -187,7 +187,7 @@ export default function Dashboard({ data, user }) {
               user.dept == 'Finance' ? '💰' : user.dept == 'Library' ? '📖' : user.dept == 'Security' ? '🔒' : user.dept == 'Sports' ? '⚽' : '🏢'
             }</div>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{user.dept} Department</div>
-            <div style={{ fontSize: 13, color: '#64748b' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
               {(data.teachers||[]).filter(t => t.dept == user.dept).length} staff members
             </div>
             {unreadMsgs > 0 && (
@@ -206,12 +206,12 @@ export default function Dashboard({ data, user }) {
               ['Total Students',   (data.students||[]).length,                            '#4f8ef7'],
               ['Total Staff',      (data.teachers||[]).filter(t => !t.admin).length,      '#10b981'],
               ['Exams on Record',  (data.exams||[]).length,                               '#f59e0b'],
-              ['Pending Approvals',pendingReqs.length,                              pendingReqs.length > 0 ? '#ef4444' : '#64748b'],
-              ['Low Stock Items',  lowInv.length,                                   lowInv.length > 0 ? '#ef4444' : '#64748b'],
-              ['Unread Messages',  unreadMsgs,                                       unreadMsgs > 0 ? '#f59e0b' : '#64748b'],
+              ['Pending Approvals',pendingReqs.length,                              pendingReqs.length > 0 ? '#ef4444' : 'var(--text-muted)'],
+              ['Low Stock Items',  lowInv.length,                                   lowInv.length > 0 ? '#ef4444' : 'var(--text-muted)'],
+              ['Unread Messages',  unreadMsgs,                                       unreadMsgs > 0 ? '#f59e0b' : 'var(--text-muted)'],
             ].map(([l, v, c]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #2a3350', fontSize: 13 }}>
-                <span style={{ color: '#94a3b8' }}>{l}</span>
+                <span style={{ color: 'var(--text-sub)' }}>{l}</span>
                 <span style={{ fontWeight: 700, color: c }}>{v}</span>
               </div>
             ))}
@@ -224,12 +224,12 @@ export default function Dashboard({ data, user }) {
 
 function StatCard({ icon, value, label, color }) {
   return (
-    <div style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', right: 14, top: 14, width: 34, height: 34, borderRadius: 8, background: color + '20', color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={icon} size={17} />
       </div>
       <div style={{ fontSize: 26, fontWeight: 700, color, marginBottom: 4 }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</div>
     </div>
   );
 }

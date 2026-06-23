@@ -12,7 +12,7 @@ const TC = {
   break:    { bg: '#f59e0b20', border: '#f59e0b', text: '#f59e0b' },
   lunch:    { bg: '#10b98120', border: '#10b981', text: '#10b981' },
   assembly: { bg: '#7c3aed20', border: '#7c3aed', text: '#7c3aed' },
-  end:      { bg: '#64748b20', border: '#64748b', text: '#64748b' },
+  end:      { bg: '#64748b20', border: 'var(--text-muted)', text: 'var(--text-muted)' },
 };
 
 // Subject colour palette — cycles for distinct visual identity per subject
@@ -436,14 +436,14 @@ export default function Timetable({ data, setData, user }) {
     <div>
 
       {/* ── View toggle ──────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 4, background: '#1e2435', padding: 4, borderRadius: 10, marginBottom: 16, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, marginBottom: 16, width: 'fit-content' }}>
         <button onClick={() => setView('class')}
-          style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'class' ? '#171b26' : 'transparent', color: view === 'class' ? '#e2e8f0' : '#64748b' }}>
+          style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'class' ? 'var(--surface)' : 'transparent', color: view === 'class' ? 'var(--text)' : 'var(--text-muted)' }}>
           Class Timetable
         </button>
         {!isPrincipal && (
           <button onClick={() => setView('personal')}
-            style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'personal' ? '#171b26' : 'transparent', color: view === 'personal' ? '#4f8ef7' : '#64748b' }}>
+            style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'personal' ? 'var(--surface)' : 'transparent', color: view === 'personal' ? '#4f8ef7' : 'var(--text-muted)' }}>
             My Timetable
           </button>
         )}
@@ -455,7 +455,7 @@ export default function Timetable({ data, setData, user }) {
       {view === 'personal' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: '#94a3b8' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)' }}>
               Your teaching schedule across all classes — {personalSessions.length} lessons/week
             </div>
             <Btn variant="ghost" size="sm" onClick={printPersonalTT}>
@@ -464,7 +464,7 @@ export default function Timetable({ data, setData, user }) {
           </div>
 
           {personalSessions.length === 0 ? (
-            <Card style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+            <Card style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
               No lessons found for you in the current timetables.
               {(user.teacherSubjects || []).length > 0 &&
                 ` Subjects assigned: ${(user.teacherSubjects || []).map(s => s.subject).join(', ')}`}
@@ -489,7 +489,7 @@ export default function Timetable({ data, setData, user }) {
                         <tr key={i}>
                           <td style={{ ...TS.td, fontWeight: 600 }}>{s.day}</td>
                           <td style={{ ...TS.td, fontWeight: 600, color: '#4f8ef7' }}>{s.bell.time}</td>
-                          <td style={{ ...TS.td, color: '#94a3b8' }}>{s.bell.duration}min</td>
+                          <td style={{ ...TS.td, color: 'var(--text-sub)' }}>{s.bell.duration}min</td>
                           <td style={TS.td}>
                             <span style={{
                               background: `${subjectColor(s.lesson)}20`,
@@ -520,7 +520,7 @@ export default function Timetable({ data, setData, user }) {
                         <Tag key={sub} color="blue">{sub}</Tag>
                       ))}
                     </div>
-                    <span style={{ color: '#64748b' }}>{cls_sessions.length} lessons/week</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{cls_sessions.length} lessons/week</span>
                   </div>
                 );
               })}
@@ -601,9 +601,9 @@ export default function Timetable({ data, setData, user }) {
                   return (
                     <tr key={b.id || i}>
                       <td style={{ ...TD, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{b.time}</td>
-                      <td style={{ ...TD, fontSize: 11, color: '#94a3b8' }}>
+                      <td style={{ ...TD, fontSize: 11, color: 'var(--text-sub)' }}>
                         <div>{b.label}</div>
-                        {b.duration > 0 && <div style={{ color: '#64748b', fontSize: 10 }}>{b.duration}min</div>}
+                        {b.duration > 0 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{b.duration}min</div>}
                       </td>
                       {DAYS.map(day => {
                         const slot     = resolveSlot((tt[day] || [])[i]);
@@ -631,7 +631,7 @@ export default function Timetable({ data, setData, user }) {
                               <input
                                 value={slot?.subject || ''}
                                 onChange={e => updateCell(day, i, e.target.value)}
-                                style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: '#1e2435', color: '#e2e8f0', border: '1px solid #2a3350', borderRadius: 4 }}
+                                style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid #2a3350', borderRadius: 4 }}
                               />
                             ) : displayLabel ? (
                               <div style={{
@@ -654,7 +654,7 @@ export default function Timetable({ data, setData, user }) {
                                 )}
                               </div>
                             ) : (
-                              <span style={{ color: '#2a3350', fontSize: 10 }}>—</span>
+                              <span style={{ color: 'var(--border)', fontSize: 10 }}>—</span>
                             )}
                           </td>
                         );
@@ -668,7 +668,7 @@ export default function Timetable({ data, setData, user }) {
 
           {/* My-lessons legend (teachers) */}
           {!isPrincipal && (
-            <div style={{ marginTop: 10, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 14, height: 14, background: '#10b98120', borderLeft: '3px solid #10b981', borderRadius: 2 }} />
               <span>Green = your lessons in this class</span>
             </div>
@@ -677,12 +677,12 @@ export default function Timetable({ data, setData, user }) {
           {/* Bell-type legend */}
           <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
             {Object.entries(TC).map(([type, c]) => (
-              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8' }}>
+              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)' }}>
                 <div style={{ width: 14, height: 14, borderRadius: 2, background: c.bg, borderLeft: `3px solid ${c.border}` }} />
                 {type.charAt(0).toUpperCase() + type.slice(1)}
               </div>
             ))}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)' }}>
               <span style={{ fontSize: 9 }}>◼◼</span> Double lesson
             </div>
           </div>
@@ -698,16 +698,16 @@ export default function Timetable({ data, setData, user }) {
         </Alert>
 
         <div style={{ margin: '14px 0' }}>
-          <label style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-sub)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
             <input type="checkbox" checked={genAll} onChange={e => setGenAll(e.target.checked)} />
             Generate for ALL classes at once
           </label>
 
           {!genAll && (
             <>
-              <label style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Class</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-sub)', display: 'block', marginBottom: 6 }}>Class</label>
               <select value={genClass} onChange={e => setGenClass(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 8, color: '#e2e8f0', fontSize: 13 }}>
+                style={{ width: '100%', padding: '9px 12px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
                 {classes.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </>
@@ -724,7 +724,7 @@ export default function Timetable({ data, setData, user }) {
               Use the <strong>Rules</strong> button on the timetable to set up subjects and frequencies first.
             </Alert>
           ) : (
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 8 }}>
               {rulesCount} subject rule{rulesCount !== 1 ? 's' : ''} will be used to generate the timetable.
             </div>
           );
@@ -747,7 +747,7 @@ export default function Timetable({ data, setData, user }) {
         title={`Subject Rules — ${rulesForClass}`}
         wide
       >
-        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 14 }}>
           Configure how often each subject appears per week, whether it can run as a double lesson,
           the preferred time of day, and which teacher delivers it.
         </p>
@@ -767,7 +767,7 @@ export default function Timetable({ data, setData, user }) {
           MODAL: Conflict Details
       ════════════════════════════════════════════════ */}
       <Modal show={showConflicts} onClose={() => setShowConflicts(false)} title="Scheduling Conflicts">
-        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 14 }}>
           The following teacher collisions were detected. Regenerate the affected classes to resolve them.
         </p>
         {conflicts.map((c, i) => {
@@ -784,7 +784,7 @@ export default function Timetable({ data, setData, user }) {
                 <Tag color="red">{c.day}</Tag>
                 {bell && <Tag color="red">{bell.time}</Tag>}
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
                 Double-booked in: {c.entries.map(e => `${e.cls} (${e.subject})`).join(' and ')}
               </div>
             </div>
@@ -815,7 +815,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
         <thead>
           <tr>
             {['Subject', 'Per week', 'Allow double', 'Pref. time', 'Teacher', ''].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11, color: '#64748b', borderBottom: '1px solid #2a3350', background: '#1e2435' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -825,21 +825,21 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
             const active = !!rules.find(r => r.subject === subject);
             return (
               <tr key={subject} style={{ opacity: active ? 1 : 0.45 }}>
-                <td style={{ padding: '6px 8px', borderBottom: '1px solid #2a3350', color: '#e2e8f0', fontWeight: active ? 600 : 400 }}>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid #2a3350', color: 'var(--text)', fontWeight: active ? 600 : 400 }}>
                   {subject}
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
                   <input
                     type="number" min="1" max="10" value={rule.freq}
                     onChange={e => onUpsert(subject, { freq: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
-                    style={{ width: 54, padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }}
+                    style={{ width: 54, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   />
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid #2a3350' }}>
                   <select
                     value={rule.allowDouble ? '1' : '0'}
                     onChange={e => onUpsert(subject, { allowDouble: e.target.value === '1' })}
-                    style={{ padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   >
                     <option value="0">No</option>
                     <option value="1">Yes</option>
@@ -849,7 +849,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
                   <select
                     value={rule.pref || 'any'}
                     onChange={e => onUpsert(subject, { pref: e.target.value })}
-                    style={{ padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   >
                     <option value="any">Any</option>
                     <option value="morning">Morning</option>
@@ -861,7 +861,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
                   <select
                     value={rule.teacherId || ''}
                     onChange={e => onUpsert(subject, { teacherId: e.target.value })}
-                    style={{ padding: '4px 6px', background: '#1e2435', border: '1px solid #2a3350', borderRadius: 4, color: '#e2e8f0', fontSize: 12, maxWidth: 140 }}
+                    style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid #2a3350', borderRadius: 4, color: 'var(--text)', fontSize: 12, maxWidth: 140 }}
                   >
                     <option value="">— None —</option>
                     {teachers.map(t => (
@@ -883,7 +883,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
           })}
         </tbody>
       </table>
-      <p style={{ fontSize: 11, color: '#64748b', marginTop: 10 }}>
+      <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
         Rows dim when no rule is saved. Editing any field auto-saves the rule for that subject.
       </p>
     </div>
@@ -895,8 +895,8 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
 ───────────────────────────────────────────────────────────── */
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: '#1e2435', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: '#e2e8f0' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid #2a3350', color: 'var(--text)' },
 };
-const TH = { textAlign: 'left', padding: '10px 10px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: '#1e2435' };
+const TH = { textAlign: 'left', padding: '10px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid #2a3350', background: 'var(--surface2)' };
 const TD = { padding: '8px 8px', borderBottom: '1px solid #2a3350', verticalAlign: 'middle' };

@@ -291,11 +291,11 @@ export default function Teachers({ data, setData }) {
     if (!list.length) return null;
     return (
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
           {title} ({list.length})
         </div>
         {list.map(t => (
-          <div key={t.id} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 12, padding: 16, marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div key={t.id} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 12, padding: 16, marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <Avatar name={t.name} size={46} color={color} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -303,11 +303,11 @@ export default function Teachers({ data, setData }) {
                 {t.admin && <Tag color="purple">Admin</Tag>}
                 {t.isClassTeacher && <Tag color="green">Class Teacher: {t.classTeacherOf}</Tag>}
                 <Tag color="blue">{t.dept}</Tag>
-                <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', background: '#1e2435', padding: '2px 7px', borderRadius: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 4 }}>
                   {t.staffId}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
                 {t.email && <span>{t.email}</span>}
                 {t.phone && <span style={{ marginLeft: 12 }}>📱 {t.phone}</span>}
                 <span style={{ marginLeft: 12, color: '#4f8ef7' }}>Password: {t.password || t.staffId}</span>
@@ -363,9 +363,9 @@ export default function Teachers({ data, setData }) {
 
     return (
       <>
-        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
           Add each subject this teacher teaches and select the classes.
-          <span style={{ color: '#64748b', fontSize: 11 }}> Subject list filters to match selected classes.</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> Subject list filters to match selected classes.</span>
         </div>
 
         {/* Lower Primary quick-assign panel */}
@@ -374,7 +374,7 @@ export default function Teachers({ data, setData }) {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>
               ⚡ Lower Primary — Quick Assign All Subjects
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
               For Grade 1, 2 or 3 teachers who teach ALL subjects in their class — click one button:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -395,10 +395,10 @@ export default function Teachers({ data, setData }) {
             : getSubjectsForClasses(allClasses, data);
 
           return (
-            <div key={i} style={{ background: '#1e2435', borderRadius: 8, padding: 12, marginBottom: 10, border: '1px solid #2a3350' }}>
+            <div key={i} style={{ background: 'var(--surface2)', borderRadius: 8, padding: 12, marginBottom: 10, border: '1px solid #2a3350' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Subject</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Subject</div>
                   <select
                     value={row.subject}
                     onChange={e => updateSubjectRow(i, 'subject', e.target.value)}
@@ -416,8 +416,8 @@ export default function Teachers({ data, setData }) {
                 )}
               </div>
 
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>
-                Classes teaching <strong style={{ color: '#94a3b8' }}>{row.subject || 'this subject'}</strong>:
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                Classes teaching <strong style={{ color: 'var(--text-sub)' }}>{row.subject || 'this subject'}</strong>:
               </div>
 
               {levelGroups.map(group => (
@@ -431,9 +431,9 @@ export default function Teachers({ data, setData }) {
                       return (
                         <div key={c} onClick={() => toggleSubjectClass(i, c)} style={{
                           padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 500, userSelect: 'none',
-                          background: active ? '#4f8ef7' : '#252d42',
-                          color:      active ? '#fff'    : '#94a3b8',
-                          border:    `1px solid ${active ? '#4f8ef7' : '#2a3350'}`,
+                          background: active ? '#4f8ef7' : 'var(--surface2)',
+                          color:      active ? '#fff'    : 'var(--text-sub)',
+                          border:    `1px solid ${active ? '#4f8ef7' : 'var(--border)'}`,
                         }}>
                           {c}
                         </div>
@@ -453,7 +453,7 @@ export default function Teachers({ data, setData }) {
         })}
 
         <button onClick={addSubjectRow}
-          style={{ background: 'none', border: '1px dashed #2a3350', color: '#64748b', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 12, width: '100%', marginBottom: 8 }}>
+          style={{ background: 'none', border: '1px dashed #2a3350', color: 'var(--text-muted)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 12, width: '100%', marginBottom: 8 }}>
           + Add Another Subject
         </button>
       </>
@@ -496,15 +496,15 @@ export default function Teachers({ data, setData }) {
           { l: 'Non-Teaching',   v: data.teachers.filter(t => t.staffType === 'non_teaching').length, c: '#f59e0b' },
           { l: 'Class Teachers', v: data.teachers.filter(t => t.isClassTeacher).length,          c: '#7c3aed' },
         ].map(({ l, v, c }) => (
-          <div key={l} style={{ background: '#171b26', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+          <div key={l} style={{ background: 'var(--surface)', border: '1px solid #2a3350', borderRadius: 10, padding: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v}</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>{l}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
           </div>
         ))}
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 48, color: '#64748b', background: '#171b26', borderRadius: 12, border: '1px solid #2a3350' }}>
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid #2a3350' }}>
           No staff found. Click "Add Staff Member" to get started.
         </div>
       )}
@@ -633,9 +633,9 @@ export default function Teachers({ data, setData }) {
       <Modal show={showStaffUpload} onClose={() => setShowStaffUpload(false)} title="Bulk Upload Staff Members" wide>
         {!staffUploadDone ? (
           <>
-            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>Step 1 — Download the Excel template</div>
-              <div style={{ fontSize:12, color:'#64748b', marginBottom:10 }}>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>Step 1 — Download the Excel template</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10 }}>
                 Fill in staff details. Columns: Name, Staff ID, Email, Phone, Department, Staff Type, Is Class Teacher, Class Teacher Of, Password.
                 Subjects are assigned manually after upload.
               </div>
@@ -644,8 +644,8 @@ export default function Teachers({ data, setData }) {
               </Btn>
             </div>
 
-            <div style={{ background:'#1e2435', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:6 }}>Step 2 — Upload your filled file</div>
+            <div style={{ background:'var(--surface2)', borderRadius:10, padding:'14px 16px', marginBottom:16, border:'1px solid #2a3350' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>Step 2 — Upload your filled file</div>
               <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#4f8ef7', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
                 <Icon name="upload" size={13} /> Choose File (.xlsx / .csv)
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={handleStaffUploadFile} style={{ display:'none' }} />
@@ -654,7 +654,7 @@ export default function Teachers({ data, setData }) {
 
             {staffUploadRows.length > 0 && (
               <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
                   Step 3 — Review & Import ({staffUploadRows.length} rows found)
                 </div>
                 <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid #2a3350', borderRadius:8 }}>
@@ -662,21 +662,21 @@ export default function Teachers({ data, setData }) {
                     <thead>
                       <tr style={{ background:'#1a2540', position:'sticky', top:0 }}>
                         {['Row','Name','Staff ID','Email','Phone','Dept','Type','Class Teacher'].map(h => (
-                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'#64748b', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', color:'var(--text-muted)', fontWeight:600, borderBottom:'1px solid #2a3350', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {staffUploadRows.map((row,i) => (
                         <tr key={i} style={{ borderBottom:'1px solid #2a3350' }}>
-                          <td style={{ padding:'5px 10px', color:'#64748b' }}>{row.rowNum}</td>
-                          <td style={{ padding:'5px 10px', color:row.name?'#e2e8f0':'#ef4444', fontWeight:row.name?400:700 }}>{row.name||'⚠ Missing'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-muted)' }}>{row.rowNum}</td>
+                          <td style={{ padding:'5px 10px', color:row.name?'var(--text)':'#ef4444', fontWeight:row.name?400:700 }}>{row.name||'⚠ Missing'}</td>
                           <td style={{ padding:'5px 10px', color:row.staffId?'#4f8ef7':'#ef4444', fontFamily:'monospace' }}>{row.staffId||'⚠ Missing'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.email||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.phone||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.dept||'—'}</td>
-                          <td style={{ padding:'5px 10px', color:'#94a3b8' }}>{row.staffType}</td>
-                          <td style={{ padding:'5px 10px', color:row.isClassTeacher?'#10b981':'#64748b' }}>{row.isClassTeacher?`Yes — ${row.classTeacherOf}`:'No'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.email||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.phone||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.dept||'—'}</td>
+                          <td style={{ padding:'5px 10px', color:'var(--text-sub)' }}>{row.staffType}</td>
+                          <td style={{ padding:'5px 10px', color:row.isClassTeacher?'#10b981':'var(--text-muted)' }}>{row.isClassTeacher?`Yes — ${row.classTeacherOf}`:'No'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -703,15 +703,15 @@ export default function Teachers({ data, setData }) {
         ) : (
           <div style={{ textAlign:'center', padding:'32px 0' }}>
             <div style={{ fontSize:56, marginBottom:16 }}>{staffUploadSummary?.added > 0 ? '✅' : '⚠️'}</div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0', marginBottom:8 }}>Upload Complete</div>
-            <div style={{ fontSize:14, color:'#94a3b8', marginBottom:20 }}>
+            <div style={{ fontSize:20, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Upload Complete</div>
+            <div style={{ fontSize:14, color:'var(--text-sub)', marginBottom:20 }}>
               <span style={{ color:'#10b981', fontWeight:700 }}>{staffUploadSummary?.added} staff members added</span>
               {staffUploadSummary?.skipped > 0 && <span style={{ color:'#f59e0b' }}> · {staffUploadSummary.skipped} rows skipped</span>}
             </div>
             {staffUploadErrors.length > 0 && (
-              <div style={{ background:'#1e2435', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:140, overflowY:'auto' }}>
+              <div style={{ background:'var(--surface2)', borderRadius:8, padding:'12px 16px', marginBottom:16, textAlign:'left', maxHeight:140, overflowY:'auto' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>Skipped rows:</div>
-                {staffUploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'#64748b', marginBottom:2 }}>• {e}</div>)}
+                {staffUploadErrors.map((e,i) => <div key={i} style={{ fontSize:12, color:'var(--text-muted)', marginBottom:2 }}>• {e}</div>)}
               </div>
             )}
             <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
