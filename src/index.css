@@ -2,108 +2,80 @@
 
 /* ════════════════════════════════════════
    DARK THEME (default)
-   High contrast — crystal clear indoors
-   and on well-lit screens
 ════════════════════════════════════════ */
 :root {
-  --bg:          #0a0e1a;   /* deep navy-black page bg */
-  --surface:     #111827;   /* card / sidebar */
-  --surface2:    #1a2236;   /* inputs, table rows */
-  --border:      #2d3f5e;   /* visible borders */
-
-  /* TEXT — maximum contrast on dark */
-  --text:        #ffffff;   /* primary: pure white — no squinting */
-  --text-sub:    #c8d8f0;   /* secondary: bright blue-white */
-  --text-muted:  #8aabcc;   /* muted: clearly visible mid-blue */
-
+  --bg:          #0a0e1a;
+  --surface:     #111827;
+  --surface2:    #1a2236;
+  --border:      #334466;
+  --text:        #ffffff;
+  --text-sub:    #d0e0f8;
+  --text-muted:  #90b0d0;
   --input-bg:    #1a2236;
   --input-color: #ffffff;
   --accent:      #4f8ef7;
-  --card-shadow: none;
-
-  --table-header-bg:   #1a2236;
+  --card-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --table-header-bg:   #1e3058;
   --table-header-text: #ffffff;
-  --table-row-alt:     #111827;
-  --table-row-hover:   #1e2c45;
+  --table-row-alt:     #0f1525;
+  --table-row-hover:   #1a2a45;
 }
 
 /* ════════════════════════════════════════
-   LIGHT THEME
-   Maximum contrast for outdoor / phone use
-   WCAG AAA compliant (7:1 contrast ratio)
+   LIGHT THEME — same as Login.jsx
+   Pure white, near-black text
+   Maximum brightness for outdoors
 ════════════════════════════════════════ */
 [data-theme="light"] {
-  --bg:          #ffffff;   /* pure white — maximum outdoor brightness */
-  --surface:     #ffffff;   /* cards: white */
-  --surface2:    #f3f6fa;   /* inputs, rows: very light grey */
-  --border:      #9aafc5;   /* borders: clearly visible */
-
-  /* TEXT — near-black for maximum contrast outdoors */
-  --text:        #050d1a;   /* primary: near-black — 19:1 contrast on white */
-  --text-sub:    #1a3557;   /* secondary: dark navy — 10:1 contrast */
-  --text-muted:  #3d5a7a;   /* muted: dark blue-grey — 7:1 contrast */
-
-  --input-bg:    #ffffff;
-  --input-color: #050d1a;
-  --accent:      #0d47c9;   /* deep blue — 7:1 on white */
-  --card-shadow: 0 2px 10px rgba(0,0,0,0.15);
-
-  --table-header-bg:   #0d47c9;
+  --bg:          #eff6ff;
+  --surface:     #ffffff;
+  --surface2:    #f8fafc;
+  --border:      #e2e8f0;
+  --text:        #1e293b;
+  --text-sub:    #475569;
+  --text-muted:  #64748b;
+  --input-bg:    #f8fafc;
+  --input-color: #1e293b;
+  --accent:      #1e40af;
+  --card-shadow: 0 20px 60px rgba(0,0,0,0.06);
+  --table-header-bg:   #1e40af;
   --table-header-text: #ffffff;
-  --table-row-alt:     #edf2f9;
-  --table-row-hover:   #d6e4f5;
+  --table-row-alt:     #f8fafc;
+  --table-row-hover:   #eff6ff;
 }
 
 html, body, #root { height: 100%; }
 
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
 }
 
-/* ── Forms ── */
+/* ── Forms — same style as Login.jsx ── */
 input, select, textarea {
   background: var(--input-bg);
   border: 1.5px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 12px;
+  border-radius: 10px;
+  padding: 11px 14px;
   color: var(--input-color);
-  font-size: 13px;
+  font-size: 14px;
   width: 100%;
   outline: none;
   font-family: inherit;
-  transition: border-color 0.15s;
+  transition: all 0.15s;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-select option {
   background: var(--surface);
-  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(30,64,175,0.12);
 }
+select option { background: var(--surface); color: var(--text); }
 textarea { resize: vertical; }
 input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
-
-/* ── Light mode: fix any remaining hardcoded dark surfaces ── */
-[data-theme="light"] {
-  color-scheme: light;
-}
-
-/* Force light mode text on elements that still have dark hardcoded backgrounds */
-[data-theme="light"] [style*="background: #"] {
-  color: var(--text);
-}
-
-/* Table header always readable */
-[data-theme="light"] th {
-  background: var(--table-header-bg) !important;
-  color: var(--table-header-text) !important;
-}
 
 /* ── Scrollbars ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
