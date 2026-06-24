@@ -333,12 +333,13 @@ function SetupWizard({ data, setData, onDone }) {
 
 
 export default function App() {
-  // Restore saved theme preference from localStorage on startup
-  const savedTheme = localStorage.getItem('edu_theme');
-  const [data, setDataRaw] = React.useState({
-    ...INITIAL_DATA,
-    darkTheme: savedTheme ? savedTheme === 'dark' : true, // default dark
+  // Theme stored ONLY in localStorage and its own state — never in data object
+  // This means Supabase data loading NEVER affects the theme
+  const [isDark, setIsDark] = React.useState(() => {
+    const saved = localStorage.getItem('edu_theme');
+    return saved ? saved === 'dark' : true; // default dark
   });
+  const [data, setDataRaw] = React.useState({ ...INITIAL_DATA });
   const [user, setUser]           = React.useState(null);
   const [page, setPage]           = React.useState('dashboard');
   const [showTeacherRegister]     = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'register');
@@ -356,7 +357,7 @@ export default function App() {
   const [loginError, setLoginError] = React.useState('');
 
   /* ── THEME: inject CSS variables whenever darkTheme changes ── */
-  const isDark = data.darkTheme !== false;
+  // isDark is now a separate state — see initialization above
   React.useEffect(() => {
     const dark = {
       '--bg':          '#0a0e1a',
@@ -412,7 +413,7 @@ export default function App() {
         if (schoolId) {
           const schoolData = await loadSchoolData(schoolId);
           if (schoolData) {
-            setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
+            setDataRaw(schoolData);
             setAnySchoolExists(true);
           } else {
             localStorage.removeItem('edumanage_school_id');
@@ -620,7 +621,7 @@ export default function App() {
             const schoolId = await createSchool(setupData);
             setLocalSchoolId(schoolId);
             const schoolData = await loadSchoolData(schoolId);
-            if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
+            if (schoolData) setDataRaw(schoolData);
             setSetupDone(true);
           } catch (e) {
             console.error('Setup error:', e);
@@ -656,7 +657,7 @@ export default function App() {
             try {
               const freshData = await loadSchoolData(schoolId);
               if (freshData) {
-                setDataRaw(d => ({ ...freshData, darkTheme: d.darkTheme }));
+                setDataRaw(freshData);
                 student = (freshData.students || []).find(s =>
                   String(s.slc || '').trim() === slcTrim
                 );
@@ -681,7 +682,7 @@ export default function App() {
             try {
               const freshData = await loadSchoolData(schoolId);
               if (freshData) {
-                setDataRaw(d => ({ ...freshData, darkTheme: d.darkTheme }));
+                setDataRaw(freshData);
                 student = (freshData.students || []).find(s =>
                   String(s.slc || '').trim() === slcTrim
                 );
@@ -705,7 +706,7 @@ export default function App() {
           const schoolId = await createSchool(setupData);
           setLocalSchoolId(schoolId);
           const schoolData = await loadSchoolData(schoolId);
-          if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
+          if (schoolData) setDataRaw(schoolData);
           // FIX: this auto-login path for a brand-new school was never
           // calling loadLicenseFromCloud/bumping licenseRefreshKey — meaning
           // useLicense's very first read of this school's token/license
@@ -732,7 +733,7 @@ export default function App() {
         if (school) {
           setLocalSchoolId(school.id);
           const schoolData = await loadSchoolData(school.id);
-          if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
+          if (schoolData) setDataRaw(schoolData);
           // Sync license/token from cloud so payment persists across devices
           await loadLicenseFromCloud(school.id);
           setLicenseRefreshKey(k => k + 1); // force useLicense to re-read localStorage
@@ -807,7 +808,7 @@ export default function App() {
             const schoolId = await createSchool(setupData);
             setLocalSchoolId(schoolId);
             const schoolData = await loadSchoolData(schoolId);
-            if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
+            if (schoolData) setDataRaw(schoolData);
             setSetupDone(true);
           } catch (e) {
             console.error('Setup error:', e);
@@ -1074,7 +1075,7 @@ export default function App() {
             )}
             {/* Theme toggle — visible for ALL users */}
             <button
-              onClick={() => setData(d => ({ ...d, darkTheme: !d.darkTheme }))}
+              onClick={() => { const next = !isDark; setIsDark(next); localStorage.setItem('edu_theme', next ? 'dark' : 'light'); }}
               title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
