@@ -46,12 +46,19 @@
 
 html, body, #root { height: 100%; }
 
+/* Tell mobile browsers explicitly which color scheme we are using */
+/* This prevents Android Chrome from force-darkening light mode */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
+  /* Force background directly on body — belt AND suspenders */
+  -webkit-text-size-adjust: 100%;
 }
 
 /* ── Forms — same style as Login.jsx ── */

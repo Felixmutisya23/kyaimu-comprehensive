@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>EduManage Pro - School Management System</title>
     <!-- Apply theme BEFORE React loads to prevent flash of wrong theme -->
     <script>
@@ -27,6 +28,8 @@
           root.style.setProperty('--table-row-alt', '#f8fafc');
           root.style.setProperty('--table-row-hover', '#eff6ff');
           document.body && (document.body.style.background = '#ffffff');
+          var rootEl = document.getElementById('root');
+          if (rootEl) rootEl.style.background = '#ffffff';
         } else {
           root.style.setProperty('--bg', '#0a0e1a');
           root.style.setProperty('--surface', '#111827');
@@ -44,6 +47,8 @@
           root.style.setProperty('--table-row-alt', '#0f1525');
           root.style.setProperty('--table-row-hover', '#1a2a45');
           document.body && (document.body.style.background = '#0a0e1a');
+          var rootEl = document.getElementById('root');
+          if (rootEl) rootEl.style.background = '#0a0e1a';
         }
       })();
     </script>
