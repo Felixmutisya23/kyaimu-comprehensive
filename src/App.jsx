@@ -376,10 +376,10 @@ export default function App() {
       '--table-row-hover':   '#1a2a45',
     };
     const light = {
-      '--bg':          '#eff6ff',
+      '--bg':          '#ffffff',
       '--surface':     '#ffffff',
-      '--surface2':    '#f8fafc',
-      '--border':      '#e2e8f0',
+      '--surface2':    '#f1f5f9',
+      '--border':      '#cbd5e1',
       '--text':        '#1e293b',
       '--text-sub':    '#475569',
       '--text-muted':  '#64748b',
