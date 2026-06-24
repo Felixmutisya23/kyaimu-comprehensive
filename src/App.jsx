@@ -412,7 +412,7 @@ export default function App() {
         if (schoolId) {
           const schoolData = await loadSchoolData(schoolId);
           if (schoolData) {
-            setDataRaw(schoolData);
+            setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
             setAnySchoolExists(true);
           } else {
             localStorage.removeItem('edumanage_school_id');
@@ -620,7 +620,7 @@ export default function App() {
             const schoolId = await createSchool(setupData);
             setLocalSchoolId(schoolId);
             const schoolData = await loadSchoolData(schoolId);
-            if (schoolData) setDataRaw(schoolData);
+            if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
             setSetupDone(true);
           } catch (e) {
             console.error('Setup error:', e);
@@ -656,7 +656,7 @@ export default function App() {
             try {
               const freshData = await loadSchoolData(schoolId);
               if (freshData) {
-                setDataRaw(freshData);
+                setDataRaw(d => ({ ...freshData, darkTheme: d.darkTheme }));
                 student = (freshData.students || []).find(s =>
                   String(s.slc || '').trim() === slcTrim
                 );
@@ -681,7 +681,7 @@ export default function App() {
             try {
               const freshData = await loadSchoolData(schoolId);
               if (freshData) {
-                setDataRaw(freshData);
+                setDataRaw(d => ({ ...freshData, darkTheme: d.darkTheme }));
                 student = (freshData.students || []).find(s =>
                   String(s.slc || '').trim() === slcTrim
                 );
@@ -705,7 +705,7 @@ export default function App() {
           const schoolId = await createSchool(setupData);
           setLocalSchoolId(schoolId);
           const schoolData = await loadSchoolData(schoolId);
-          if (schoolData) setDataRaw(schoolData);
+          if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
           // FIX: this auto-login path for a brand-new school was never
           // calling loadLicenseFromCloud/bumping licenseRefreshKey — meaning
           // useLicense's very first read of this school's token/license
@@ -732,7 +732,7 @@ export default function App() {
         if (school) {
           setLocalSchoolId(school.id);
           const schoolData = await loadSchoolData(school.id);
-          if (schoolData) setDataRaw(schoolData);
+          if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
           // Sync license/token from cloud so payment persists across devices
           await loadLicenseFromCloud(school.id);
           setLicenseRefreshKey(k => k + 1); // force useLicense to re-read localStorage
@@ -807,7 +807,7 @@ export default function App() {
             const schoolId = await createSchool(setupData);
             setLocalSchoolId(schoolId);
             const schoolData = await loadSchoolData(schoolId);
-            if (schoolData) setDataRaw(schoolData);
+            if (schoolData) setDataRaw(d => ({ ...schoolData, darkTheme: d.darkTheme }));
             setSetupDone(true);
           } catch (e) {
             console.error('Setup error:', e);

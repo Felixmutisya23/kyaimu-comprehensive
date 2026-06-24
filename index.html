@@ -4,6 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EduManage Pro - School Management System</title>
+    <!-- Apply theme BEFORE React loads to prevent flash of wrong theme -->
+    <script>
+      (function() {
+        var theme = localStorage.getItem('edu_theme') || 'dark';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', theme);
+        if (theme === 'light') {
+          root.style.setProperty('--bg', '#ffffff');
+          root.style.setProperty('--surface', '#ffffff');
+          root.style.setProperty('--surface2', '#f1f5f9');
+          root.style.setProperty('--border', '#cbd5e1');
+          root.style.setProperty('--text', '#1e293b');
+          root.style.setProperty('--text-sub', '#475569');
+          root.style.setProperty('--text-muted', '#64748b');
+          root.style.setProperty('--input-bg', '#f8fafc');
+          root.style.setProperty('--input-color', '#1e293b');
+          root.style.setProperty('--accent', '#1e40af');
+          root.style.setProperty('--card-shadow', '0 20px 60px rgba(0,0,0,0.06)');
+          root.style.setProperty('--table-header-bg', '#1e40af');
+          root.style.setProperty('--table-header-text', '#ffffff');
+          root.style.setProperty('--table-row-alt', '#f8fafc');
+          root.style.setProperty('--table-row-hover', '#eff6ff');
+          document.body && (document.body.style.background = '#ffffff');
+        } else {
+          root.style.setProperty('--bg', '#0a0e1a');
+          root.style.setProperty('--surface', '#111827');
+          root.style.setProperty('--surface2', '#1a2236');
+          root.style.setProperty('--border', '#334466');
+          root.style.setProperty('--text', '#ffffff');
+          root.style.setProperty('--text-sub', '#d0e0f8');
+          root.style.setProperty('--text-muted', '#90b0d0');
+          root.style.setProperty('--input-bg', '#1a2236');
+          root.style.setProperty('--input-color', '#ffffff');
+          root.style.setProperty('--accent', '#4f8ef7');
+          root.style.setProperty('--card-shadow', '0 2px 12px rgba(0,0,0,0.4)');
+          root.style.setProperty('--table-header-bg', '#1e3058');
+          root.style.setProperty('--table-header-text', '#ffffff');
+          root.style.setProperty('--table-row-alt', '#0f1525');
+          root.style.setProperty('--table-row-hover', '#1a2a45');
+          document.body && (document.body.style.background = '#0a0e1a');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
