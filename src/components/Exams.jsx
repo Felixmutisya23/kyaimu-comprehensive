@@ -3,7 +3,11 @@ import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Al
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 
-export default function Exams({ data, setData, user, flushSave }) {
+export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const isPrincipal  = user.role === 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass      = user.classTeacherOf;

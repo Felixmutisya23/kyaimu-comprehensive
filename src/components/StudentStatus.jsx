@@ -10,7 +10,11 @@ const TODAY = new Date().toISOString().split('T')[0];
 const CUR_YEAR = new Date().getFullYear();
 const CUR_TERM = new Date().getMonth() < 4 ? 1 : new Date().getMonth() < 8 ? 2 : 3;
 
-export default function StudentStatus({ data, setData, user }) {
+export default function StudentStatus({ data, setData, user , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const isPrincipal    = user.role === 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;

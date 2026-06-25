@@ -2,7 +2,10 @@ import React from 'react';
 import { Card, SectionTitle, Alert, ProgressBar, Tag, Icon } from './UI';
 import { canSeeKitchenAlerts, canSeeFees } from '../data/initialData';
 
-export default function Dashboard({ data, user }) {
+export default function Dashboard({ data, user, isDark, themeVars }) {
+  const bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
   const isPrincipal    = user.role == 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
@@ -29,7 +32,7 @@ export default function Dashboard({ data, user }) {
   }).length;
 
   return (
-    <div>
+    <div style={{ background: bg, color: text, minHeight: '100%' }}>
       <div style={{ marginBottom: 22 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
           Welcome back, {(user.name||'').split(' ')[0]} 👋

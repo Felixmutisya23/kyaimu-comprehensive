@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, SectionTitle, Alert, Avatar, Icon } from './UI';
 
-export default function Messages({ data, setData, role }) {
+export default function Messages({ data, setData, role , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const [show, setShow]       = useState(false);
   const [selected, setSelected] = useState(null);
   const [reply, setReply]     = useState('');

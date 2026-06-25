@@ -339,7 +339,11 @@ function SchoolAuditView({ data }) {
 }
 
 /* ── MAIN EXPORT — developer gate same as LicenseSystem ─────── */
-export default function AuditLog({ data, isDevMode = false }) {
+export default function AuditLog({ data, isDevMode = false , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const [devPass, setDevPass]   = useState('');
   const [authed,  setAuthed]    = useState(false);
   const [passErr, setPassErr]   = useState('');

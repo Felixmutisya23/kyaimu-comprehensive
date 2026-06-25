@@ -66,7 +66,11 @@ export function TermBadge({ data, style }) {
   );
 }
 
-export default function TermManagement({ data, setData }) {
+export default function TermManagement({ data, setData , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 1, currentYear, currentYear + 1];
   const [selYear, setSelYear] = useState(currentYear);

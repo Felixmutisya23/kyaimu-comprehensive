@@ -356,50 +356,40 @@ export default function App() {
   const [saveStatus, setSaveStatus] = React.useState('idle'); // idle | pending | saving | saved | error
   const [loginError, setLoginError] = React.useState('');
 
-  /* ── THEME: inject CSS variables whenever darkTheme changes ── */
-  // isDark is now a separate state — see initialization above
-  React.useEffect(() => {
-    const dark = {
-      '--bg':          '#0a0e1a',
-      '--surface':     '#111827',
-      '--surface2':    '#1a2236',
-      '--border':      '#334466',
-      '--text':        '#ffffff',
-      '--text-sub':    '#d0e0f8',
-      '--text-muted':  '#90b0d0',
-      '--input-bg':    '#1a2236',
-      '--input-color': '#ffffff',
-      '--accent':      '#4f8ef7',
-      '--card-shadow': '0 2px 12px rgba(0,0,0,0.4)',
-      '--table-header-bg':   '#1e3058',
-      '--table-header-text': '#ffffff',
-      '--table-row-alt':     '#0f1525',
-      '--table-row-hover':   '#1a2a45',
-    };
-    const light = {
-      '--bg':          '#ffffff',
-      '--surface':     '#ffffff',
-      '--surface2':    '#f1f5f9',
-      '--border':      '#cbd5e1',
-      '--text':        '#1e293b',
-      '--text-sub':    '#475569',
-      '--text-muted':  '#64748b',
-      '--input-bg':    '#f8fafc',
-      '--input-color': '#1e293b',
-      '--accent':      '#1e40af',
-      '--card-shadow': '0 20px 60px rgba(0,0,0,0.06)',
-      '--table-header-bg':   '#1e40af',
-      '--table-header-text': '#ffffff',
-      '--table-row-alt':     '#f8fafc',
-      '--table-row-hover':   '#eff6ff',
-    };
-    const vars = isDark ? dark : light;
+  /* ── THEME: apply CSS variables synchronously on every render ── */
+  // Apply theme synchronously on every render — no delays, works on all devices
+  const themeVars = isDark ? {
+    '--bg': '#0a0e1a', '--surface': '#111827', '--surface2': '#1a2236',
+    '--border': '#334466', '--text': '#ffffff', '--text-sub': '#d0e0f8',
+    '--text-muted': '#90b0d0', '--input-bg': '#1a2236', '--input-color': '#ffffff',
+    '--accent': '#4f8ef7', '--card-shadow': '0 2px 12px rgba(0,0,0,0.4)',
+    '--table-header-bg': '#1e3058', '--table-header-text': '#ffffff',
+    '--table-row-alt': '#0f1525', '--table-row-hover': '#1a2a45',
+  } : {
+    '--bg': '#ffffff', '--surface': '#ffffff', '--surface2': '#f1f5f9',
+    '--border': '#cbd5e1', '--text': '#1e293b', '--text-sub': '#475569',
+    '--text-muted': '#64748b', '--input-bg': '#f8fafc', '--input-color': '#1e293b',
+    '--accent': '#1e40af', '--card-shadow': '0 20px 60px rgba(0,0,0,0.06)',
+    '--table-header-bg': '#1e40af', '--table-header-text': '#ffffff',
+    '--table-row-alt': '#f8fafc', '--table-row-hover': '#eff6ff',
+  };
+  // Apply immediately — runs synchronously every render
+  if (typeof document !== 'undefined') {
     const root = document.documentElement;
-    Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    Object.entries(themeVars).forEach(([k, v]) => root.style.setProperty(k, v));
     root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.body.style.background = themeVars['--bg'];
+    document.body.style.color = themeVars['--text'];
+  }
+  // Also in useEffect to handle any async updates
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    Object.entries(themeVars).forEach(([k, v]) => root.style.setProperty(k, v));
+    root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.body.style.background = themeVars['--bg'];
+    document.body.style.color = themeVars['--text'];
     localStorage.setItem('edu_theme', isDark ? 'dark' : 'light');
-    document.body.style.background = vars['--bg'];
-    document.body.style.color      = vars['--text'];
   }, [isDark]);
 
 
@@ -864,7 +854,7 @@ export default function App() {
 
   function renderPage() {
     if (!nav.find(n => n.id == page)) return <Dashboard data={data} setData={setData} user={user} />;
-    const props = { data, setData, user, isUnlocked: license.isUnlocked };
+    const props = { data, setData, user, isUnlocked: license.isUnlocked, isDark, themeVars, flushSave: flushPendingSave };
     switch (page) {
       case 'dashboard':     return <Dashboard     {...props} />;
       case 'notifications': return <Notifications {...props} />;

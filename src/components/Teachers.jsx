@@ -31,7 +31,11 @@ const BLANK_FORM = {
   admin: false, password: '',
 };
 
-export default function Teachers({ data, setData }) {
+export default function Teachers({ data, setData , isDark, themeVars }) {
+  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
+  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
+  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+
   const [show, setShow]           = useState(false);
   const [isEditing, setIsEditing] = useState(false);   // true = edit mode
   const [editId, setEditId]       = useState(null);    // id of staff being edited
