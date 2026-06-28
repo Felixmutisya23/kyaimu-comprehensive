@@ -337,7 +337,7 @@ export default function App() {
   // This means Supabase data loading NEVER affects the theme
   const [isDark, setIsDark] = React.useState(() => {
     const saved = localStorage.getItem('edu_theme');
-    return saved ? saved === 'dark' : true; // default dark
+    return saved ? saved === 'dark' : false; // default light — better for outdoor/sunlight use
   });
   const [data, setDataRaw] = React.useState({ ...INITIAL_DATA });
   const [user, setUser]           = React.useState(null);
@@ -359,19 +359,19 @@ export default function App() {
   /* ── THEME: apply CSS variables synchronously on every render ── */
   // Apply theme synchronously on every render — no delays, works on all devices
   const themeVars = isDark ? {
-    '--bg': '#0a0e1a', '--surface': '#111827', '--surface2': '#1a2236',
-    '--border': '#334466', '--text': '#ffffff', '--text-sub': '#d0e0f8',
-    '--text-muted': '#90b0d0', '--input-bg': '#1a2236', '--input-color': '#ffffff',
-    '--accent': '#4f8ef7', '--card-shadow': '0 2px 12px rgba(0,0,0,0.4)',
-    '--table-header-bg': '#1e3058', '--table-header-text': '#ffffff',
-    '--table-row-alt': '#0f1525', '--table-row-hover': '#1a2a45',
+    '--bg': '#0a0e1a', '--surface': '#131c2e', '--surface2': '#1c2a40',
+    '--border': '#2e4470', '--text': '#ffffff', '--text-sub': '#e0ecff',
+    '--text-muted': '#a0c0e0', '--input-bg': '#1c2a40', '--input-color': '#ffffff',
+    '--accent': '#5a9fff', '--card-shadow': '0 2px 12px rgba(0,0,0,0.5)',
+    '--table-header-bg': '#1e3a6e', '--table-header-text': '#ffffff',
+    '--table-row-alt': '#111c30', '--table-row-hover': '#1e3050',
   } : {
-    '--bg': '#ffffff', '--surface': '#ffffff', '--surface2': '#f1f5f9',
-    '--border': '#cbd5e1', '--text': '#1e293b', '--text-sub': '#475569',
-    '--text-muted': '#64748b', '--input-bg': '#f8fafc', '--input-color': '#1e293b',
-    '--accent': '#1e40af', '--card-shadow': '0 20px 60px rgba(0,0,0,0.06)',
-    '--table-header-bg': '#1e40af', '--table-header-text': '#ffffff',
-    '--table-row-alt': '#f8fafc', '--table-row-hover': '#eff6ff',
+    '--bg': '#f0f4f8', '--surface': '#ffffff', '--surface2': '#e8eef6',
+    '--border': '#93a8c4', '--text': '#0a1628', '--text-sub': '#1e3a5f',
+    '--text-muted': '#374f6b', '--input-bg': '#ffffff', '--input-color': '#0a1628',
+    '--accent': '#1440a0', '--card-shadow': '0 2px 8px rgba(0,0,0,0.18)',
+    '--table-header-bg': '#1440a0', '--table-header-text': '#ffffff',
+    '--table-row-alt': '#edf2f8', '--table-row-hover': '#d8e6f8',
   };
   // Apply immediately — runs synchronously every render
   if (typeof document !== 'undefined') {

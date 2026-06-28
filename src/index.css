@@ -1,47 +1,47 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ════════════════════════════════════════
-   DARK THEME (default)
+   DARK THEME
 ════════════════════════════════════════ */
 :root {
   --bg:          #0a0e1a;
-  --surface:     #111827;
-  --surface2:    #1a2236;
-  --border:      #334466;
+  --surface:     #131c2e;
+  --surface2:    #1c2a40;
+  --border:      #2e4470;
   --text:        #ffffff;
-  --text-sub:    #d0e0f8;
-  --text-muted:  #90b0d0;
-  --input-bg:    #1a2236;
+  --text-sub:    #e0ecff;       /* brighter than before */
+  --text-muted:  #a0c0e0;       /* brighter than before */
+  --input-bg:    #1c2a40;
   --input-color: #ffffff;
-  --accent:      #4f8ef7;
-  --card-shadow: 0 2px 12px rgba(0,0,0,0.4);
-  --table-header-bg:   #1e3058;
+  --accent:      #5a9fff;
+  --card-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  --table-header-bg:   #1e3a6e;
   --table-header-text: #ffffff;
-  --table-row-alt:     #0f1525;
-  --table-row-hover:   #1a2a45;
+  --table-row-alt:     #111c30;
+  --table-row-hover:   #1e3050;
 }
 
 /* ════════════════════════════════════════
-   LIGHT THEME — same as Login.jsx
-   Pure white, near-black text
-   Maximum brightness for outdoors
+   LIGHT THEME — HIGH CONTRAST OUTDOOR
+   Pure white bg + near-black text
+   Thick borders, deep shadows for sunlight
 ════════════════════════════════════════ */
 [data-theme="light"] {
-  --bg:          #ffffff;
+  --bg:          #f0f4f8;        /* slight grey so pure white cards pop */
   --surface:     #ffffff;
-  --surface2:    #f1f5f9;
-  --border:      #cbd5e1;
-  --text:        #1e293b;
-  --text-sub:    #475569;
-  --text-muted:  #64748b;
-  --input-bg:    #f8fafc;
-  --input-color: #1e293b;
-  --accent:      #1e40af;
-  --card-shadow: 0 20px 60px rgba(0,0,0,0.06);
-  --table-header-bg:   #1e40af;
+  --surface2:    #e8eef6;
+  --border:      #93a8c4;        /* darker border = more visible in sunlight */
+  --text:        #0a1628;        /* near-black for max contrast */
+  --text-sub:    #1e3a5f;        /* dark blue-grey, still readable */
+  --text-muted:  #374f6b;        /* darker muted — no washed-out grey */
+  --input-bg:    #ffffff;
+  --input-color: #0a1628;
+  --accent:      #1440a0;        /* deeper blue — visible in glare */
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.18);  /* stronger shadow = depth in bright light */
+  --table-header-bg:   #1440a0;
   --table-header-text: #ffffff;
-  --table-row-alt:     #f8fafc;
-  --table-row-hover:   #eff6ff;
+  --table-row-alt:     #edf2f8;
+  --table-row-hover:   #d8e6f8;
 }
 
 html, body, #root { height: 100%; }
@@ -55,8 +55,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
   /* Force background directly on body — belt AND suspenders */
   -webkit-text-size-adjust: 100%;
 }
