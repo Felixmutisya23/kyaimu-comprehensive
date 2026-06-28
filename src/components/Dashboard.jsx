@@ -3,9 +3,9 @@ import { Card, SectionTitle, Alert, ProgressBar, Tag, Icon } from './UI';
 import { canSeeKitchenAlerts, canSeeFees } from '../data/initialData';
 
 export default function Dashboard({ data, user, isDark, themeVars }) {
-  const bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
-  const surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
-  const text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+  const bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
+  const surface = themeVars ? themeVars['--surface'] : 'var(--surface)';
+  const text = themeVars ? themeVars['--text'] : 'var(--text)';
   const isPrincipal    = user.role == 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;

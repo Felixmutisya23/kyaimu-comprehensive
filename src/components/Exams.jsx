@@ -4,9 +4,9 @@ import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeache
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 
 export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
-  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
-  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
-  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+  const _bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
+  const _surface = themeVars ? themeVars['--surface'] : 'var(--surface)';
+  const _text = themeVars ? themeVars['--text'] : 'var(--text)';
 
   const isPrincipal  = user.role === 'principal';
   const isClassTeacher = user.isClassTeacher;

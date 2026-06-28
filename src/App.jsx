@@ -261,7 +261,7 @@ function SetupWizard({ data, setData, onDone }) {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: isDark ? '#0a0e1a' : '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 560 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ width: 60, height: 60, borderRadius: 14, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 26, fontWeight: 800, color: '#fff' }}>E</div>
@@ -592,7 +592,7 @@ export default function App() {
 
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: isDark ? '#0a0e1a' : '#ffffff', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 48 }}>🏫</div>
       <div style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 18 }}>EduManage Pro</div>
       <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading school data...</div>
@@ -876,7 +876,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: isDark ? '#0a0e1a' : '#ffffff' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
       {/* LICENSE GATE — shows over read-only mode */}
       {showLicenseGate && <LicenseGate license={license} data={data} />}
 
@@ -884,7 +884,7 @@ export default function App() {
       {showDevPanel && (
         <div style={{ position: 'fixed', inset: 0, background: '#0008', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={e => { if (e.target == e.currentTarget) setShowDevPanel(false); }}>
-          <div style={{ background: isDark ? '#0a0e1a' : '#ffffff', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg)', border: '2px solid #7c3aed', borderRadius: 20, padding: 28, maxWidth: 520, width: '94%', boxShadow: '0 32px 100px #7c3aed30', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 2 }}>🛠 Developer Panel</div>
@@ -941,7 +941,7 @@ export default function App() {
         @media (max-width: 768px) {
           .edu-sidebar { position: fixed !important; left: 0; top: 0; height: 100vh; z-index: 1000; transform: translateX(-100%); transition: transform 0.25s !important; width: 260px !important; }
           .edu-sidebar.open { transform: translateX(0) !important; }
-          .edu-overlay { display: block !important; }
+          .edu-sidebar.open ~ .edu-overlay { display: block !important; }
           .edu-top-bar { display: flex !important; }
           .edu-main { margin-left: 0 !important; padding-top: 56px !important; }
           .edu-hamburger-btn { display: flex !important; }
@@ -969,7 +969,7 @@ export default function App() {
         {myNotifUnread > 0 && <div style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{myNotifUnread}</div>}
       </div>
       {/* SIDEBAR */}
-      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: isDark ? '#111827' : '#ffffff', borderRight: `1px solid ${isDark ? '#334466' : '#cbd5e1'}`, display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
+      <aside className={"edu-sidebar" + (!collapsed ? " open" : "")} style={{ width: collapsed ? 64 : 240, background: 'var(--surface)', borderRight: `1px solid var(--border)`, display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.2s' }}>
         <div style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#4f8ef7,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#fff', flexShrink: 0 }}>E</div>
           {!collapsed && (
@@ -1041,7 +1041,7 @@ export default function App() {
 
       {/* MAIN */}
       <main className="edu-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: (!license.isUnlocked && user?.role == 'principal') ? 30 : 0 }}>
-        <header style={{ background: isDark ? '#111827' : '#ffffff', borderBottom: `1px solid ${isDark ? '#334466' : '#cbd5e1'}`, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <header style={{ background: 'var(--surface)', borderBottom: `1px solid var(--border)`, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={() => setCollapsed(c => !c)}
               style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 20, padding: 4, borderRadius: 6 }}>☰</button>
@@ -1109,7 +1109,7 @@ export default function App() {
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: roleColor + '30', color: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, border: `2px solid ${roleColor}40`, flexShrink: 0 }}>{initials}</div>
           </div>
         </header>
-        <div className="edu-page-content" style={{ flex: 1, overflowY: 'auto', padding: 24, background: isDark ? '#0a0e1a' : '#ffffff' }}>
+        <div className="edu-page-content" style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
           {renderPage()}
         </div>
       </main>

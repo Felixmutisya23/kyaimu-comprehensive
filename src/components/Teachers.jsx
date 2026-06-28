@@ -32,9 +32,9 @@ const BLANK_FORM = {
 };
 
 export default function Teachers({ data, setData , isDark, themeVars }) {
-  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
-  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
-  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+  const _bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
+  const _surface = themeVars ? themeVars['--surface'] : 'var(--surface)';
+  const _text = themeVars ? themeVars['--text'] : 'var(--text)';
 
   const [show, setShow]           = useState(false);
   const [isEditing, setIsEditing] = useState(false);   // true = edit mode

@@ -236,9 +236,9 @@ function generateForClass(cls, rules, bells, existingTimetable) {
    MAIN COMPONENT
 ───────────────────────────────────────────────────────────── */
 export default function Timetable({ data, setData, user , isDark, themeVars }) {
-  const _bg = themeVars ? themeVars['--bg'] : (isDark ? '#0a0e1a' : '#ffffff');
-  const _surface = themeVars ? themeVars['--surface'] : (isDark ? '#111827' : '#ffffff');
-  const _text = themeVars ? themeVars['--text'] : (isDark ? '#ffffff' : '#1e293b');
+  const _bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
+  const _surface = themeVars ? themeVars['--surface'] : 'var(--surface)';
+  const _text = themeVars ? themeVars['--text'] : 'var(--text)';
 
   const isPrincipal = user.role === 'principal';
   const classes = getAllClasses(data);
