@@ -74,9 +74,12 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     ? [...new Set(Object.values(selExam.results || {}).flatMap(r => Object.keys(r)))]
     : [];
 
-  // Exam columns — respects groups + always shows columns with marks
+  // Exam columns — ALWAYS reflects the live Setup Subjects list for selClass.
+  // Per-exam subjectColumns snapshots are ignored here so that adding or
+  // renaming a subject in Setup Subjects takes effect on every exam for
+  // this class immediately — past, present, and future.
   const examColumns = (() => {
-    const cols = getExamColumnsForClass(selClass, data, selExam?.subjectColumns || null);
+    const cols = getExamColumnsForClass(selClass, data, null);
     if (!selExam || markedSubjects.length === 0) return cols;
     const coveredByCol = new Set(cols.flatMap(c =>
       c.type === 'group' ? c.components : [c.subject || c.name]
