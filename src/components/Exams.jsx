@@ -533,14 +533,14 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
               {isClassTeacher ? 'Viewing all subjects for your class' : !isPrincipal ? `Showing: ${visibleSubjects.join(', ')}` : 'Full results view'}
             </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={TS.table}>
-              <thead>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh' }}>
+            <table style={{ ...TS.table, borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr>
-                  <th style={TS.th}>#</th>
-                  <th style={TS.th}>Name</th>
+                  <th style={{ ...TS.th, position: 'sticky', left: 0, zIndex: 20, background: 'var(--table-header-bg, #1e40af)' }}>#</th>
+                  <th style={{ ...TS.th, position: 'sticky', left: 32, zIndex: 20, background: 'var(--table-header-bg, #1e40af)', minWidth: 140 }}>Name</th>
                   <th style={TS.th}>Adm No</th>
-                  {visibleSubjects.map(s => <th key={s} style={TS.th}>{s}</th>)}
+                  {visibleSubjects.map(s => <th key={s} style={{ ...TS.th, whiteSpace: 'nowrap' }}>{s}</th>)}
                   {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
                   <th style={TS.th}>Action</th>
                 </tr>
@@ -908,20 +908,20 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             You are entering scores for: <strong>{enterableSubjects.join(', ')}</strong> only.
           </Alert>
         )}
-        <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-          <table style={TS.table}>
-            <thead>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', marginBottom: 16 }}>
+          <table style={{ ...TS.table, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr>
-                <th style={TS.th}>Student</th>
-                {enterSubjects.map(s => <th key={s} style={TS.th}>{s}</th>)}
+                <th style={{ ...TS.th, position: 'sticky', left: 0, zIndex: 20, background: 'var(--table-header-bg, #1e40af)', minWidth: 140 }}>Student</th>
+                {enterSubjects.map(s => <th key={s} style={{ ...TS.th, whiteSpace: 'nowrap', minWidth: 70 }}>{s}</th>)}
               </tr>
             </thead>
             <tbody>
-              {classStudents.map(st => (
-                <tr key={st.id}>
-                  <td style={{ ...TS.td, fontWeight: 500, whiteSpace: 'nowrap' }}>{st.name}</td>
+              {classStudents.map((st, idx) => (
+                <tr key={st.id} style={{ background: idx % 2 === 0 ? 'var(--surface)' : 'var(--table-row-alt)' }}>
+                  <td style={{ ...TS.td, fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'inherit', zIndex: 5, borderRight: '2px solid var(--border)', minWidth: 140 }}>{st.name}</td>
                   {enterSubjects.map(sub => (
-                    <td key={sub} style={{ ...TS.td, padding: '4px 6px' }}>
+                    <td key={sub} style={{ ...TS.td, padding: '4px 6px', textAlign: 'center' }}>
                       <input type="number" min={0} max={100} value={scores[st.name]?.[sub] ?? ''}
                         onChange={e => setScores(prev => ({ ...prev, [st.name]: { ...prev[st.name], [sub]: e.target.value } }))}
                         style={{ width: 58, textAlign: 'center', padding: '5px 4px' }} />
