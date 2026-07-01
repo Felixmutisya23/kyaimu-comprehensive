@@ -1,4 +1,4 @@
-import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass } from '../data/initialData';
+import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, getSubjectsForClass } from '../data/initialData';
 
 /* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
 function getFeeExpected(student, term, year, data) {
@@ -616,13 +616,54 @@ export function printOverallClassList(exam, data) {
     resultsMap[s.name] = ex ? (ex.results[s.name] || {}) : {};
   });
 
-  // Collect all subjects appearing in any sibling exam
-  const subjectSet = new Set();
-  siblingClasses.forEach(cls => {
-    const ex = findSiblingExam(cls);
-    if (ex) Object.values(ex.results || {}).forEach(r => Object.keys(r).forEach(k => subjectSet.add(k)));
+  // ── Canonical subject list from Setup Subjects ──────────────────────
+  // Use Setup Subjects (subjectsByClass) as the single source of truth.
+  // This prevents duplicate columns when streams use different spellings
+  // e.g. "Eng" vs "English", "Kisw" vs "Kiswahili", "MathS" vs "Mathematics"
+  const canonicalSubjects = getSubjectsForClass(siblingClasses[0], data);
+
+  // Build normalisation map: result key → canonical name
+  function normaliseSubject(key) {
+    if (!key) return key;
+    const exact = canonicalSubjects.find(s => s === key);
+    if (exact) return exact;
+    const ci = canonicalSubjects.find(s => s.toLowerCase() === key.toLowerCase());
+    if (ci) return ci;
+    const kLow = key.toLowerCase();
+    const prefix = canonicalSubjects.find(s =>
+      s.toLowerCase().startsWith(kLow) ||
+      kLow.startsWith(s.toLowerCase().slice(0, Math.min(4, s.length)))
+    );
+    return prefix || key;
+  }
+
+  // Re-build resultsMap with normalised subject keys — no marks lost
+  allStudents.forEach(s => {
+    const raw = resultsMap[s.name] || {};
+    const normalised = {};
+    Object.entries(raw).forEach(([k, v]) => {
+      const canon = normaliseSubject(k);
+      if (!normalised[canon]) {
+        normalised[canon] = v;
+      } else {
+        // Two keys mapped to same canonical — keep the one with actual score
+        const oldScore = typeof normalised[canon] === 'object' ? normalised[canon]?.score : normalised[canon];
+        const newScore = typeof v === 'object' ? v?.score : v;
+        if (newScore != null && (oldScore == null || Number(newScore) > Number(oldScore))) {
+          normalised[canon] = v;
+        }
+      }
+    });
+    resultsMap[s.name] = normalised;
   });
-  const subjects = [...subjectSet];
+
+  // Final subject list: canonical order, only subjects that have data
+  const usedSubjects = new Set();
+  Object.values(resultsMap).forEach(r => Object.keys(r).forEach(k => usedSubjects.add(k)));
+  const subjects = [
+    ...canonicalSubjects.filter(s => usedSubjects.has(s)),
+    ...[...usedSubjects].filter(s => !canonicalSubjects.includes(s)),
+  ];
 
   // Rank overall — sorted by total descending
   const withStats = allStudents.map(s => {
