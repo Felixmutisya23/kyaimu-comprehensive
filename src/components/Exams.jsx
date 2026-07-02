@@ -33,6 +33,14 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   // orphaning it. A row with no original (newly added) is just inserted.
   const [setupSubjectRows, setSetupSubjectRows] = useState([]); // [{ original, current }]
   const [newSubjectName, setNewSubjectName] = useState('');
+  // Subjects that have real marks in some exam for this class but are NOT
+  // in the current Setup Subjects list — e.g. old/legacy names. These are
+  // shown separately (not mixed into setupSubjectRows) because they aren't
+  // part of the saved subjectsByClass list; each one is deleted directly
+  // (purges those marks from every exam for the class) or merged by typing
+  // an existing subject's exact name.
+  const [legacySubjects, setLegacySubjects] = useState([]); // [{ name, count }]
+  const [legacyMergeInput, setLegacyMergeInput] = useState({}); // { [legacyName]: targetSubjectName }
   const classSubjects = getSubjectsForClass(selClass, data);
   const [selExamId, setSelExamId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
@@ -470,6 +478,57 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     if (flushSave) setTimeout(() => flushSave(), 50);
   }
 
+  /* ── Legacy subjects (marks exist, not in Setup Subjects list) ────
+     These aren't part of setupSubjectRows because they're not saved in
+     subjectsByClass — they're orphaned keys sitting in old exam.results.
+     Give the admin a real way to get rid of them: delete outright, or
+     merge into an existing subject name (moves the marks, doesn't just
+     hide them). ─────────────────────────────────────────────────── */
+  function purgeLegacySubject(name) {
+    if (!window.confirm(`Permanently delete all "${name}" marks recorded for ${selClass}? This removes those scores from every exam where they appear and cannot be undone.`)) return;
+    setData(d => ({
+      ...d,
+      exams: d.exams.map(ex => {
+        if (ex.class !== selClass) return ex;
+        const newResults = {};
+        Object.entries(ex.results || {}).forEach(([studentName, subjectScores]) => {
+          const updated = { ...subjectScores };
+          delete updated[name];
+          newResults[studentName] = updated;
+        });
+        return { ...ex, results: newResults };
+      }),
+    }));
+    setLegacySubjects(rows => rows.filter(r => r.name !== name));
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
+  function mergeLegacySubject(name) {
+    const target = (legacyMergeInput[name] || '').trim();
+    if (!target) { alert('Type the exact name of the subject to merge into.'); return; }
+    setData(d => ({
+      ...d,
+      exams: d.exams.map(ex => {
+        if (ex.class !== selClass) return ex;
+        const newResults = {};
+        Object.entries(ex.results || {}).forEach(([studentName, subjectScores]) => {
+          const updated = { ...subjectScores };
+          if (updated[name] !== undefined) {
+            if (updated[target] === undefined) {
+              updated[target] = updated[name];
+            }
+            delete updated[name];
+          }
+          newResults[studentName] = updated;
+        });
+        return { ...ex, results: newResults };
+      }),
+    }));
+    setLegacySubjects(rows => rows.filter(r => r.name !== name));
+    setLegacyMergeInput(m => { const n = { ...m }; delete n[name]; return n; });
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
   /* ── Can this user request an edit of a score? ────── */
   function canRequestEdit(subject, exam) {
     if (!exam) return false;
@@ -578,15 +637,33 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           )}
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => {
-              // Show the CURRENT Setup Subjects list only. We deliberately
-              // stopped merging in every subject that has ever had marks
-              // recorded in any exam for this class — that used to make
-              // subjects you'd just removed pop right back into this list
-              // (and then get re-saved by accident), which is the opposite
-              // of what "remove" should do. If a subject already has marks
-              // and you want it back, use "+ Add" with the same name.
+              // Main editable list: the CURRENT Setup Subjects only. We
+              // deliberately don't merge in every subject that has ever had
+              // marks recorded — that used to make subjects you'd just
+              // removed pop right back into this list (and then get
+              // re-saved by accident), which is the opposite of "remove".
               const settingsSubs = getSubjectsForClass(selClass, data) || [];
               setSetupSubjectRows(settingsSubs.map(s => ({ original: s, current: s })));
+
+              // Separately: any subject with real marks somewhere in this
+              // class's exams that ISN'T in the current list — legacy/
+              // out-of-sync names. Surfaced on their own so the admin can
+              // actually see and manage them (delete outright, or merge
+              // into an existing subject by renaming) instead of them being
+              // invisible everywhere.
+              const settingsSet = new Set(settingsSubs);
+              const markCounts = {};
+              (data.exams || [])
+                .filter(e => e.class === selClass)
+                .forEach(e => {
+                  Object.values(e.results || {}).forEach(r => {
+                    Object.keys(r).forEach(k => {
+                      if (!settingsSet.has(k)) markCounts[k] = (markCounts[k] || 0) + 1;
+                    });
+                  });
+                });
+              setLegacySubjects(Object.keys(markCounts).map(name => ({ name, count: markCounts[name] })));
+
               setNewSubjectName('');
               setShowSetupSubjects(true);
             }}>
@@ -811,6 +888,41 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             setNewSubjectName('');
           }}>+ Add</Btn>
         </div>
+
+        {legacySubjects.length > 0 && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#f59e0b', marginBottom: 4 }}>
+              ⚠ Legacy subjects with marks — not in the list above ({legacySubjects.length})
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+              These have real recorded marks under a name that isn't in your current subject list — likely old/renamed subjects. Delete to permanently remove those marks, or merge them into an existing subject name to keep the scores.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {legacySubjects.map(({ name, count }) => (
+                <div key={name} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div>
+                      <strong>{name}</strong>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{count} score{count === 1 ? '' : 's'} recorded</span>
+                    </div>
+                    <Btn size="sm" variant="danger" onClick={() => purgeLegacySubject(name)}>
+                      <Icon name="trash" size={12} /> Delete
+                    </Btn>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={legacyMergeInput[name] || ''}
+                      onChange={e => setLegacyMergeInput(m => ({ ...m, [name]: e.target.value }))}
+                      placeholder={`Merge into… e.g. "${setupSubjectRows[0]?.current || 'Kiswahili Language'}"`}
+                      style={{ flex: 1, fontSize: 12 }}
+                    />
+                    <Btn size="sm" variant="ghost" onClick={() => mergeLegacySubject(name)}>Merge</Btn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
           <Btn variant="ghost" onClick={() => setShowSetupSubjects(false)}>Cancel</Btn>
