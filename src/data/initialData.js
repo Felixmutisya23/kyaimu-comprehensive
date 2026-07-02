@@ -11,8 +11,14 @@ export const GRADES_CBC = [
 
 export function getGrade(score, data) {
   const grades = data?.gradesConfig || GRADES_CBC;
+  // Clamp to the valid 0–100 range first. Without this, any caller that
+  // accidentally passes a sum/total instead of a mean (score > 100) — or
+  // a negative value — silently falls through the loop below and always
+  // lands on the LAST band in the list (worst grade), no matter how well
+  // the student/class actually performed.
+  const clamped = Math.max(0, Math.min(100, score));
   for (const g of grades) {
-    if (score >= g.scoreMin && score <= g.scoreMax) return g;
+    if (clamped >= g.scoreMin && clamped <= g.scoreMax) return g;
   }
   return grades[grades.length - 1];
 }

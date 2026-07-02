@@ -460,14 +460,19 @@ function renderResultSheet({
   const best    = subjectStats[0];
   const weakest = subjectStats[subjectStats.length - 1];
 
-  // Summary stats
-  const allTotals = students.map(s => {
+  // Summary stats — class mean must be the average of each student's
+  // per-subject MEAN (0–100 scale), not the average of their totals
+  // (sum across all subjects), otherwise it blows past 100 and getGrade()
+  // falls through to its last band (BE2) for every student every time.
+  const allMeans = students.map(s => {
     const res  = resultsMap[s.name] || {};
     const subs = subjects.filter(k => res[k] !== undefined);
-    return subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-  });
-  const classMean = allTotals.length
-    ? (allTotals.reduce((a, b) => a + b, 0) / allTotals.length).toFixed(1)
+    if (!subs.length) return null;
+    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    return total / subs.length;
+  }).filter(m => m !== null);
+  const classMean = allMeans.length
+    ? (allMeans.reduce((a, b) => a + b, 0) / allMeans.length).toFixed(1)
     : '—';
   const classGrade = getGrade(Math.round(parseFloat(classMean) || 0));
 
