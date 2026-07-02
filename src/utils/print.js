@@ -662,15 +662,22 @@ export function printOverallClassList(exam, data) {
     resultsMap[s.name] = normalised;
   });
 
-  // Final subject list: canonical order, current Setup Subjects only.
-  // We deliberately do NOT append leftover subjects that only exist in old
-  // marks but were removed from Setup Subjects — that used to make removed
-  // subjects reappear on this combined sheet even though they were gone
-  // everywhere else. The marks themselves are untouched in the data; they
-  // just aren't displayed unless the subject is added back to Setup Subjects.
+  // Final subject list: canonical Setup Subjects first (in order), then any
+  // leftover subject key that genuinely has marks recorded but isn't part
+  // of the current canonical list. That leftover case covers real, already
+  // -entered scores under legacy/out-of-sync subject names — e.g. marks
+  // entered before Setup Subjects was tidied up. Hiding those would make
+  // real recorded scores invisible on the printed sheet even though they
+  // still count toward each student's total and mean, which is worse than
+  // the sheet showing an extra column. (This does not write anything back
+  // to Setup Subjects — a subject deliberately removed there still won't
+  // reappear in the Setup Subjects editor or in future new exams.)
   const usedSubjects = new Set();
   Object.values(resultsMap).forEach(r => Object.keys(r).forEach(k => usedSubjects.add(k)));
-  const subjects = canonicalSubjects.filter(s => usedSubjects.has(s));
+  const subjects = [
+    ...canonicalSubjects.filter(s => usedSubjects.has(s)),
+    ...[...usedSubjects].filter(s => !canonicalSubjects.includes(s)),
+  ];
 
   // Rank overall — sorted by total descending
   const withStats = allStudents.map(s => {

@@ -80,19 +80,40 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     ? [...new Set(Object.values(selExam.results || {}).flatMap(r => Object.keys(r)))]
     : [];
 
-  // Exam columns — ALWAYS reflects the live Setup Subjects list for selClass.
-  // Per-exam subjectColumns snapshots are ignored here so that adding or
-  // renaming a subject in Setup Subjects takes effect on every exam for
-  // this class immediately — past, present, and future.
+  // Exam columns for VIEWING an exam's results.
+  // Base columns always reflect the live Setup Subjects list for selClass —
+  // adding or renaming a subject in Setup Subjects takes effect on every
+  // exam for this class immediately, past, present, and future.
   //
-  // NOTE: we deliberately do NOT re-inject subjects that still have marks
-  // recorded but were removed from Setup Subjects. Doing so used to make
-  // "removed" subjects silently reappear in every exam and after every
-  // login, which defeated the entire purpose of removing them. Setup
-  // Subjects is the single source of truth for what's shown — the old
-  // marks are kept in the data (nothing is deleted), just no longer
-  // displayed, exactly as the Setup Subjects dialog already warns.
-  const examColumns = getExamColumnsForClass(selClass, data, null);
+  // On top of that, we also surface any subject that already has real
+  // marks recorded in THIS specific exam, even if it's not (or no longer)
+  // in Setup Subjects. This is important: a subject's key can end up out
+  // of sync with Setup Subjects for legitimate reasons — e.g. marks were
+  // entered under an old/legacy name before Setup Subjects was tidied up,
+  // or a subject was renamed without going through the migration in the
+  // Setup Subjects editor. Hiding those columns would make real, already-
+  // recorded scores invisible even though they still count toward the
+  // student's total and mean — exactly the kind of "my marks disappeared"
+  // problem this is guarding against.
+  //
+  // IMPORTANT: this extra-columns behavior is scoped ONLY to this view.
+  // It does NOT feed back into the Setup Subjects editor's row list (see
+  // the "📚 Setup Subjects" button below) and does NOT get re-saved into
+  // subjectsByClass automatically — so a subject you deliberately remove
+  // via Setup Subjects still won't reappear there or in future new exams.
+  // It will simply keep showing here for any past exam where it genuinely
+  // has marks, until those marks are cleared.
+  const examColumns = (() => {
+    const cols = getExamColumnsForClass(selClass, data, null);
+    if (!selExam || markedSubjects.length === 0) return cols;
+    const coveredByCol = new Set(cols.flatMap(c =>
+      c.type === 'group' ? c.components : [c.subject || c.name]
+    ));
+    const extraCols = markedSubjects
+      .filter(s => !coveredByCol.has(s) && !cols.some(c => c.name === s))
+      .map(s => ({ name: s, type: 'single', subject: s }));
+    return [...cols, ...extraCols];
+  })();
 
   const columnNames = examColumns.map(c => c.name);
 
@@ -747,9 +768,8 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       {/* Setup Subjects Modal */}
       <Modal show={showSetupSubjects} onClose={() => setShowSetupSubjects(false)} title={`Setup Subjects — ${selClass}`}>
         <Alert type="info">
-          Showing ALL subjects — both from Settings and those already used in exams for <strong>{selClass}</strong>.
-          Rename a subject and marks move with it automatically.
-          <strong style={{ color: '#f59e0b' }}> Only delete subjects with no marks — deleting a subject with marks will hide those marks.</strong>
+          This is the exam subject list for <strong>{selClass}</strong> — controls what shows when entering new marks. Rename a subject and marks move with it automatically.
+          <strong style={{ color: '#f59e0b' }}> Removing a subject here takes it out of this list for good (it won't come back on its own) — but if it already has marks in a past exam, those marks stay visible when viewing that exam's results, they just won't be offered again for new entry.</strong>
           <br/>Changes here do <strong>not</strong> affect Settings subjects used for timetable or teacher assignment.
         </Alert>
 
