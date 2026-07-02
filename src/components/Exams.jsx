@@ -41,6 +41,12 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   const [showEditReq, setShowEditReq] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editNewScore, setEditNewScore] = useState('');
+  // Editing a GROUP column (e.g. "English" = Grammar + Composition summed)
+  // means editing each underlying component subject's score individually —
+  // there's no single number to overwrite. Principal-only, direct-apply,
+  // same as single-subject principal edits.
+  const [showEditGroup, setShowEditGroup] = useState(false);
+  const [editGroupTarget, setEditGroupTarget] = useState(null); // { studentName, examId, column, values }
 
   const DEFAULT_EXAM_NAMES = [
     'Opening Exam', 'Mid-Term Exam', 'End-Term Exam',
@@ -78,17 +84,15 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   // Per-exam subjectColumns snapshots are ignored here so that adding or
   // renaming a subject in Setup Subjects takes effect on every exam for
   // this class immediately — past, present, and future.
-  const examColumns = (() => {
-    const cols = getExamColumnsForClass(selClass, data, null);
-    if (!selExam || markedSubjects.length === 0) return cols;
-    const coveredByCol = new Set(cols.flatMap(c =>
-      c.type === 'group' ? c.components : [c.subject || c.name]
-    ));
-    const extraCols = markedSubjects
-      .filter(s => !coveredByCol.has(s) && !cols.some(c => c.name === s))
-      .map(s => ({ name: s, type: 'single', subject: s }));
-    return [...cols, ...extraCols];
-  })();
+  //
+  // NOTE: we deliberately do NOT re-inject subjects that still have marks
+  // recorded but were removed from Setup Subjects. Doing so used to make
+  // "removed" subjects silently reappear in every exam and after every
+  // login, which defeated the entire purpose of removing them. Setup
+  // Subjects is the single source of truth for what's shown — the old
+  // marks are kept in the data (nothing is deleted), just no longer
+  // displayed, exactly as the Setup Subjects dialog already warns.
+  const examColumns = getExamColumnsForClass(selClass, data, null);
 
   const columnNames = examColumns.map(c => c.name);
 
@@ -284,7 +288,10 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   function submitEditRequest() {
     const newScore = Number(editNewScore);
     if (isNaN(newScore) || newScore < 0 || newScore > 100) { alert('Please enter a valid score (0–100)'); return; }
-    if (newScore === editTarget.currentScore) { alert('New score is the same as current score.'); return; }
+    // Only block "no-op" edits for the approval-request flow — a principal's
+    // direct edit is harmless even if re-entering the same number, and
+    // blocking it here was an unnecessary restriction on the admin.
+    if (!isPrincipal && newScore === editTarget.currentScore) { alert('New score is the same as current score.'); return; }
 
     // Principal edits marks directly — no approval needed
     if (isPrincipal) {
@@ -375,6 +382,71 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
         return { ...ex, results: r };
       }),
     };
+  }
+
+  /* ── Remove a mark entirely (principal only, direct — no approval,
+     no restriction) ───────────────────────────────────────────── */
+  function clearScore(studentName, subject, examId) {
+    if (!isPrincipal) return;
+    if (!window.confirm(`Remove the ${subject} score for ${studentName}? This cannot be undone.`)) return;
+    setData(d => ({
+      ...d,
+      exams: d.exams.map(ex => {
+        if (ex.id !== examId) return ex;
+        const newResults = { ...ex.results };
+        if (newResults[studentName]) {
+          const updated = { ...newResults[studentName] };
+          delete updated[subject];
+          newResults[studentName] = updated;
+        }
+        return { ...ex, results: newResults };
+      }),
+    }));
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
+  /* ── Edit a GROUP column (e.g. "English" = Grammar + Composition) ──
+     There's no single number to overwrite — edit each component subject's
+     score directly. Principal-only, direct-apply, no approval workflow. */
+  function openGroupEdit(studentName, col, examId) {
+    if (!isPrincipal) return;
+    const exam = data.exams.find(e => e.id === examId);
+    const res  = exam?.results?.[studentName] || {};
+    const values = {};
+    col.components.forEach(c => { values[c] = getScore(res[c]) ?? ''; });
+    setEditGroupTarget({ studentName, examId, column: col, values });
+    setShowEditGroup(true);
+  }
+
+  function saveGroupEdit() {
+    const { studentName, examId, column, values } = editGroupTarget;
+    for (const c of column.components) {
+      const v = values[c];
+      if (v !== '' && v !== null && v !== undefined && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 100)) {
+        alert(`Invalid score for ${c} — must be 0–100 (or left blank to remove it).`);
+        return;
+      }
+    }
+    setData(d => ({
+      ...d,
+      exams: d.exams.map(ex => {
+        if (ex.id !== examId) return ex;
+        const newResults = { ...ex.results };
+        const studentResults = { ...(newResults[studentName] || {}) };
+        column.components.forEach(c => {
+          const v = values[c];
+          if (v === '' || v === null || v === undefined) {
+            delete studentResults[c];
+          } else {
+            studentResults[c] = { score: Number(v), submittedBy: user.staffId, locked: false, editedByPrincipal: true };
+          }
+        });
+        newResults[studentName] = studentResults;
+        return { ...ex, results: newResults };
+      }),
+    }));
+    setShowEditGroup(false);
+    if (flushSave) setTimeout(() => flushSave(), 50);
   }
 
   /* ── Can this user request an edit of a score? ────── */
@@ -485,16 +557,15 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           )}
           {isPrincipal && (
             <Btn variant="ghost" onClick={() => {
-              // Show ALL subjects that have marks in any exam for this class
-              // PLUS subjects from Settings — so principal sees everything
-              const markedInAnyExam = new Set(
-                (data.exams || [])
-                  .filter(e => e.class === selClass)
-                  .flatMap(e => Object.values(e.results || {}).flatMap(r => Object.keys(r)))
-              );
+              // Show the CURRENT Setup Subjects list only. We deliberately
+              // stopped merging in every subject that has ever had marks
+              // recorded in any exam for this class — that used to make
+              // subjects you'd just removed pop right back into this list
+              // (and then get re-saved by accident), which is the opposite
+              // of what "remove" should do. If a subject already has marks
+              // and you want it back, use "+ Add" with the same name.
               const settingsSubs = getSubjectsForClass(selClass, data) || [];
-              settingsSubs.forEach(s => markedInAnyExam.add(s));
-              setSetupSubjectRows([...markedInAnyExam].map(s => ({ original: s, current: s })));
+              setSetupSubjectRows(settingsSubs.map(s => ({ original: s, current: s })));
               setNewSubjectName('');
               setShowSetupSubjects(true);
             }}>
@@ -558,7 +629,8 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                     {visibleSubjects.map(colName => {
                       const col   = examColumns.find(c => c.name === colName) || { name: colName, type: 'single', subject: colName };
                       const score = computeColumnScore(col, s.results);
-                      const canEdit = col.type === 'single' && canRequestEdit(col.subject || col.name, selExam);
+                      const canEditSingle = col.type === 'single' && canRequestEdit(col.subject || col.name, selExam);
+                      const canEditGroup  = col.type === 'group' && isPrincipal;
                       return (
                         <td key={colName} style={{ ...TS.td, textAlign: 'center', position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
@@ -566,9 +638,20 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                               style={{ color: col.type === 'group' ? '#4f8ef7' : 'inherit', fontWeight: col.type === 'group' ? 700 : 'inherit' }}>
                               {score ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
                             </span>
-                            {score !== null && canEdit && (
+                            {score !== null && canEditSingle && (
                               <button onClick={() => openEditRequest(s.name, col.subject || col.name, score, selExam.id)}
+                                title="Edit score"
                                 style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '1px 4px', borderRadius: 4, opacity: 0.7 }}>✎</button>
+                            )}
+                            {canEditGroup && (
+                              <button onClick={() => openGroupEdit(s.name, col, selExam.id)}
+                                title="Edit combined subject components"
+                                style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '1px 4px', borderRadius: 4, opacity: 0.7 }}>✎</button>
+                            )}
+                            {score !== null && col.type === 'single' && isPrincipal && (
+                              <button onClick={() => clearScore(s.name, col.subject || col.name, selExam.id)}
+                                title="Remove this score"
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '1px 4px', borderRadius: 4, opacity: 0.7 }}>✕</button>
                             )}
                           </div>
                         </td>
@@ -939,11 +1022,18 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       </Modal>
 
       {/* Edit Request Modal */}
-      <Modal show={showEditReq} onClose={() => setShowEditReq(false)} title="Request Score Edit">
-        <Alert type="warning">
-          <Icon name="alert" size={14} />
-          Editing a submitted score requires approval from the class teacher AND the principal. All parties will be notified.
-        </Alert>
+      <Modal show={showEditReq} onClose={() => setShowEditReq(false)} title={isPrincipal ? 'Edit Score' : 'Request Score Edit'}>
+        {isPrincipal ? (
+          <Alert type="info">
+            <Icon name="alert" size={14} />
+            As principal, changes apply immediately — no approval needed.
+          </Alert>
+        ) : (
+          <Alert type="warning">
+            <Icon name="alert" size={14} />
+            Editing a submitted score requires approval from the class teacher AND the principal. All parties will be notified.
+          </Alert>
+        )}
         {editTarget && (
           <>
             <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: 14, marginBottom: 16, fontSize: 13 }}>
@@ -959,9 +1049,43 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             </FormGroup>
           </>
         )}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setShowEditReq(false)}>Cancel</Btn>
-          <Btn variant="primary" onClick={submitEditRequest} disabled={!editNewScore}>Submit Edit Request</Btn>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+          {isPrincipal && editTarget && (
+            <Btn variant="danger" onClick={() => {
+              setShowEditReq(false);
+              clearScore(editTarget.studentName, editTarget.subject, editTarget.examId);
+            }}>Remove Score</Btn>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <Btn variant="ghost" onClick={() => setShowEditReq(false)}>Cancel</Btn>
+            <Btn variant="primary" onClick={submitEditRequest} disabled={!editNewScore}>{isPrincipal ? 'Save' : 'Submit Edit Request'}</Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Group (combined/overall subject) Modal — principal only */}
+      <Modal show={showEditGroup} onClose={() => setShowEditGroup(false)} title={`Edit ${editGroupTarget?.column?.name || ''} — ${editGroupTarget?.studentName || ''}`}>
+        <Alert type="info">
+          <Icon name="alert" size={14} />
+          This is a combined subject made up of several components. Edit each one directly — changes apply immediately. Leave a field blank to remove that component's score.
+        </Alert>
+        {editGroupTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            {editGroupTarget.column.components.map(c => (
+              <FormGroup key={c} label={c}>
+                <input
+                  type="number" min={0} max={100}
+                  value={editGroupTarget.values[c]}
+                  onChange={e => setEditGroupTarget(t => ({ ...t, values: { ...t.values, [c]: e.target.value } }))}
+                  placeholder="—"
+                />
+              </FormGroup>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+          <Btn variant="ghost" onClick={() => setShowEditGroup(false)}>Cancel</Btn>
+          <Btn variant="primary" onClick={saveGroupEdit}>Save</Btn>
         </div>
       </Modal>
     </div>
