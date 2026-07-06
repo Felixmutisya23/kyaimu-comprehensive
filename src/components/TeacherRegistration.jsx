@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Btn, FormGroup, FormRow, Alert, Tag } from './UI';
 import { getAllClasses, getSubjectsForClass, getCurriculumLevel, CURRICULUM_LEVELS } from '../data/initialData';
-import { loadSchoolData } from '../supabase';
+import { loadSchoolData, saveSchoolData } from '../supabase';
 
 /* ══════════════════════════════════════════════════════════
    TEACHER SELF-REGISTRATION
@@ -93,6 +93,7 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
 
   async function submitRegistration() {
     setSubmitting(true);
+    setError('');
     const validSubjects = subjectRows.filter(r => r.subject && r.classes.length > 0);
     const staffId = 'P' + Date.now().toString().slice(-6);
     const cap = s => s ? s.trim().replace(/\b\w/g, c => c.toUpperCase()) : '';
@@ -116,16 +117,37 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
       registeredAt:    new Date().toISOString(),
     };
 
-    setData(d => ({
-      ...d,
-      teachers: [...(d.teachers || []), pendingTeacher],
-      notifications: [...(d.notifications || []), {
+    // IMPORTANT: write this straight to the school's real data and save it
+    // directly — do NOT route it through the parent App's setData.
+    //
+    // On a device that has never logged into this school before (a
+    // teacher's own phone opening the invite link for the very first
+    // time), the parent App's top-level `data` is still the empty default
+    // scaffold (it only gets replaced with real data on login, or if this
+    // device already has a locally-remembered school id). That scaffold
+    // has no _schoolId/_loadedFromDB, and the App's save function silently
+    // refuses to save anything without those — by design, to avoid ever
+    // wiping the database with empty data. So a registration merged into
+    // that scaffold via the parent's setData would show "Submitted!" to
+    // the teacher but NEVER ACTUALLY REACH THE DATABASE. That's exactly
+    // why some teachers' registrations were invisible to the admin no
+    // matter how long they waited — they were never saved at all.
+    //
+    // `data` here (schoolData || propData) is the copy this component
+    // fetched itself via loadSchoolData(schoolId) using the ?school= URL
+    // param, which always has the correct _schoolId/_loadedFromDB — so we
+    // build the update from that, and save it ourselves.
+    if (!data._schoolId) {
+      setSubmitting(false);
+      setError('Could not verify the school for this link. Please ask your administrator to resend the invite link, then try again.');
+      return;
+    }
+
+    const updated = {
+      ...data,
+      teachers: [...(data.teachers || []), pendingTeacher],
+      notifications: [...(data.notifications || []), {
         id:      Date.now() + 1,
-        // NOTE: was 'ADMIN' — a value nothing in the app ever checks for,
-        // so this notification silently went nowhere and no principal ever
-        // saw it. 'ALL_PRINCIPALS' is recognized by the principal-context
-        // notification filters (Notifications page, header bell badge,
-        // Dashboard badge) so it now actually reaches the admin.
         to:      'ALL_PRINCIPALS',
         from:    cap(form.name.trim()),
         message: `New teacher registration awaiting approval: ${cap(form.name.trim())} (${form.email}) — ${validSubjects.map(s => s.subject).join(', ')}`,
@@ -134,9 +156,22 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
         type:    'teacher_registration',
         teacherId: pendingTeacher.id,
       }],
-    }));
-    setSubmitting(false);
-    setStep(3);
+    };
+
+    try {
+      await saveSchoolData(updated);
+      setSchoolData(updated);
+      // Also hand it to the parent in case this device happens to already
+      // be an active authenticated session (e.g. admin testing the link
+      // while logged in) — harmless no-op guard-wise otherwise since the
+      // save already happened above regardless of parent state.
+      if (setData) setData(() => updated);
+      setSubmitting(false);
+      setStep(3);
+    } catch (err) {
+      setSubmitting(false);
+      setError('Could not submit your registration — please check your internet connection and try again. ' + (err?.message || ''));
+    }
   }
 
   if (loading) {
