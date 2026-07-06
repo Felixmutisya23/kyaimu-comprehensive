@@ -101,8 +101,8 @@ function getUserRole(staffRecord) {
   return 'non_teaching';
 }
 
-function Notifications({ data, setData, user }) {
-  const myNotifs = (data.notifications || []).filter(n => n.to == user.staffId || n.to == 'ALL');
+function Notifications({ data, setData, user, setPage }) {
+  const myNotifs = (data.notifications || []).filter(n => n.to == user.staffId || n.to == 'ALL' || n.to == 'ALL_PRINCIPALS' || n.to == 'ADMIN');
   // Also show pending edit requests that need this user's approval
   const pendingApprovals = (data.editRequests || []).filter(r => {
     if (r.status !== 'pending') return false;
@@ -223,7 +223,18 @@ function Notifications({ data, setData, user }) {
           borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer',
         }}>
           <div style={{ fontSize: 13, color: n.read ? 'var(--text-sub)' : 'var(--text)', marginBottom: 4 }}>{n.message}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{n.date} {!n.read && <span style={{ color: '#4f8ef7', fontWeight: 600 }}>· New</span>}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span>{n.date}</span>
+            {!n.read && <span style={{ color: '#4f8ef7', fontWeight: 600 }}>· New</span>}
+            {n.type === 'teacher_registration' && (
+              <span
+                onClick={e => { e.stopPropagation(); markRead(n.id); setPage?.('teachers'); }}
+                style={{ color: '#4f8ef7', fontWeight: 700, textDecoration: 'underline' }}
+              >
+                Review & Approve →
+              </span>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -814,7 +825,7 @@ export default function App() {
   const sections = [...new Set(nav.map(n => n.section))];
 
   const myMsgUnread = (data.messages||[]).filter(m => !m.read && (user.role == 'principal' || m.dept == user.dept)).length;
-  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL')).length;
+  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL' || n.to == 'ALL_PRINCIPALS' || n.to == 'ADMIN')).length;
   const pendingApprovalCount = (data.editRequests || []).filter(r => {
     if (r.status !== 'pending') return false;
     if (user.role == 'principal' && r.approvals?.principal == null) return true;
@@ -857,7 +868,7 @@ export default function App() {
     const props = { data, setData, user, isUnlocked: license.isUnlocked, isDark, themeVars, flushSave: flushPendingSave };
     switch (page) {
       case 'dashboard':     return <Dashboard     {...props} />;
-      case 'notifications': return <Notifications {...props} />;
+      case 'notifications': return <Notifications {...props} setPage={setPage} />;
       case 'students':      return <Students      {...props} />;
       case 'teachers':      return <Teachers      {...props} />;
       case 'fees':          return <FeesModule    {...props} />;

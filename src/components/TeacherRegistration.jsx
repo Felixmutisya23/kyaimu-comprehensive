@@ -121,7 +121,12 @@ export function TeacherRegisterPage({ data: propData, setData, onBack }) {
       teachers: [...(d.teachers || []), pendingTeacher],
       notifications: [...(d.notifications || []), {
         id:      Date.now() + 1,
-        to:      'ADMIN',
+        // NOTE: was 'ADMIN' — a value nothing in the app ever checks for,
+        // so this notification silently went nowhere and no principal ever
+        // saw it. 'ALL_PRINCIPALS' is recognized by the principal-context
+        // notification filters (Notifications page, header bell badge,
+        // Dashboard badge) so it now actually reaches the admin.
+        to:      'ALL_PRINCIPALS',
         from:    cap(form.name.trim()),
         message: `New teacher registration awaiting approval: ${cap(form.name.trim())} (${form.email}) — ${validSubjects.map(s => s.subject).join(', ')}`,
         date:    new Date().toISOString().split('T')[0],

@@ -20,7 +20,7 @@ export default function Dashboard({ data, user, isDark, themeVars }) {
   const myStudents  = isClassTeacher ? (data.students||[]).filter(s => s.class == myClass) : data.students;
   const pendingReqs = (data.editRequests || []).filter(r => r.status == 'pending');
 
-  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL')).length;
+  const myNotifUnread = (data.notifications || []).filter(n => !n.read && (n.to == user.staffId || n.to == 'ALL' || n.to == 'ALL_PRINCIPALS' || n.to == 'ADMIN')).length;
   const myApprovalsPending = pendingReqs.filter(r => {
     if (isPrincipal && r.approvals?.principal == null) return true;
     const staff = (data.teachers||[]).find(t => t.staffId == user.staffId);
