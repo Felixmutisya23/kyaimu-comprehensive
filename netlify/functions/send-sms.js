@@ -1,7 +1,7 @@
 /* ── Netlify Function: send-sms ─────────────────────────────────────
    Proxies SMS requests to Africa's Talking API server-side,
    avoiding CORS issues when called from the browser.
-   
+
    POST body: { to, message, username, senderId, apiKey }
    to: comma-separated phone numbers e.g. "+254712345678,+254798765432"
 ─────────────────────────────────────────────────────────────────── */
@@ -21,7 +21,7 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
   try {
@@ -35,16 +35,24 @@ exports.handler = async (event) => {
       };
     }
 
-    // Use env var first, fall back to client-supplied key (for per-school keys)
-    const key = process.env.AT_API_KEY || apiKey;
-    const user = process.env.AT_USERNAME || username || 'sandbox';
-    const sender = process.env.AT_SENDER_ID || senderId || 'SCHOOL';
+    // IMPORTANT: prefer whatever the school's admin actually configured in
+    // the app's SMS Setup screen. This app is built for many schools, each
+    // with their own Africa's Talking account/credentials entered through
+    // the UI — a server-side env var should only ever be a fallback (e.g.
+    // for a single-tenant deployment), never a silent override. The
+    // previous version did env-var-first, which meant ANY leftover/
+    // placeholder AT_API_KEY set in Netlify's environment variables would
+    // silently override the real key the admin entered in the app, with
+    // no indication why authentication kept failing.
+    const key    = apiKey    || process.env.AT_API_KEY;
+    const user   = username  || process.env.AT_USERNAME  || 'sandbox';
+    const sender = senderId  || process.env.AT_SENDER_ID || 'SCHOOL';
 
     if (!key) {
       return {
         statusCode: 400,
         headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'No API key configured. Set AT_API_KEY in Netlify environment variables or in SMS Settings.' }),
+        body: JSON.stringify({ error: 'No API key configured. Enter one in the app under Parent SMS → SMS Setup.' }),
       };
     }
 
@@ -63,17 +71,42 @@ exports.handler = async (event) => {
       }).toString(),
     });
 
-    const json = await res.json();
+    // Africa's Talking doesn't always return JSON — auth failures and some
+    // other errors come back as plain text (e.g. "The supplied
+    // authentication is invalid"). Read the raw text first and only THEN
+    // attempt to parse it, so we never throw here and always hand the
+    // browser something valid to read, no matter what AT sends back.
+    const rawText = await res.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = null;
+    }
+
+    if (!res.ok || !parsed) {
+      // Surface AT's real message (JSON or plain text) clearly, with the
+      // actual HTTP status, instead of letting a JSON.parse crash produce
+      // a confusing generic error on the client.
+      return {
+        statusCode: 200, // 200 so the client can read the body; ok/error is inside the payload
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({
+          error: (parsed && (parsed.error || parsed.message)) || rawText || `Africa's Talking returned HTTP ${res.status}`,
+          atHttpStatus: res.status,
+        }),
+      };
+    }
 
     return {
       statusCode: 200,
       headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify(json),
+      body: JSON.stringify(parsed),
     };
 
   } catch (e) {
     return {
-      statusCode: 500,
+      statusCode: 200, // keep 200 so this is always readable JSON on the client
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify({ error: e.message }),
     };
