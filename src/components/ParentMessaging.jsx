@@ -21,25 +21,42 @@ function getSMSGatewayConfig(data) {
 }
 
 async function sendSMSViaSenderId(phones, message, config) {
-  // Africa's Talking SMS API (works great in Kenya)
+  // Africa's Talking's API cannot be called directly from a browser — it
+  // has no CORS headers, so the request gets silently blocked by the
+  // browser before it ever reaches Africa's Talking's servers. This is
+  // exactly why sends could report "success" in the app while Africa's
+  // Talking's own dashboard showed zero messages and an untouched wallet.
+  // We route through the Netlify function (netlify/functions/send-sms.js)
+  // instead, which was already built for this and does the same request
+  // server-side where CORS doesn't apply.
   if (config.provider === 'africastalking') {
     try {
-      const res = await fetch('https://api.africastalking.com/version1/messaging', {
+      const res = await fetch('/.netlify/functions/send-sms', {
         method: 'POST',
-        headers: {
-          'apiKey': config.apiKey,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-        },
-        body: new URLSearchParams({
-          username: config.username || 'sandbox',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           to: phones.join(','),
           message,
-          from: config.senderId,
+          username: config.username || 'sandbox',
+          senderId: config.senderId,
+          apiKey: config.apiKey,
         }),
       });
       const json = await res.json();
-      return { ok: true, json };
+      if (!res.ok || json.error) {
+        return { ok: false, error: json.error || `HTTP ${res.status}`, json };
+      }
+      // Africa's Talking returns HTTP 200 even when it rejects individual
+      // numbers — the real per-recipient result is inside
+      // SMSMessageData.Recipients[].status ("Success" or a rejection
+      // reason). Checking only res.ok (as before) would still call a
+      // fully-rejected batch a "success". We check every recipient here.
+      const recipients = json?.SMSMessageData?.Recipients || [];
+      const failed = recipients.filter(r => r.status !== 'Success');
+      if (recipients.length > 0 && failed.length === recipients.length) {
+        return { ok: false, error: failed[0]?.status || 'All recipients rejected', json };
+      }
+      return { ok: true, json, failedNumbers: failed.map(r => r.number) };
     } catch (e) {
       return { ok: false, error: e.message };
     }
@@ -97,7 +114,7 @@ export default function ParentMessaging({ data, setData, user }) {
     if (conf.provider !== 'manual' && conf.apiKey) {
       const result = await sendSMSViaSenderId(uniquePhones.map(p => `+254${p.replace(/^0/, '')}`), message, conf);
       ok = result.ok;
-      if (!result.ok) alert(`SMS error: ${result.error}. Messages logged for manual sending.`);
+      if (!result.ok) alert(`⚠ SMS failed to send: ${result.error}\n\nNo messages were delivered. Check your Africa's Talking dashboard (wallet balance, API key, Sender ID status) and try again.`);
     }
     // Log the message
     const log = {
@@ -127,26 +144,39 @@ export default function ParentMessaging({ data, setData, user }) {
     setSend(true);
     const conf = getSMSGatewayConfig(data);
     let sentCount = 0;
+    const failures = []; // [{ name, phone, error }] — real failures, not guesses
     for (const student of students) {
       const msg = buildResultMessage(student, exam);
       if (!msg) continue;
       if (conf.provider !== 'manual' && conf.apiKey) {
         const phone = `+254${student.parentPhone.replace(/^0/, '')}`;
-        await sendSMSViaSenderId([phone], msg, conf);
+        const result = await sendSMSViaSenderId([phone], msg, conf);
+        if (result.ok) {
+          sentCount++;
+        } else {
+          failures.push({ name: student.name, phone: student.parentPhone, error: result.error || 'Unknown error' });
+        }
+      } else {
+        sentCount++; // manual/print mode — no delivery to verify
       }
-      sentCount++;
     }
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'results',
       examName: exam.name, class: selClass, recipientCount: sentCount,
+      failedCount: failures.length, failedDetails: failures,
       sentBy: user.name, delivered: conf.provider !== 'manual' && !!conf.apiKey,
     };
     setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
     setSend(false);
     if (conf.provider === 'manual') {
       printAllResultSMS(students, exam, data);
+    } else if (failures.length > 0) {
+      alert(`⚠ Sent to ${sentCount} parent(s), but ${failures.length} FAILED:\n\n` +
+        failures.slice(0, 10).map(f => `• ${f.name} (${f.phone}): ${f.error}`).join('\n') +
+        (failures.length > 10 ? `\n...and ${failures.length - 10} more (see Message Logs).` : '') +
+        `\n\nCheck the phone numbers and your Africa's Talking dashboard for details.`);
     } else {
-      alert(`✅ Results sent to ${sentCount} parent(s)!`);
+      alert(`✅ Results sent to ${sentCount} parent(s)! (Verified via Africa's Talking response — check their dashboard to confirm final delivery.)`);
     }
   }
 
@@ -314,6 +344,9 @@ export default function ParentMessaging({ data, setData, user }) {
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {log.recipientCount} parents · {log.class} · By: {log.sentBy}
+                {log.failedCount > 0 && (
+                  <span style={{ color: '#ef4444', fontWeight: 700 }}> · {log.failedCount} FAILED</span>
+                )}
               </div>
               {log.message && (
                 <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 4, fontStyle: 'italic' }}>
