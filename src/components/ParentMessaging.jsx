@@ -110,25 +110,43 @@ export default function ParentMessaging({ data, setData, user }) {
     if (!window.confirm(`Send message to ${uniquePhones.length} parent(s)?`)) return;
     setSend(true);
     const conf = getSMSGatewayConfig(data);
-    let ok = true;
-    if (conf.provider !== 'manual' && conf.apiKey) {
-      const result = await sendSMSViaSenderId(uniquePhones.map(p => `+254${p.replace(/^0/, '')}`), message, conf);
-      ok = result.ok;
-      if (!result.ok) alert(`⚠ SMS failed to send: ${result.error}\n\nNo messages were delivered. Check your Africa's Talking dashboard (wallet balance, API key, Sender ID status) and try again.`);
+
+    if (conf.provider === 'manual') {
+      const log = {
+        id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
+        message, class: selClass, recipientCount: uniquePhones.length,
+        sentBy: user.name, delivered: false,
+      };
+      setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
+      setSend(false); setMsg('');
+      printManualSMS(targets, message, data);
+      return;
     }
-    // Log the message
+
+    // IMPORTANT: if the provider is set to a real gateway (africastalking)
+    // but there's no API key configured, that's a configuration problem —
+    // NOT a reason to silently pretend the send succeeded. The previous
+    // version defaulted `ok = true` and skipped straight to the success
+    // alert in this exact case, meaning a missing/not-yet-saved API key
+    // produced "✅ Message sent!" without ever calling the API at all.
+    if (!conf.apiKey) {
+      setSend(false);
+      alert('⚠ No API key configured yet. Go to SMS Setup and save your Africa\'s Talking API key before sending — nothing was sent.');
+      return;
+    }
+
+    const result = await sendSMSViaSenderId(uniquePhones.map(p => `+254${p.replace(/^0/, '')}`), message, conf);
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
       message, class: selClass, recipientCount: uniquePhones.length,
-      sentBy: user.name, delivered: ok && conf.provider !== 'manual',
+      sentBy: user.name, delivered: result.ok,
     };
     setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
     setSend(false); setMsg('');
-    if (conf.provider === 'manual') {
-      // Show printable list
-      printManualSMS(targets, message, data);
+    if (!result.ok) {
+      alert(`⚠ SMS failed to send: ${result.error}\n\nNo messages were delivered. Check your Africa's Talking dashboard (wallet balance, API key, Sender ID status) and try again.`);
     } else {
-      alert(`✅ Message sent to ${uniquePhones.length} parent(s)!`);
+      alert(`✅ Message sent to ${uniquePhones.length} parent(s)! (Confirmed by Africa's Talking's response — check their Outbox to verify final delivery.)`);
     }
   }
 
@@ -143,12 +161,26 @@ export default function ParentMessaging({ data, setData, user }) {
     if (!window.confirm(`Send results to ${students.length} parent(s)?`)) return;
     setSend(true);
     const conf = getSMSGatewayConfig(data);
+
+    if (conf.provider !== 'manual' && !conf.apiKey) {
+      // Same guard as broadcastMessage: a real gateway with no API key is
+      // a configuration problem, not a silent success. This used to fall
+      // into the same "sentCount++, no delivery to verify" branch as
+      // genuine manual mode, meaning it reported success without ever
+      // calling the API.
+      setSend(false);
+      alert('⚠ No API key configured yet. Go to SMS Setup and save your Africa\'s Talking API key before sending — nothing was sent.');
+      return;
+    }
+
     let sentCount = 0;
     const failures = []; // [{ name, phone, error }] — real failures, not guesses
     for (const student of students) {
       const msg = buildResultMessage(student, exam);
       if (!msg) continue;
-      if (conf.provider !== 'manual' && conf.apiKey) {
+      if (conf.provider === 'manual') {
+        sentCount++; // manual/print mode — no delivery to verify
+      } else {
         const phone = `+254${student.parentPhone.replace(/^0/, '')}`;
         const result = await sendSMSViaSenderId([phone], msg, conf);
         if (result.ok) {
@@ -156,15 +188,13 @@ export default function ParentMessaging({ data, setData, user }) {
         } else {
           failures.push({ name: student.name, phone: student.parentPhone, error: result.error || 'Unknown error' });
         }
-      } else {
-        sentCount++; // manual/print mode — no delivery to verify
       }
     }
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'results',
       examName: exam.name, class: selClass, recipientCount: sentCount,
       failedCount: failures.length, failedDetails: failures,
-      sentBy: user.name, delivered: conf.provider !== 'manual' && !!conf.apiKey,
+      sentBy: user.name, delivered: conf.provider !== 'manual',
     };
     setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
     setSend(false);
