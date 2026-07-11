@@ -20,6 +20,25 @@ function getSMSGatewayConfig(data) {
   };
 }
 
+// Normalizes a raw, free-typed parent phone number into the +254XXXXXXXXX
+// format Africa's Talking requires — or returns null if it genuinely
+// doesn't look like a valid Kenyan mobile number. Blindly doing
+// `+254${phone.replace(/^0/, '')}` (the old approach) mangles anything
+// that wasn't typed as exactly "07XXXXXXXX"/"01XXXXXXXX" — a number
+// already containing "+254", stray spaces/dashes, or a wrong digit count
+// all produce garbage that Africa's Talking rejects. Because
+// broadcastMessage sends every recipient in ONE comma-joined request,
+// a single bad number used to get the ENTIRE batch rejected — nobody
+// got the message, not just the parent with the bad number.
+function normalizeKenyanPhone(raw) {
+  if (!raw) return null;
+  const digits = String(raw).replace(/[^\d]/g, '');
+  if (digits.length === 12 && digits.startsWith('254')) return '+' + digits;
+  if (digits.length === 10 && digits.startsWith('0'))   return '+254' + digits.slice(1);
+  if (digits.length === 9 && /^[17]/.test(digits))      return '+254' + digits;
+  return null;
+}
+
 async function sendSMSViaSenderId(phones, message, config) {
   // Africa's Talking's API cannot be called directly from a browser — it
   // has no CORS headers, so the request gets silently blocked by the
@@ -148,10 +167,33 @@ export default function ParentMessaging({ data, setData, user }) {
       return;
     }
 
-    const result = await sendSMSViaSenderId(uniquePhones.map(p => `+254${p.replace(/^0/, '')}`), message, conf);
+    // Validate/normalize every number BEFORE sending. Previously all
+    // numbers were joined into one request with a blind +254 prefix — one
+    // malformed number (stray spaces, already had +254, wrong digit
+    // count, etc.) got the ENTIRE batch rejected by Africa's Talking, so
+    // nobody received the message, not just the parent with the bad
+    // number. Now we separate good numbers from bad ones up front and
+    // still send to everyone whose number is actually valid.
+    const validPhones = [];
+    const badNumbers = []; // [{ name, phone }]
+    targets.forEach(s => {
+      const norm = normalizeKenyanPhone(s.parentPhone);
+      if (norm) validPhones.push(norm);
+      else badNumbers.push({ name: s.name, phone: s.parentPhone });
+    });
+    const uniqueValidPhones = [...new Set(validPhones)];
+
+    if (uniqueValidPhones.length === 0) {
+      setSend(false);
+      alert(`⚠ None of the ${badNumbers.length} phone number(s) for this class look valid — nothing was sent. Fix them in Student records first (expected format: 07XXXXXXXX or 01XXXXXXXX).`);
+      return;
+    }
+
+    const result = await sendSMSViaSenderId(uniqueValidPhones, message, conf);
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
-      message, class: selClass, recipientCount: uniquePhones.length,
+      message, class: selClass, recipientCount: uniqueValidPhones.length,
+      skippedCount: badNumbers.length, skippedDetails: badNumbers,
       sentBy: user.name, delivered: result.ok,
     };
     setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
@@ -159,7 +201,12 @@ export default function ParentMessaging({ data, setData, user }) {
     if (!result.ok) {
       alert(`⚠ SMS failed to send: ${result.error}\n\nNo messages were delivered. Check your Africa's Talking dashboard (wallet balance, API key, Sender ID status) and try again.`);
     } else {
-      alert(`✅ Message sent to ${uniquePhones.length} parent(s)! (Confirmed by Africa's Talking's response — check their Outbox to verify final delivery.)`);
+      let msg = `✅ Message sent to ${uniqueValidPhones.length} parent(s)! (Confirmed by Africa's Talking's response — check their Outbox to verify final delivery.)`;
+      if (badNumbers.length > 0) {
+        msg += `\n\n⚠ Skipped ${badNumbers.length} invalid number(s) — fix these in Student records:\n` +
+          badNumbers.slice(0, 10).map(b => `• ${b.name}: "${b.phone}"`).join('\n');
+      }
+      alert(msg);
     }
   }
 
@@ -194,7 +241,11 @@ export default function ParentMessaging({ data, setData, user }) {
       if (conf.provider === 'manual') {
         sentCount++; // manual/print mode — no delivery to verify
       } else {
-        const phone = `+254${student.parentPhone.replace(/^0/, '')}`;
+        const phone = normalizeKenyanPhone(student.parentPhone);
+        if (!phone) {
+          failures.push({ name: student.name, phone: student.parentPhone, error: 'Invalid phone number format' });
+          continue;
+        }
         const result = await sendSMSViaSenderId([phone], msg, conf);
         if (result.ok) {
           sentCount++;
