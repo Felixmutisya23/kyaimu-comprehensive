@@ -51,9 +51,22 @@ async function sendSMSViaSenderId(phones, message, config) {
       // SMSMessageData.Recipients[].status ("Success" or a rejection
       // reason). Checking only res.ok (as before) would still call a
       // fully-rejected batch a "success". We check every recipient here.
+      //
+      // IMPORTANT: a whole-batch rejection (e.g. an invalid or
+      // unregistered Sender ID) comes back as Recipients: [] — an EMPTY
+      // array — with the real reason in SMSMessageData.Message instead of
+      // per-recipient. An empty array used to fall through every check
+      // below and return ok:true, which is exactly how a batch could be
+      // fully rejected by Africa's Talking (0 recipients, nothing in
+      // their Outbox, wallet untouched) while the app still reported
+      // "Message sent!". We now treat an empty Recipients array as a
+      // failure and surface the top-level Message as the reason.
       const recipients = json?.SMSMessageData?.Recipients || [];
+      if (recipients.length === 0) {
+        return { ok: false, error: json?.SMSMessageData?.Message || 'Africa\'s Talking rejected the request (no recipients were processed — check your Sender ID and phone number format).', json };
+      }
       const failed = recipients.filter(r => r.status !== 'Success');
-      if (recipients.length > 0 && failed.length === recipients.length) {
+      if (failed.length === recipients.length) {
         return { ok: false, error: failed[0]?.status || 'All recipients rejected', json };
       }
       return { ok: true, json, failedNumbers: failed.map(r => r.number) };

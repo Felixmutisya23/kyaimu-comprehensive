@@ -46,7 +46,15 @@ exports.handler = async (event) => {
     // no indication why authentication kept failing.
     const key    = apiKey    || process.env.AT_API_KEY;
     const user   = username  || process.env.AT_USERNAME  || 'sandbox';
-    const sender = senderId  || process.env.AT_SENDER_ID || 'SCHOOL';
+    // IMPORTANT: only pass `from` when a real Sender ID was actually
+    // configured. The previous fallback of the literal string 'SCHOOL'
+    // was NOT a real, registered Sender ID on anyone's account — sending
+    // an unregistered alphanumeric sender is a common reason Africa's
+    // Talking rejects the ENTIRE batch (Recipients: [] — nothing
+    // processed, nothing in the Outbox, wallet untouched, yet the HTTP
+    // call itself still "succeeds"). Omitting `from` entirely lets
+    // Africa's Talking fall back to the account's own default route.
+    const sender = senderId || process.env.AT_SENDER_ID || '';
 
     if (!key) {
       return {
@@ -56,6 +64,9 @@ exports.handler = async (event) => {
       };
     }
 
+    const params = { username: user, to, message };
+    if (sender) params.from = sender;
+
     const res = await fetch('https://api.africastalking.com/version1/messaging', {
       method: 'POST',
       headers: {
@@ -63,12 +74,7 @@ exports.handler = async (event) => {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
       },
-      body: new URLSearchParams({
-        username: user,
-        to,
-        message,
-        from: sender,
-      }).toString(),
+      body: new URLSearchParams(params).toString(),
     });
 
     // Africa's Talking doesn't always return JSON — auth failures and some
