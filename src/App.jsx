@@ -28,6 +28,7 @@ import {
   loadLicenseFromCloud,
   getSubscription, upsertSubscription,
   supabaseClient,
+  findStudentBySlc,
 } from './supabase';
 
 /*
@@ -647,54 +648,104 @@ export default function App() {
       onStudentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        // First check already-loaded data
+        // 1. Fast path: already-loaded data (this device is already on
+        //    the right school, e.g. principal testing on their own device)
         let student = (data.students || []).find(s =>
           String(s.slc || '').trim() === slcTrim
         );
-        // If not found and we have a schoolId, reload from DB
-        if (!student) {
-          const schoolId = getLocalSchoolId();
-          if (schoolId) {
-            try {
-              const freshData = await loadSchoolData(schoolId);
-              if (freshData) {
-                setDataRaw(freshData);
-                student = (freshData.students || []).find(s =>
-                  String(s.slc || '').trim() === slcTrim
-                );
-              }
-            } catch(e) { console.error('SLC load error:', e); }
-          }
-        }
         if (student) { setStudentUser(student); return true; }
+
+        // 2. This device remembers a school locally — reload it fresh in
+        //    case the student list changed since the app last loaded.
+        const localSchoolId = getLocalSchoolId();
+        if (localSchoolId) {
+          try {
+            const freshData = await loadSchoolData(localSchoolId);
+            if (freshData) {
+              student = (freshData.students || []).find(s =>
+                String(s.slc || '').trim() === slcTrim
+              );
+              if (student) { setDataRaw(freshData); setStudentUser(student); return true; }
+            }
+          } catch (e) { console.error('SLC local reload error:', e); }
+        }
+
+        // 3. GLOBAL fallback — searches every school for this code. This is
+        //    the important one: a student on their OWN device (never used
+        //    to access this or any school before) has no locally-
+        //    remembered school id at all, so steps 1–2 above always fail
+        //    for them. Without this, "Sign In" did nothing on any device
+        //    that had never logged in as staff before — which is nearly
+        //    every student/parent device. findStudentBySlc already existed
+        //    in supabase.js for exactly this purpose but wasn't being used.
+        try {
+          const result = await findStudentBySlc(slcTrim);
+          if (result) {
+            const freshData = await loadSchoolData(result.schoolId);
+            if (freshData) {
+              setDataRaw(freshData);
+              setLocalSchoolId(result.schoolId);
+              const fullStudent = (freshData.students || []).find(s =>
+                String(s.slc || '').trim() === slcTrim
+              ) || result.student;
+              setStudentUser(fullStudent);
+              return true;
+            }
+          }
+        } catch (e) { console.error('SLC global lookup error:', e); }
+
         return false;
       }}
       onParentLogin={async (slcCode) => {
         const slcTrim = String(slcCode || '').trim();
         if (!slcTrim) return false;
-        // First check already-loaded data
+        // 1. Fast path: already-loaded data
         let student = (data.students || []).find(s =>
           String(s.slc || '').trim() === slcTrim
         );
-        // If not found, reload from DB
-        if (!student) {
-          const schoolId = getLocalSchoolId();
-          if (schoolId) {
-            try {
-              const freshData = await loadSchoolData(schoolId);
-              if (freshData) {
-                setDataRaw(freshData);
-                student = (freshData.students || []).find(s =>
-                  String(s.slc || '').trim() === slcTrim
-                );
-              }
-            } catch(e) { console.error('SLC parent load error:', e); }
-          }
-        }
         if (student) {
           setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id });
           return true;
         }
+
+        // 2. This device remembers a school locally — reload fresh
+        const localSchoolId = getLocalSchoolId();
+        if (localSchoolId) {
+          try {
+            const freshData = await loadSchoolData(localSchoolId);
+            if (freshData) {
+              student = (freshData.students || []).find(s =>
+                String(s.slc || '').trim() === slcTrim
+              );
+              if (student) {
+                setDataRaw(freshData);
+                setParentUser({ email: student.parentEmail, name: student.parentName, phone: student.parentPhone, childId: student.id });
+                return true;
+              }
+            }
+          } catch (e) { console.error('SLC parent local reload error:', e); }
+        }
+
+        // 3. GLOBAL fallback — see the matching comment in onStudentLogin
+        //    above. This is the case that was completely missing before:
+        //    a parent on their own phone, which has never logged into any
+        //    school on this app before, had no way to be found at all.
+        try {
+          const result = await findStudentBySlc(slcTrim);
+          if (result) {
+            const freshData = await loadSchoolData(result.schoolId);
+            if (freshData) {
+              setDataRaw(freshData);
+              setLocalSchoolId(result.schoolId);
+              const fullStudent = (freshData.students || []).find(s =>
+                String(s.slc || '').trim() === slcTrim
+              ) || result.student;
+              setParentUser({ email: fullStudent.parentEmail, name: fullStudent.parentName, phone: fullStudent.parentPhone, childId: fullStudent.id });
+              return true;
+            }
+          }
+        } catch (e) { console.error('SLC parent global lookup error:', e); }
+
         return false;
       }}
       onTeacherRegister={() => {

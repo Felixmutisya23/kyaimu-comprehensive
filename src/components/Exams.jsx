@@ -702,7 +702,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
               {isClassTeacher ? 'Viewing all subjects for your class' : !isPrincipal ? `Showing: ${visibleSubjects.join(', ')}` : 'Full results view'}
             </div>
           </div>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh' }}>
+          <div style={{ overflowX: 'auto' }}>
             <table style={{ ...TS.table, borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr>
@@ -1123,7 +1123,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             You are entering scores for: <strong>{enterableSubjects.join(', ')}</strong> only.
           </Alert>
         )}
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', marginBottom: 16 }}>
+        <div style={{ overflowX: 'auto', marginBottom: 16 }}>
           <table style={{ ...TS.table, borderCollapse: 'separate', borderSpacing: 0 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr>
