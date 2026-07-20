@@ -107,6 +107,9 @@ export default function ParentMessaging({ data, setData, user }) {
   const [sending, setSend]  = useState(false);
   const [preview, setPrev]  = useState(false);
   const [smsConf, setSmsConf] = useState(() => getSMSGatewayConfig(data));
+  const [testPhone, setTestPhone]   = useState('');
+  const [testSending, setTestSend]  = useState(false);
+  const [testResult, setTestResult] = useState(null); // { ok, detail }
 
   const logs = data.parentMessages || [];
 
@@ -136,6 +139,14 @@ export default function ParentMessaging({ data, setData, user }) {
     return `${data.schoolName || 'School'}\n${exam.name} Results\nStudent: ${student.name}\nAdm: ${student.admNo}\n${scores.join(', ')}\nMean: ${mean} (${grade.label})\nRegards, School Administration`;
   }
 
+  // Gives every broadcast the same school-name heading that result messages
+  // already get from buildResultMessage — so a parent seeing an SMS from a
+  // generic short code/sender still immediately knows which school it's
+  // from, without every admin having to remember to type it themselves.
+  function buildBroadcastMessage(body) {
+    return `${data.schoolName || 'School'}\n\n${body.trim()}`;
+  }
+
   async function broadcastMessage() {
     if (!message.trim()) { alert('Please type a message first'); return; }
     if (uniquePhones.length === 0) { alert('No parent phone numbers found for the selected class. Add phone numbers in Student records.'); return; }
@@ -143,15 +154,17 @@ export default function ParentMessaging({ data, setData, user }) {
     setSend(true);
     const conf = getSMSGatewayConfig(data);
 
+    const fullMessage = buildBroadcastMessage(message);
+
     if (conf.provider === 'manual') {
       const log = {
         id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
-        message, class: selClass, recipientCount: uniquePhones.length,
+        message: fullMessage, class: selClass, recipientCount: uniquePhones.length,
         sentBy: user.name, delivered: false,
       };
       setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
       setSend(false); setMsg('');
-      printManualSMS(targets, message, data);
+      printManualSMS(targets, fullMessage, data);
       return;
     }
 
@@ -189,10 +202,10 @@ export default function ParentMessaging({ data, setData, user }) {
       return;
     }
 
-    const result = await sendSMSViaSenderId(uniqueValidPhones, message, conf);
+    const result = await sendSMSViaSenderId(uniqueValidPhones, fullMessage, conf);
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
-      message, class: selClass, recipientCount: uniqueValidPhones.length,
+      message: fullMessage, class: selClass, recipientCount: uniqueValidPhones.length,
       skippedCount: badNumbers.length, skippedDetails: badNumbers,
       sentBy: user.name, delivered: result.ok,
     };
@@ -321,6 +334,41 @@ export default function ParentMessaging({ data, setData, user }) {
     alert('SMS configuration saved!');
   }
 
+  // Sends a single real SMS to whatever number is typed in the test field,
+  // using whatever is currently in the form (saves it first so the test
+  // matches exactly what "Save" would store). Surfaces Africa's Talking's
+  // own per-recipient status/cost/messageId, or its exact rejection
+  // reason, instead of a generic pass/fail — this is what actually
+  // confirms a Sender ID like ELIMU_PRO is live and usable, since AT can
+  // return HTTP 200 "success" for a batch it fully rejected.
+  async function sendTestSMS() {
+    if (!smsConf.apiKey) { alert('Enter your API key first.'); return; }
+    const phone = normalizeKenyanPhone(testPhone);
+    if (!phone) { alert('Enter a valid Kenyan number, e.g. 07XXXXXXXX or +2547XXXXXXXX.'); return; }
+
+    setData(d => ({ ...d, smsConfig: smsConf })); // keep config in sync with what we're testing
+    setTestSend(true);
+    setTestResult(null);
+    const result = await sendSMSViaSenderId(
+      [phone],
+      `Test message from ${data.schoolName || 'EduManage'} — Sender ID "${smsConf.senderId || '(default)'}" is working.`,
+      smsConf
+    );
+    setTestSend(false);
+
+    if (result.ok) {
+      const r = result.json?.SMSMessageData?.Recipients?.[0];
+      setTestResult({
+        ok: true,
+        detail: r
+          ? `Delivered to ${r.number} · status: ${r.status} · cost: ${r.cost} · messageId: ${r.messageId}`
+          : 'Sent successfully.',
+      });
+    } else {
+      setTestResult({ ok: false, detail: result.error || 'Unknown error.' });
+    }
+  }
+
   const exams = data.exams || [];
 
   return (
@@ -365,11 +413,46 @@ export default function ParentMessaging({ data, setData, user }) {
               placeholder={`Dear Parent/Guardian,\n\n[Your message here]\n\nRegards,\n${data.schoolName || 'School'} Administration`}
               style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
           </FormGroup>
+
+          {/* Live preview — every broadcast is automatically prefixed with the
+              school name heading (same as exam results already get from
+              buildResultMessage), so parents always know which school an SMS
+              is from, without the admin having to type it every time.
+              Showing the actual wrapped text — not just what's in the
+              textarea — means the character count and preview here always
+              match exactly what gets sent/billed. */}
+          {message.trim() && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+                Preview — what parents will receive
+              </div>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b98112, #10b98108)',
+                border: '1px solid #10b98135',
+                borderRadius: '14px 14px 14px 4px',
+                padding: '12px 14px',
+                maxWidth: 420,
+                whiteSpace: 'pre-wrap',
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: 'var(--text)',
+              }}>
+                <div style={{ fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
+                  {data.schoolName || 'School'}
+                </div>
+                <div>{message.trim()}</div>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Btn onClick={broadcastMessage} disabled={sending || !message.trim()} style={{ background: '#10b981' }}>
               {sending ? '⏳ Sending...' : `📤 Send to ${uniquePhones.length} Parent(s)`}
             </Btn>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{message.length} characters</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {buildBroadcastMessage(message).length} characters
+              {buildBroadcastMessage(message).length > 160 && ` · ${Math.ceil(buildBroadcastMessage(message).length / 153)} SMS parts`}
+            </span>
           </div>
           {!getSMSGatewayConfig(data).apiKey && (
             <Alert type="warning" style={{ marginTop: 12 }}>
@@ -387,20 +470,33 @@ export default function ParentMessaging({ data, setData, user }) {
           <Alert type="info">
             📊 Each parent receives their child's individual results by SMS. Results include all subjects, scores, grades, and mean.
           </Alert>
-          <FormGroup label="Select Exam" style={{ marginTop: 12 }}>
-            <select value={selExam} onChange={e => setExam(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-              <option value="">-- Select Exam --</option>
-              {exams.map(e => (
-                <option key={e.id} value={e.id}>{e.name} · {e.class} · Term {e.term} {e.year}</option>
-              ))}
-            </select>
-          </FormGroup>
-          <FormGroup label="Filter by Class">
-            <select value={selClass} onChange={e => setSel(e.target.value)}
+          <FormGroup label="Filter by Class" style={{ marginTop: 12 }}>
+            <select value={selClass} onChange={e => { setSel(e.target.value); setExam(''); }}
               style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
               <option value="ALL">All Classes</option>
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </FormGroup>
+          <FormGroup label="Select Exam">
+            <select value={selExam} onChange={e => setExam(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              <option value="">-- Select Exam --</option>
+              {/* IMPORTANT: only show exams for the class picked above (or all,
+                  sorted by class, when "All Classes" is selected). Previously
+                  this listed every exam from every grade in one flat, unsorted
+                  list — easy to pick a Grade 1 exam while "Filter by Class"
+                  said Grade 2, which silently produced "0 students" below
+                  with no clue why. Sorting by class also groups duplicate-
+                  looking entries (e.g. multiple "oppener"/"Mid-Term" exams
+                  per grade) together so they're easier to spot and clean up
+                  from Exams & Reports if they're not wanted. */}
+              {exams
+                .filter(e => selClass === 'ALL' || e.class === selClass)
+                .slice()
+                .sort((a, b) => (a.class || '').localeCompare(b.class || '') || (a.name || '').localeCompare(b.name || ''))
+                .map(e => (
+                  <option key={e.id} value={e.id}>{e.class} · {e.name} · Term {e.term} {e.year}</option>
+                ))}
             </select>
           </FormGroup>
           {selExam && (() => {
@@ -487,6 +583,31 @@ export default function ParentMessaging({ data, setData, user }) {
             </>
           )}
           <Btn onClick={saveSmsConfig}>Save SMS Config</Btn>
+
+          {smsConf.provider === 'africastalking' && (
+            <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+                🧪 Send Test SMS
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                Sends one real SMS using the settings above, so you can confirm Sender ID "{smsConf.senderId || '(default)'}"
+                is approved and actually delivering before messaging real parents.
+              </div>
+              <FormGroup label="Your phone number (to receive the test)">
+                <input value={testPhone} onChange={e => setTestPhone(e.target.value)}
+                  placeholder="07XXXXXXXX or +2547XXXXXXXX"
+                  style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+              </FormGroup>
+              <Btn onClick={sendTestSMS} disabled={testSending} style={{ background: '#0891b2' }}>
+                {testSending ? '⏳ Sending test...' : '📤 Send Test SMS'}
+              </Btn>
+              {testResult && (
+                <Alert type={testResult.ok ? 'success' : 'warning'} style={{ marginTop: 12 }}>
+                  {testResult.ok ? '✅ ' : '⚠ '}{testResult.detail}
+                </Alert>
+              )}
+            </div>
+          )}
         </Card>
       )}
     </div>
