@@ -6,7 +6,7 @@
    to: comma-separated phone numbers e.g. "+254712345678,+254798765432"
 ─────────────────────────────────────────────────────────────────── */
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {

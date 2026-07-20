@@ -38,7 +38,7 @@ function makeToken(schoolId, expiryDate, maxStudents = 9999) {
   return `EDU-${schoolCode}-${dateStr}-${seats}-${check}`;
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: '' };
   }

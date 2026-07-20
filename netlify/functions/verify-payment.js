@@ -1,4 +1,4 @@
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const method = event.httpMethod;
 
   // ── INITIATE STK PUSH (POST with body.action = 'initiate') ──────────
