@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Avatar, GradeBadge, Icon } from './UI';
 import { getGrade, getAllClasses, getScore, getStreamFromClass, generateSLC, generateAdmNo, buildStudentName } from '../data/initialData';
+import { deleteStudentDirect } from '../supabase';
 import { getTotalExpected, getPaid } from './FeesModule';
 import * as XLSX from 'xlsx';
 import { printLeavingCert, printReportForm, printStudentIntakeForm, printStudentRegister } from '../utils/print';
@@ -19,6 +20,11 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
   const isPrincipal    = user.role === 'principal';
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
+  // A dedicated "Registrar"-type staff member can be granted this flag
+  // (Teachers screen) to add/edit students across ALL classes without
+  // being the principal or a class teacher. Deleting a student record is
+  // deliberately still principal-only.
+  const canManageAllStudents = isPrincipal || !!user.canManageStudents;
 
   const admMode = data.admissionSetting || 'manual';
   // manual = Type A: required, admin types
@@ -27,7 +33,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
 
   function getVisibleStudents(search, filterClass) {
     let students = data.students;
-    if (!isPrincipal) {
+    if (!canManageAllStudents) {
       if (isClassTeacher) students = students.filter(s => s.class === myClass);
       else {
         const myClasses = (user.teacherSubjects || []).flatMap(s => s.classes);
@@ -213,15 +219,15 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
     setUploadRows([]);
   }
 
-  const canAdd         = isPrincipal || isClassTeacher;
-  const addableClasses = isPrincipal ? getAllClasses(data) : isClassTeacher ? [myClass] : [];
+  const canAdd         = canManageAllStudents || isClassTeacher;
+  const addableClasses = canManageAllStudents ? getAllClasses(data) : isClassTeacher ? [myClass] : [];
 
   function save() {
     if (!form.firstName.trim() && !form.lastName.trim()) {
       alert('Please enter at least a first name or last name.');
       return;
     }
-    if (!isPrincipal && isClassTeacher && form.class !== myClass) {
+    if (!canManageAllStudents && isClassTeacher && form.class !== myClass) {
       alert(`You can only add students to your class: ${myClass}`);
       return;
     }
@@ -280,6 +286,15 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
     if (!isPrincipal) { alert('Only the principal can delete student records.'); return; }
     if (window.confirm('Delete this student? This cannot be undone.')) {
       setData(d => ({ ...d, students: d.students.filter(s => s.id !== id) }));
+      // Delete directly and immediately — don't rely on the general
+      // debounced save to notice this row is "missing", since another
+      // browser tab's stale copy could otherwise bring it right back.
+      if (data._schoolId) {
+        deleteStudentDirect(data._schoolId, id).catch(e => {
+          console.error('Delete failed:', e);
+          alert('Could not delete — check your connection and try again.');
+        });
+      }
     }
   }
 
@@ -340,7 +355,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
 
   const filtered       = getVisibleStudents(search, filterClass);
   const allClasses     = getAllClasses(data);
-  const visibleClasses = isPrincipal ? allClasses
+  const visibleClasses = canManageAllStudents ? allClasses
     : isClassTeacher ? [myClass]
     : (user.teacherSubjects || []).flatMap(s => s.classes).filter((v, i, a) => a.indexOf(v) === i);
 
@@ -487,19 +502,19 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input placeholder="Search name, adm no or login code..." value={search}
           onChange={e => setSearch(e.target.value)} style={{ width: 280 }} />
-        {isPrincipal && (
+        {canManageAllStudents && (
           <select value={filterClass} onChange={e => setFilterClass(e.target.value)} style={{ width: 160 }}>
             <option value="">All Classes</option>
             {visibleClasses.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          {isPrincipal && (
+          {canManageAllStudents && (
             <Btn variant="ghost" onClick={() => printStudentIntakeForm(data)}>
               <Icon name="print" size={14} /> Intake Form
             </Btn>
           )}
-          {isPrincipal && (
+          {canManageAllStudents && (
             <Btn variant="ghost" onClick={() => {
               const missing = (data.students || []).filter(s => !s.slc);
               if (!missing.length) { alert('All students already have login codes.'); return; }
@@ -520,7 +535,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
               🔑 Fix Missing Codes ({(data.students || []).filter(s => !s.slc).length})
             </Btn>
           )}
-          {(isPrincipal || isClassTeacher) && (
+          {(canManageAllStudents || isClassTeacher) && (
             <Btn variant="ghost" onClick={() => {
               const cls = filterClass || myClass || '';
               const studentsForList = cls
@@ -539,7 +554,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
               <Icon name="print" size={14} /> Class List
             </Btn>
           )}
-          {isPrincipal && (
+          {canManageAllStudents && (
             <Btn variant="ghost" onClick={() => { setShowUpload(true); setUploadRows([]); setUploadErrors([]); setUploadDone(false); setUploadSummary(null); }}>
               <Icon name="upload" size={14} /> Bulk Upload
             </Btn>
@@ -609,7 +624,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
                     <td style={TS.td}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <Btn size="sm" variant="ghost" onClick={() => setViewStudent(s)}><Icon name="eye" size={13} /></Btn>
-                        {(isPrincipal || isClassTeacher) && <Btn size="sm" variant="ghost" onClick={() => openEdit(s)}><Icon name="edit" size={13} /></Btn>}
+                        {(canManageAllStudents || isClassTeacher) && <Btn size="sm" variant="ghost" onClick={() => openEdit(s)}><Icon name="edit" size={13} /></Btn>}
                         {isPrincipal && <Btn size="sm" variant="danger" onClick={() => deleteStudent(s.id)}><Icon name="trash" size={13} /></Btn>}
                       </div>
                     </td>
@@ -661,7 +676,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
 
         <FormRow>
           <FormGroup label="Class">
-            <select value={form.class} onChange={e=>setForm({...form,class:e.target.value})} disabled={isClassTeacher&&!isPrincipal}>
+            <select value={form.class} onChange={e=>setForm({...form,class:e.target.value})} disabled={isClassTeacher&&!canManageAllStudents}>
               {addableClasses.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
           </FormGroup>
@@ -835,8 +850,8 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
           <FormRow>
             <FormGroup label="Class">
               <select value={editForm.class} onChange={e=>setEditForm({...editForm,class:e.target.value})}
-                disabled={isClassTeacher&&!isPrincipal}>
-                {(isPrincipal ? getAllClasses(data) : [myClass]).map(c=><option key={c} value={c}>{c}</option>)}
+                disabled={isClassTeacher&&!canManageAllStudents}>
+                {(canManageAllStudents ? getAllClasses(data) : [myClass]).map(c=><option key={c} value={c}>{c}</option>)}
               </select>
             </FormGroup>
             <FormGroup label="Date of Birth">

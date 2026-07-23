@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Avatar, Alert, Icon } from './UI';
 import * as XLSX from 'xlsx';
 import { getAllClasses, getSubjectsForClass, CURRICULUM_LEVELS } from '../data/initialData';
+import { deleteTeacherDirect } from '../supabase';
 import { printStaffIntakeForm, printTeacherLoginSheet } from '../utils/print';
 import { PendingTeacherApprovals, InviteLinkGenerator } from './TeacherRegistration';
 
@@ -13,6 +14,7 @@ const STAFF_TYPES = [
 const DEPT_ICONS = {
   Academics: '📚', Management: '🏫', Kitchen: '🍳', Sports: '⚽',
   Library: '📖', Finance: '💰', Counselling: '🧡', Security: '🔒',
+  Registrar: '🗂️',
 };
 
 /* Get all subjects relevant to a set of classes — Settings only, no hardcoded extras */
@@ -28,6 +30,7 @@ const BLANK_FORM = {
   isClassTeacher: false, classTeacherOf: '',
   canSeeKitchenAlerts: false, canSeeFees: false,
   canEnterAllMarks: false,
+  canManageStudents: false, canMessageParents: false,
   admin: false, password: '',
 };
 
@@ -131,6 +134,8 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
         subjects:       [],
         canSeeKitchenAlerts: dept.toLowerCase() === 'kitchen',
         canSeeFees:     dept.toLowerCase() === 'finance',
+        canManageStudents: dept.toLowerCase() === 'registrar',
+        canMessageParents: dept.toLowerCase() === 'registrar',
         admin:          false,
         password:       row.password || row.staffId,
         status:         'active',
@@ -198,6 +203,8 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
       canSeeKitchenAlerts: t.canSeeKitchenAlerts || false,
       canSeeFees:         t.canSeeFees || false,
       canEnterAllMarks:   t.canEnterAllMarks || false,
+      canManageStudents:  t.canManageStudents || false,
+      canMessageParents:  t.canMessageParents || false,
       admin:              t.admin      || false,
       password:           t.password   || t.staffId || '',
     });
@@ -248,6 +255,8 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
       canSeeKitchenAlerts: form.canSeeKitchenAlerts || form.dept === 'Kitchen',
       canSeeFees:         form.canSeeFees || form.dept === 'Finance',
       canEnterAllMarks:   form.canEnterAllMarks || false,
+      canManageStudents:  form.canManageStudents || form.dept === 'Registrar',
+      canMessageParents:  form.canMessageParents || form.dept === 'Registrar',
       admin:              form.admin,
       password:           form.password || form.staffId.trim(),
     };
@@ -275,6 +284,12 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
   function remove(id) {
     if (window.confirm('Remove this staff member? This cannot be undone.')) {
       setData(d => ({ ...d, teachers: d.teachers.filter(t => t.id !== id) }));
+      if (data._schoolId) {
+        deleteTeacherDirect(data._schoolId, id).catch(e => {
+          console.error('Delete failed:', e);
+          alert('Could not delete — check your connection and try again.');
+        });
+      }
     }
   }
 
@@ -617,6 +632,8 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
             { field: 'canSeeFees',          label: 'Can view fee & financial records' },
             { field: 'canSeeKitchenAlerts', label: 'Receives kitchen inventory alerts' },
             { field: 'canEnterAllMarks',    label: 'Can enter marks for ALL subjects in ALL classes (e.g. Secretary)' },
+            { field: 'canManageStudents',   label: 'Can add & edit students in ALL classes (e.g. Registrar/Admissions) — does not include deleting records' },
+            { field: 'canMessageParents',   label: 'Can send messages/SMS to parents' },
           ].map(({ field, label }) => (
             <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
               <input type="checkbox" checked={form[field]} onChange={e => setForm({ ...form, [field]: e.target.checked })} />

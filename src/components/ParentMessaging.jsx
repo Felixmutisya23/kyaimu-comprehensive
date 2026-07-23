@@ -385,7 +385,7 @@ export default function ParentMessaging({ data, setData, user }) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {[['broadcast','📢 Broadcast Message'],['results','📊 Send Results'],['logs','📋 Message Logs'],['config','⚙ SMS Setup']].map(([t,l]) => (
+        {[['broadcast','📢 Broadcast Message'],['results','📊 Send Results'],['logs','📋 Message Logs'],...(isPrincipal ? [['config','⚙ SMS Setup']] : [])].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
             background: tab === t ? '#4f8ef7' : 'var(--surface2)', color: tab === t ? '#fff' : 'var(--text-sub)', fontWeight: 600, fontSize: 13,
@@ -548,7 +548,7 @@ export default function ParentMessaging({ data, setData, user }) {
         </Card>
       )}
 
-      {tab === 'config' && (
+      {tab === 'config' && isPrincipal && (
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>SMS Gateway Configuration</div>
           <Alert type="info">

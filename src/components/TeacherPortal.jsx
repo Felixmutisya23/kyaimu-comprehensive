@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon, Avatar } from './UI';
 import { getAllClasses, getGrade, getScore, GRADES_CBC, getSubjectsForClass } from '../data/initialData';
+import { applyExamScorePatch } from '../supabase';
+import Students from './Students';
+import ParentMessaging from './ParentMessaging';
 
 /* ═══════════════════════════════════════════════════════════
    TEACHER PORTAL  —  fully responsive (phone/tablet/desktop)
@@ -25,6 +28,8 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
     markEntrySubjects: liveRecord?.markEntrySubjects ?? loginUser.markEntrySubjects ?? [],
     canEnterAllMarks: liveRecord?.canEnterAllMarks  ?? loginUser.canEnterAllMarks ?? false,
     canSeeFees:       liveRecord?.canSeeFees        ?? loginUser.canSeeFees       ?? false,
+    canManageStudents: liveRecord?.canManageStudents ?? loginUser.canManageStudents ?? false,
+    canMessageParents: liveRecord?.canMessageParents ?? loginUser.canMessageParents ?? false,
     dept:             liveRecord?.dept              ?? loginUser.dept              ?? '',
     staffType:        liveRecord?.staffType         ?? loginUser.staffType        ?? 'teaching',
     name:             liveRecord?.name              ?? loginUser.name,
@@ -75,6 +80,8 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
     { id: 'marks',   icon: '✏️',  label: 'Enter Marks' },
     { id: 'results', icon: '📊', label: 'View Results' },
     ...(isClassTeacher ? [{ id: 'class', icon: '👩‍🏫', label: 'My Class' }] : []),
+    ...(user.canManageStudents ? [{ id: 'students', icon: '👨‍🎓', label: 'Students' }] : []),
+    ...(user.canMessageParents ? [{ id: 'parentmsg', icon: '💬', label: 'Message Parents' }] : []),
     ...(pendingApprovals.length > 0 ? [{ id: 'approvals', icon: '✅', label: `Approve Marks (${pendingApprovals.length})` }] : []),
     { id: 'notifs',  icon: '🔔', label: `Notifications${myNotifs.length > 0 ? ` (${myNotifs.length})` : ''}` },
   ];
@@ -190,6 +197,8 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
         {page === 'class'     && isClassTeacher && <TeacherClass user={user} data={data} setData={setData} />}
         {page === 'approvals' && <TeacherApprovals user={user} data={data} setData={setData} />}
         {page === 'notifs'    && <TeacherNotifs user={user} data={data} setData={setData} />}
+        {page === 'students'  && user.canManageStudents && <Students data={data} setData={setData} user={user} />}
+        {page === 'parentmsg' && user.canMessageParents && <ParentMessaging data={data} setData={setData} user={user} />}
       </main>
 
       {/* Bottom nav (phones only) */}
@@ -432,96 +441,45 @@ function TeacherMarks({ user, data, setData }) {
     return ct?.staffId || null;
   }
 
-  function saveMarks() {
+  async function saveMarks() {
     if (!selExam || !selSubject) return;
 
-    const ctStaffId = getClassTeacherStaffId();
-    const bypass = autoApproved();
-    const newEditRequests = [];
-    const newNotifications = [];
-    let editedCount = 0;
-
-    setData(d => {
-      const exams = d.exams.map(ex => {
-        if (ex.id !== selExam.id) return ex;
-        const res = { ...ex.results };
-        classStudents.forEach(st => {
-          const raw = scores[st.name];
-          if (raw === '' || raw === undefined) return;
-          const v = Number(raw);
-          if (isNaN(v)) return;
-
-          const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
-          const isChange = hadPrior && Number(original[st.name]) !== v;
-
-          if (!hadPrior) {
-            // First-time entry — always saved directly, no approval needed
-            if (!res[st.name]) res[st.name] = {};
-            res[st.name][selSubject] = { score: v, submittedBy: user.staffId, locked: false };
-          } else if (isChange) {
-            editedCount++;
-            if (bypass) {
-              // Principal or this class's own class teacher — apply immediately
-              if (!res[st.name]) res[st.name] = {};
-              res[st.name][selSubject] = { ...res[st.name][selSubject], score: v };
-            } else {
-              // Needs approval — queue an edit request, leave the score untouched for now
-              const req = {
-                id: Date.now() + Math.floor(Math.random() * 10000),
-                examId: selExam.id,
-                studentName: st.name,
-                subject: selSubject,
-                oldScore: Number(original[st.name]),
-                newScore: v,
-                requestedBy: user.staffId,
-                requestedByName: user.name,
-                approvals: { classTeacher: null, principal: null },
-                status: 'pending',
-                date: new Date().toISOString().split('T')[0],
-              };
-              newEditRequests.push(req);
-              if (ctStaffId && ctStaffId !== user.staffId) {
-                newNotifications.push({ id: Date.now() + Math.floor(Math.random()*10000), to: ctStaffId, from: user.name, message: `Edit request: ${st.name} — ${selSubject} (${req.oldScore}→${v}). Requested by ${user.name}. Your approval needed.`, date: req.date, read: false });
-              }
-              const principalId = (d.teachers || []).find(t => t.admin)?.staffId;
-              if (principalId) {
-                newNotifications.push({ id: Date.now() + Math.floor(Math.random()*10000), to: principalId, from: user.name, message: `Edit request: ${st.name} — ${selSubject} (${req.oldScore}→${v}). Requested by ${user.name}. Your approval needed.`, date: req.date, read: false });
-              }
-            }
-          }
-        });
-        return { ...ex, results: res };
-      });
-
-      return {
-        ...d,
-        exams,
-        editRequests: [...(d.editRequests || []), ...newEditRequests],
-        notifications: [...(d.notifications || []), ...newNotifications],
-      };
+    // Build the list of cells actually being saved (new entries AND edits —
+    // a teacher assigned to this subject is now always allowed to save
+    // directly; there is no more separate approval queue to get stuck in
+    // or to silently swallow a change).
+    const patches = [];
+    classStudents.forEach(st => {
+      const raw = scores[st.name];
+      if (raw === '' || raw === undefined) return;
+      const v = Number(raw);
+      if (isNaN(v)) return;
+      const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
+      const isChange = hadPrior && Number(original[st.name]) !== v;
+      if (!hadPrior || isChange) {
+        patches.push({ studentName: st.name, subject: selSubject, score: v, submittedBy: user.staffId, locked: false });
+      }
     });
+    if (patches.length === 0) { setSaved(true); return; }
 
-    setSaved(true);
-    if (!bypass && editedCount > 0) {
-      setPendingNote(`${editedCount} changed score${editedCount>1?'s':''} sent for approval (class teacher + principal). New entries were saved directly.`);
-      // Revert on-screen values for queued (not-yet-applied) edits back to their original score
-      setScores(prev => {
-        const reverted = { ...prev };
-        classStudents.forEach(st => {
-          const raw = prev[st.name];
-          if (raw === '' || raw === undefined) return;
-          const v = Number(raw);
-          if (isNaN(v)) return;
-          const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
-          const isChange = hadPrior && Number(original[st.name]) !== v;
-          if (isChange) reverted[st.name] = original[st.name];
-        });
-        return reverted;
-      });
-    } else {
+    try {
+      // Save directly to the database NOW, merged against whatever is
+      // currently there for this exam — not this browser tab's possibly
+      // stale full copy — so another teacher's marks for a different
+      // subject in the same exam can never be wiped out by this save.
+      const merged = await applyExamScorePatch(data._schoolId, selExam.id, patches);
+      // Reflect the confirmed, merged database state locally (not just our
+      // own guess), so what's on screen always matches what's actually saved.
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => ex.id === selExam.id ? { ...ex, results: merged.results } : ex),
+      }));
+      setSaved(true);
       setPendingNote('');
-      // New/auto-approved entries become the new "original" baseline
       setOriginal(scores);
+    } catch (e) {
+      console.error('Save marks failed:', e);
+      setPendingNote('⚠ Could not save — check your connection and try again. Nothing was lost; your entries are still shown here.');
     }
   }
 
@@ -610,12 +568,6 @@ function TeacherMarks({ user, data, setData }) {
             <Btn variant="success" onClick={saveMarks} style={{ minHeight: 44, fontSize: 15 }}>{saved ? '✅ Saved!' : '💾 Save Marks'}</Btn>
           </div>
 
-          {!autoApproved() && (
-            <Alert type="info" style={{ marginBottom: 14 }}>
-              <Icon name="alert" size={14} />
-              <span>New scores save instantly. Changing a score that's already submitted will be sent to the class teacher and principal for approval.</span>
-            </Alert>
-          )}
           {saved && pendingNote && (
             <Alert type="warning" style={{ marginBottom: 14 }}>
               <Icon name="alert" size={14} /> <span>{pendingNote}</span>
@@ -639,7 +591,6 @@ function TeacherMarks({ user, data, setData }) {
                 const numScore = score !== '' && score !== undefined && !isNaN(Number(score)) ? Number(score) : null;
                 const hadPrior = original[st.name] !== '' && original[st.name] !== undefined && original[st.name] !== null;
                 const isChanged = hadPrior && numScore !== null && Number(original[st.name]) !== numScore;
-                const needsApproval = isChanged && !autoApproved();
                 return (
                   <tr key={st.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td data-label="#" style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{i + 1}</td>
@@ -652,9 +603,8 @@ function TeacherMarks({ user, data, setData }) {
                         inputMode="numeric"
                         onChange={e => { setScores(p => ({ ...p, [st.name]: e.target.value })); setSaved(false); }}
                         className="score-input"
-                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: 'var(--bg)', border: `2px solid ${needsApproval ? '#f59e0b' : 'var(--border)'}`, color: 'var(--text)' }}
+                        style={{ width: 80, textAlign: 'center', padding: '8px', fontSize: 16, fontWeight: 700, borderRadius: 8, background: 'var(--bg)', border: `2px solid ${isChanged ? '#4f8ef7' : 'var(--border)'}`, color: 'var(--text)' }}
                       />
-                      {needsApproval && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 3 }}>needs approval</div>}
                     </td>
                     <td data-label="Grade" style={{ padding: '8px 10px', textAlign: 'center' }}>
                       {numScore !== null ? <GradeBadge score={numScore} /> : <span style={{ color: 'var(--border)' }}>—</span>}

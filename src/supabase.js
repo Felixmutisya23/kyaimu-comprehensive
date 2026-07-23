@@ -238,6 +238,8 @@ export async function loadSchoolData(schoolId) {
     canSeeKitchenAlerts: t.can_see_kitchen,
     canSeeFees:     t.can_see_fees,
     canEnterAllMarks: t.can_enter_all_marks || false,
+    canManageStudents: t.can_manage_students || false,
+    canMessageParents: t.can_message_parents || false,
     admin:          t.admin,
     password:       t.password,
     status:         t.status || 'active',  // 'pending' until admin approves
@@ -520,31 +522,42 @@ async function syncTeachers(schoolId, teachers, teachersLoaded) {
       can_see_kitchen:  t.canSeeKitchenAlerts || false,
       can_see_fees:     t.canSeeFees || false,
       can_enter_all_marks: t.canEnterAllMarks || false,
+      can_manage_students: t.canManageStudents || false,
+      can_message_parents: t.canMessageParents || false,
       admin:            t.admin || false,
       password:         hashedPw,
       status:           t.status || 'active',
     };
   }));
   let { error: upsertErr } = await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
-  if (upsertErr && /mark_entry_subjects/i.test(upsertErr.message || '')) {
-    // The mark_entry_subjects column hasn't been added to this database yet
-    // (needs: ALTER TABLE teachers ADD COLUMN mark_entry_subjects jsonb DEFAULT '[]'::jsonb;).
-    // Don't let this break saving everything else — retry without it, and
-    // warn loudly so it gets fixed. Until the migration runs, "Assign
-    // Teachers" selections won't persist across reloads.
-    console.error('[EduManage] "mark_entry_subjects" column missing on teachers table — Assign Teachers selections will NOT be saved until this migration is run: ALTER TABLE teachers ADD COLUMN mark_entry_subjects jsonb DEFAULT \'[]\'::jsonb;');
-    const fallbackRows = rows.map(r => { const { mark_entry_subjects, ...rest } = r; return rest; });
-    ({ error: upsertErr } = await getSupabase().from('teachers').upsert(fallbackRows, { onConflict: 'school_id,local_id' }));
+  // If a newly-added column (from a migration the school hasn't run yet)
+  // doesn't exist, don't let it break saving everything else — strip that
+  // column and retry, warning loudly so it gets fixed. Until the migration
+  // runs, whatever that column stores won't persist across reloads.
+  const NEW_COLUMNS = {
+    mark_entry_subjects: "ALTER TABLE teachers ADD COLUMN mark_entry_subjects jsonb DEFAULT '[]'::jsonb;",
+    can_manage_students: "ALTER TABLE teachers ADD COLUMN can_manage_students boolean DEFAULT false;",
+    can_message_parents: "ALTER TABLE teachers ADD COLUMN can_message_parents boolean DEFAULT false;",
+  };
+  let currentRows = rows;
+  let guard = 0;
+  while (upsertErr && guard < Object.keys(NEW_COLUMNS).length) {
+    const missingCol = Object.keys(NEW_COLUMNS).find(col => new RegExp(col, 'i').test(upsertErr.message || ''));
+    if (!missingCol) break;
+    console.error(`[EduManage] "${missingCol}" column missing on teachers table — related settings will NOT be saved until this migration is run: ${NEW_COLUMNS[missingCol]}`);
+    currentRows = currentRows.map(r => { const { [missingCol]: _drop, ...rest } = r; return rest; });
+    ({ error: upsertErr } = await getSupabase().from('teachers').upsert(currentRows, { onConflict: 'school_id,local_id' }));
+    guard++;
   }
   if (upsertErr) { console.error('[EduManage] teachers.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (teachers): ' + upsertErr.message); }
-  // Step 2: delete only teachers that were explicitly removed
-  const currentIds = teachers.map(t => String(t.id || t.staffId));
-  const { data: existing } = await getSupabase().from('teachers').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from('teachers').delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error('[EduManage] teachers.delete FAILED:', delErr.message, delErr);
-  }
+  // NOTE: same reasoning as students — deletion is never inferred from a
+  // stale local array. See deleteTeacherDirect().
+}
+
+export async function deleteTeacherDirect(schoolId, localId) {
+  await setSchoolContext(schoolId);
+  const { error } = await getSupabase().from('teachers').delete().eq('school_id', schoolId).eq('local_id', String(localId));
+  if (error) { console.error('[EduManage] deleteTeacherDirect FAILED:', error.message, error); throw new Error('Delete failed: ' + error.message); }
 }
 
 async function syncStudents(schoolId, students, studentsLoaded) {
@@ -571,25 +584,36 @@ async function syncStudents(schoolId, students, studentsLoaded) {
   });
   const { error: upsertErr } = await getSupabase().from('students').upsert(rows, { onConflict: 'school_id,local_id' });
   if (upsertErr) { console.error('[EduManage] students.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (students): ' + upsertErr.message); }
-  // Delete only students that were explicitly removed
-  const currentIds = students.map(s => String(s.id));
-  const { data: existing } = await getSupabase().from('students').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.includes(String(e.local_id))).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from('students').delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error('[EduManage] students.delete FAILED:', delErr.message, delErr);
-  }
+  // NOTE: deletion is intentionally NOT inferred from "rows missing from this
+  // local array" — a session that hasn't refreshed recently has a stale
+  // local list, and syncing it used to silently DELETE students that were
+  // only ever absent because this browser tab hadn't seen them yet
+  // (typically another admission/teacher's device added them moments
+  // earlier), and could just as easily RESURRECT a student someone else had
+  // just deleted. Deleting a student is now a direct, explicit, immediate
+  // action — see deleteStudentDirect() — never inferred here.
+}
+
+// Explicit, immediate delete — call this the moment a student is removed in
+// the UI, instead of relying on the general debounced save to notice it's
+// "missing". This is what makes a deletion actually stick.
+export async function deleteStudentDirect(schoolId, localId) {
+  await setSchoolContext(schoolId);
+  const { error } = await getSupabase().from('students').delete().eq('school_id', schoolId).eq('local_id', String(localId));
+  if (error) { console.error('[EduManage] deleteStudentDirect FAILED:', error.message, error); throw new Error('Delete failed: ' + error.message); }
 }
 
 async function syncJsonTable(table, schoolId, items) {
-  // If items is empty, delete everything in this table for this school
-  if (!items || items.length == 0) {
-    const { error: delAllErr } = await getSupabase().from(table).delete().eq('school_id', schoolId);
-    if (delAllErr) console.error(`[EduManage] ${table}.delete-all FAILED:`, delAllErr.message, delAllErr);
-    return;
-  }
-  // Safe upsert: update existing records, insert new ones
-  // FIX 10: use generateId not array index (i) as fallback — prevents id collision
+  // NOTE: this used to (a) wipe the ENTIRE table for this school if the
+  // local array was empty, and (b) delete any row missing from the local
+  // array. Both are unsafe: any session with a stale or momentarily-empty
+  // local copy (e.g. right after login, or a slow tab that hasn't
+  // refreshed) would silently erase real data — including OTHER people's
+  // just-saved exam marks — the moment it saved anything. This is now
+  // upsert-only. Explicit deletes (e.g. deleting one exam) go through
+  // deleteJsonRowDirect() instead, called immediately at the point of
+  // deletion, never inferred here.
+  if (!items || items.length == 0) return;
   const rows = items.map(item => ({
     school_id: schoolId,
     local_id:  String(item.id || item._uuid || generateId()),
@@ -597,22 +621,65 @@ async function syncJsonTable(table, schoolId, items) {
   }));
   const { error: upsertErr } = await getSupabase().from(table).upsert(rows, { onConflict: 'school_id,local_id' });
   if (upsertErr) { console.error(`[EduManage] ${table}.upsert FAILED:`, upsertErr.message, upsertErr); throw new Error(`Save failed (${table}): ` + upsertErr.message); }
-  // Delete only items that were explicitly removed
-  const currentIds = new Set(rows.map(r => r.local_id));
-  const { data: existing } = await getSupabase().from(table).select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.has(e.local_id)).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from(table).delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error(`[EduManage] ${table}.delete FAILED:`, delErr.message, delErr);
-  }
+}
+
+// Explicit, immediate delete for one row in a json-blob table (exams,
+// notifications, etc.) — call at the moment of deletion in the UI.
+export async function deleteJsonRowDirect(table, schoolId, localId) {
+  await setSchoolContext(schoolId);
+  const { error } = await getSupabase().from(table).delete().eq('school_id', schoolId).eq('local_id', String(localId));
+  if (error) { console.error(`[EduManage] deleteJsonRowDirect(${table}) FAILED:`, error.message, error); throw new Error('Delete failed: ' + error.message); }
+}
+
+// Safely apply score changes to ONE exam's results, for ONE class, without
+// touching anything else in that row. Fetches the exam's CURRENT data
+// straight from the database, merges in just the cells being changed, and
+// writes back immediately — instead of relying on the general debounced
+// save (which pushes this browser's whole, possibly-stale, copy of the
+// exam and can silently erase marks another teacher entered moments
+// earlier into the SAME exam). patches is [{ studentName, subject, score,
+// submittedBy, locked }].
+export async function applyExamScorePatch(schoolId, examLocalId, patches) {
+  await setSchoolContext(schoolId);
+  const { data: row, error: fetchErr } = await getSupabase()
+    .from('exams').select('data').eq('school_id', schoolId).eq('local_id', String(examLocalId)).maybeSingle();
+  if (fetchErr) { console.error('[EduManage] applyExamScorePatch fetch FAILED:', fetchErr.message, fetchErr); throw new Error('Save failed (marks): ' + fetchErr.message); }
+  const current = row?.data || {};
+  const results = { ...(current.results || {}) };
+  patches.forEach(p => {
+    results[p.studentName] = { ...(results[p.studentName] || {}) };
+    results[p.studentName][p.subject] = {
+      ...(results[p.studentName][p.subject] || {}),
+      score: p.score, submittedBy: p.submittedBy, locked: p.locked || false,
+    };
+  });
+  const merged = { ...current, results };
+  const { error: upsertErr } = await getSupabase().from('exams')
+    .upsert({ school_id: schoolId, local_id: String(examLocalId), data: merged }, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] applyExamScorePatch save FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (marks): ' + upsertErr.message); }
+  return merged;
+}
+
+// Safely set the Setup Subjects list for ONE class without touching any
+// other class's list — fetches the school's current subjects_by_class
+// straight from the database, updates just this one class's key, and
+// writes back immediately. This is what stops Setup Subjects from
+// "disappearing" after logout/login: previously the whole subjects_by_class
+// object was overwritten wholesale by whichever browser tab saved last,
+// including tabs that hadn't seen a class's most recent subject list yet.
+export async function saveSubjectsByClassDirect(schoolId, className, subjectsList) {
+  await setSchoolContext(schoolId);
+  const { data: row, error: fetchErr } = await getSupabase()
+    .from('schools').select('subjects_by_class').eq('id', schoolId).maybeSingle();
+  if (fetchErr) { console.error('[EduManage] saveSubjectsByClassDirect fetch FAILED:', fetchErr.message, fetchErr); throw new Error('Save failed (subjects): ' + fetchErr.message); }
+  const merged = { ...(row?.subjects_by_class || {}), [className]: subjectsList };
+  const { error: upErr } = await getSupabase().from('schools').update({ subjects_by_class: merged }).eq('id', schoolId);
+  if (upErr) { console.error('[EduManage] saveSubjectsByClassDirect save FAILED:', upErr.message, upErr); throw new Error('Save failed (subjects): ' + upErr.message); }
+  return merged;
 }
 
 async function syncFeeTypes(schoolId, feeTypes) {
-  if (!feeTypes || !feeTypes.length) {
-    const { error } = await getSupabase().from('fee_types').delete().eq('school_id', schoolId);
-    if (error) console.error('[EduManage] fee_types.delete-all FAILED:', error.message, error);
-    return;
-  }
+  if (!feeTypes || !feeTypes.length) return;
   const rows = feeTypes.map(f => ({
     school_id:          schoolId,
     local_id:           String(f.id),
@@ -623,22 +690,10 @@ async function syncFeeTypes(schoolId, feeTypes) {
   }));
   const { error: upsertErr } = await getSupabase().from('fee_types').upsert(rows, { onConflict: 'school_id,local_id' });
   if (upsertErr) { console.error('[EduManage] fee_types.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_types): ' + upsertErr.message); }
-  // Delete removed fee types
-  const currentIds = new Set(rows.map(r => r.local_id));
-  const { data: existing } = await getSupabase().from('fee_types').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from('fee_types').delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error('[EduManage] fee_types.delete FAILED:', delErr.message, delErr);
-  }
 }
 
 async function syncFeeSchedule(schoolId, feeSchedule) {
-  if (!feeSchedule || !feeSchedule.length) {
-    const { error } = await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId);
-    if (error) console.error('[EduManage] fee_schedule.delete-all FAILED:', error.message, error);
-    return;
-  }
+  if (!feeSchedule || !feeSchedule.length) return;
   const rows = feeSchedule.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
@@ -650,20 +705,10 @@ async function syncFeeSchedule(schoolId, feeSchedule) {
   }));
   const { error: upsertErr } = await getSupabase().from('fee_schedule').upsert(rows, { onConflict: 'school_id,local_id' });
   if (upsertErr) { console.error('[EduManage] fee_schedule.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_schedule): ' + upsertErr.message); }
-  const currentIds = new Set(rows.map(r => r.local_id));
-  const { data: existing } = await getSupabase().from('fee_schedule').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from('fee_schedule').delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error('[EduManage] fee_schedule.delete FAILED:', delErr.message, delErr);
-  }
 }
 
 async function syncFeePayments(schoolId, feePayments) {
-  if (!feePayments || !feePayments.length) {
-    // SAFETY: Never wipe all payments on empty — same guard as students
-    return;
-  }
+  if (!feePayments || !feePayments.length) return;
   const rows = feePayments.map(f => ({
     school_id:   schoolId,
     local_id:    String(f.id),
@@ -679,14 +724,6 @@ async function syncFeePayments(schoolId, feePayments) {
   }));
   const { error: upsertErr } = await getSupabase().from('fee_payments').upsert(rows, { onConflict: 'school_id,local_id' });
   if (upsertErr) { console.error('[EduManage] fee_payments.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (fee_payments): ' + upsertErr.message); }
-  // Only delete payments that were explicitly removed
-  const currentIds = new Set(rows.map(r => r.local_id));
-  const { data: existing } = await getSupabase().from('fee_payments').select('local_id').eq('school_id', schoolId);
-  const toDelete = (existing || []).filter(e => !currentIds.has(String(e.local_id))).map(e => e.local_id);
-  if (toDelete.length > 0) {
-    const { error: delErr } = await getSupabase().from('fee_payments').delete().eq('school_id', schoolId).in('local_id', toDelete);
-    if (delErr) console.error('[EduManage] fee_payments.delete FAILED:', delErr.message, delErr);
-  }
 }
 
 // ── Login: find teacher across all schools by email+password ─────

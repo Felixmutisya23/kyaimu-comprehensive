@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
+import { deleteJsonRowDirect, applyExamScorePatch, saveSubjectsByClassDirect } from '../supabase';
 
 export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
   const _bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
@@ -278,38 +279,36 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   }
 
   /* ── Save scores (initial submission) ────────────────*/
-  function saveScores() {
-    setData(d => ({
-      ...d,
-      exams: d.exams.map(ex => {
-        if (ex.id !== enterExam.id) return ex;
-        const newResults = { ...ex.results };
-        classStudents.forEach(st => {
-          if (!newResults[st.name]) newResults[st.name] = {};
-          enterSubjects.forEach(sub => {
-            const v = Number(scores[st.name]?.[sub]);
-            if (!isNaN(v) && scores[st.name]?.[sub] !== '') {
-              newResults[st.name][sub] = { score: v, submittedBy: user.staffId, locked: false };
-            }
-          });
-        });
-        return { ...ex, results: newResults };
-      }),
-      // Notify class teacher of new submission (if submitter is not class teacher)
-      notifications: [
-        ...(d.notifications || []),
-        ...(() => {
-          const ctStaffId = getClassTeacherStaffId(selClass, d);
-          if (ctStaffId && ctStaffId !== user.staffId) {
-            return [{ id: Date.now(), to: ctStaffId, from: user.name, message: `${user.name} submitted scores for ${enterableSubjects.join(', ')} — ${selClass} · ${enterExam.name}`, date: new Date().toISOString().split('T')[0], read: false }];
-          }
-          return [];
-        })(),
-      ],
-    }));
-    // Flush immediately so marks never lost if teacher closes browser quickly
-    if (flushSave) setTimeout(() => flushSave(), 50);
+  async function saveScores() {
+    const patches = [];
+    classStudents.forEach(st => {
+      enterSubjects.forEach(sub => {
+        const v = Number(scores[st.name]?.[sub]);
+        if (!isNaN(v) && scores[st.name]?.[sub] !== '') {
+          patches.push({ studentName: st.name, subject: sub, score: v, submittedBy: user.staffId, locked: false });
+        }
+      });
+    });
+    const ctStaffId = getClassTeacherStaffId(selClass, data);
+    const notif = (ctStaffId && ctStaffId !== user.staffId)
+      ? [{ id: Date.now(), to: ctStaffId, from: user.name, message: `${user.name} submitted scores for ${enterableSubjects.join(', ')} — ${selClass} · ${enterExam.name}`, date: new Date().toISOString().split('T')[0], read: false }]
+      : [];
     setShowEnter(false);
+    if (patches.length === 0) return;
+    try {
+      // Save directly, merged against the exam's current database state —
+      // not this tab's full local copy — so it can never wipe out another
+      // teacher's marks for a different subject entered moments earlier.
+      const merged = await applyExamScorePatch(data._schoolId, enterExam.id, patches);
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => ex.id === enterExam.id ? { ...ex, results: merged.results } : ex),
+        notifications: [...(d.notifications || []), ...notif],
+      }));
+    } catch (e) {
+      console.error('Save scores failed:', e);
+      alert('Could not save — check your connection and try again.');
+    }
   }
 
   /* ── Request edit ─────────────────────────────────── */
@@ -727,6 +726,12 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             <Btn variant="danger" size="sm" onClick={() => {
               if (window.confirm(`Delete exam "${selExam.name}" for ${selExam.class}? This cannot be undone.`)) {
                 setData(d => ({ ...d, exams: d.exams.filter(e => e.id !== selExam.id) }));
+                if (data._schoolId) {
+                  deleteJsonRowDirect('exams', data._schoolId, selExam.id).catch(e => {
+                    console.error('Delete failed:', e);
+                    alert('Could not delete — check your connection and try again.');
+                  });
+                }
                 setSelExamId(null);
               }
             }}>
@@ -746,6 +751,11 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                   const hasReal = Object.keys(ex.results||{}).some(name=>studentNames.has(name));
                   return hasReal || Object.keys(ex.results||{}).length === 0;
                 })}));
+                if (data._schoolId) {
+                  orphaned.forEach(ex => {
+                    deleteJsonRowDirect('exams', data._schoolId, ex.id).catch(e => console.error('Delete failed:', e));
+                  });
+                }
                 alert('Orphaned exam records removed.');
               }
             }}>
@@ -1048,7 +1058,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
           <Btn variant="ghost" onClick={() => setShowSetupSubjects(false)}>Cancel</Btn>
-          <Btn variant="success" onClick={() => {
+          <Btn variant="success" onClick={async () => {
             const finalSubs = setupSubjectRows.map(r => r.current.trim()).filter(Boolean);
 
             // Detect renames: rows where the name actually changed
@@ -1093,6 +1103,21 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
               }
               return next;
             });
+            // Save this class's subject list directly to the database right
+            // now — merged against whatever's currently there for OTHER
+            // classes — instead of waiting on the general debounced save,
+            // which pushes this whole browser tab's copy of every class's
+            // subjects and can silently undo a change another tab made to a
+            // different class in the meantime. This is what was making
+            // Setup Subjects "disappear" after logout/login.
+            if (data._schoolId) {
+              try {
+                await saveSubjectsByClassDirect(data._schoolId, selClass, finalSubs);
+              } catch (e) {
+                console.error('Save failed:', e);
+                alert('Could not save — check your connection and try again. Your changes are still shown here but may not have been saved.');
+              }
+            }
             setShowSetupSubjects(false);
           }}>Save Subjects</Btn>
         </div>

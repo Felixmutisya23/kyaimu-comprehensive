@@ -831,6 +831,8 @@ export default function App() {
             canSeeFees:         teacherRecord?.canSeeFees      || false,
             canSeeKitchenAlerts:teacherRecord?.canSeeKitchenAlerts || false,
             canEnterAllMarks:   teacherRecord?.canEnterAllMarks || false,
+            canManageStudents:  teacherRecord?.canManageStudents || false,
+            canMessageParents:  teacherRecord?.canMessageParents || false,
           });
           setPage('dashboard');
           // Load subscription for current term

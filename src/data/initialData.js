@@ -356,7 +356,7 @@ export const INITIAL_DATA = {
   subjects:        [],
   subjectsByClass: {},
 
-  departments: ['Academics','Management','Kitchen','Sports','Library','Finance','Counselling','Security'],
+  departments: ['Academics','Management','Kitchen','Sports','Library','Finance','Counselling','Security','Registrar'],
 
   teachers: [
     {
