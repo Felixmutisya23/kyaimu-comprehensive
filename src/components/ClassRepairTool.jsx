@@ -75,6 +75,10 @@ function applyRenames(data, renameMap) {
       ...sub,
       classes: (sub.classes || []).map(r),
     })),
+    markEntrySubjects: (t.markEntrySubjects || []).map(sub => ({
+      ...sub,
+      classes: (sub.classes || []).map(r),
+    })),
   }));
 
   // ── exams ────────────────────────────────────────────────────────────────
@@ -251,7 +255,9 @@ export default function ClassRepairTool({ data, setData }) {
     const affectedStudents  = data.students?.filter(s => renameMap[s.class]).length || 0;
     const affectedExams     = data.exams?.filter(e => renameMap[e.class]).length || 0;
     const affectedTeachers  = data.teachers?.filter(t =>
-      renameMap[t.classTeacherOf] || (t.subjects || []).some(sub => (sub.classes||[]).some(c => renameMap[c]))
+      renameMap[t.classTeacherOf]
+      || (t.subjects || []).some(sub => (sub.classes||[]).some(c => renameMap[c]))
+      || (t.markEntrySubjects || []).some(sub => (sub.classes||[]).some(c => renameMap[c]))
     ).length || 0;
 
     summaryLines.push('');

@@ -234,6 +234,7 @@ export async function loadSchoolData(schoolId) {
     isClassTeacher: t.is_class_teacher,
     classTeacherOf: t.class_teacher_of,
     subjects:       t.subjects || [],
+    markEntrySubjects: t.mark_entry_subjects || [],
     canSeeKitchenAlerts: t.can_see_kitchen,
     canSeeFees:     t.can_see_fees,
     canEnterAllMarks: t.can_enter_all_marks || false,
@@ -515,6 +516,7 @@ async function syncTeachers(schoolId, teachers, teachersLoaded) {
       is_class_teacher: t.isClassTeacher || false,
       class_teacher_of: t.classTeacherOf || null,
       subjects:         t.subjects || [],
+      mark_entry_subjects: t.markEntrySubjects || [],
       can_see_kitchen:  t.canSeeKitchenAlerts || false,
       can_see_fees:     t.canSeeFees || false,
       can_enter_all_marks: t.canEnterAllMarks || false,
@@ -523,7 +525,17 @@ async function syncTeachers(schoolId, teachers, teachersLoaded) {
       status:           t.status || 'active',
     };
   }));
-  const { error: upsertErr } = await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
+  let { error: upsertErr } = await getSupabase().from('teachers').upsert(rows, { onConflict: 'school_id,local_id' });
+  if (upsertErr && /mark_entry_subjects/i.test(upsertErr.message || '')) {
+    // The mark_entry_subjects column hasn't been added to this database yet
+    // (needs: ALTER TABLE teachers ADD COLUMN mark_entry_subjects jsonb DEFAULT '[]'::jsonb;).
+    // Don't let this break saving everything else — retry without it, and
+    // warn loudly so it gets fixed. Until the migration runs, "Assign
+    // Teachers" selections won't persist across reloads.
+    console.error('[EduManage] "mark_entry_subjects" column missing on teachers table — Assign Teachers selections will NOT be saved until this migration is run: ALTER TABLE teachers ADD COLUMN mark_entry_subjects jsonb DEFAULT \'[]\'::jsonb;');
+    const fallbackRows = rows.map(r => { const { mark_entry_subjects, ...rest } = r; return rest; });
+    ({ error: upsertErr } = await getSupabase().from('teachers').upsert(fallbackRows, { onConflict: 'school_id,local_id' }));
+  }
   if (upsertErr) { console.error('[EduManage] teachers.upsert FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (teachers): ' + upsertErr.message); }
   // Step 2: delete only teachers that were explicitly removed
   const currentIds = teachers.map(t => String(t.id || t.staffId));

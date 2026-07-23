@@ -470,12 +470,22 @@ export function canEnterScores(user, subject, className, data) {
   const teacher = (data.teachers || []).find(t => t.staffId === user.staffId);
   if (!teacher) return false;
   if (teacher.isClassTeacher && teacher.classTeacherOf === className) return true;
-  return (teacher.subjects || []).some(s => s.subject === subject && (s.classes || []).includes(className));
+  if (teacher.canEnterAllMarks) return true;
+  // Marks-entry access comes from markEntrySubjects (set via Exams → Setup
+  // Subjects → Assign Teachers) — NOT from `subjects` (the teaching/
+  // timetable assignment made on the Teachers screen). Being assigned to
+  // teach a subject does not, by itself, grant marks-entry access.
+  return (teacher.markEntrySubjects || []).some(s => s.subject === subject && (s.classes || []).includes(className));
 }
 
 export function getTeacherSubjects(staffId, data) {
   const teacher = (data.teachers || []).find(t => t.staffId === staffId);
   return teacher?.subjects || [];
+}
+
+export function getTeacherMarkEntrySubjects(staffId, data) {
+  const teacher = (data.teachers || []).find(t => t.staffId === staffId);
+  return teacher?.markEntrySubjects || [];
 }
 
 export function getClassTeacherStaffId(className, data) {

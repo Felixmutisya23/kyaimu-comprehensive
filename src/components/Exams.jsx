@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 
 export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
@@ -42,6 +42,11 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   const [legacySubjects, setLegacySubjects] = useState([]); // [{ name, count }]
   const [legacyMergeInput, setLegacyMergeInput] = useState({}); // { [legacyName]: targetSubjectName }
   const classSubjects = getSubjectsForClass(selClass, data);
+  // Assign Teachers modal — lets the principal say who enters marks for
+  // each SUBJECT AS DEFINED IN SETUP SUBJECTS (the exam list), instead of
+  // having to go to Teachers and type the exact subject name from memory.
+  const [showAssignTeachers, setShowAssignTeachers] = useState(false);
+  const [staleReassignInput, setStaleReassignInput] = useState({}); // { [teacherId__subject]: targetSubjectName }
   const [selExamId, setSelExamId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -498,6 +503,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
         });
         return { ...ex, results: newResults };
       }),
+      teachers: retargetTeacherAssignments(d.teachers || [], selClass, name, null),
     }));
     setLegacySubjects(rows => rows.filter(r => r.name !== name));
     if (flushSave) setTimeout(() => flushSave(), 50);
@@ -523,9 +529,120 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
         });
         return { ...ex, results: newResults };
       }),
+      teachers: retargetTeacherAssignments(d.teachers || [], selClass, name, target),
     }));
     setLegacySubjects(rows => rows.filter(r => r.name !== name));
     setLegacyMergeInput(m => { const n = { ...m }; delete n[name]; return n; });
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
+  /* ── Teacher ↔ Subject assignment for MARKS ENTRY (SETUP SUBJECTS is ──
+     the source of truth for exams/marks-entry). This writes to a field
+     — markEntrySubjects — that is DELIBERATELY SEPARATE from `subjects`
+     (the subjects a teacher is assigned to TEACH, set on the Teachers
+     screen/Settings). Being assigned to teach a subject does NOT by
+     itself let a teacher enter marks for it — only an assignment made
+     here does. This solves two problems:
+     1. Assigning a teacher for MARKS ENTRY has to reference the exact
+        current Setup Subjects name — but before this screen existed,
+        admins had no dedicated place to do that and had to retype the
+        exact name from memory and easily got it wrong.
+     2. When a subject IS renamed/merged here, any teacher previously
+        assigned to the old name for marks entry silently loses access —
+        this is exactly the "only admin can enter marks" complaint. */
+
+  // Move every teacher's MARKS-ENTRY assignment for `fromName` in `cls`
+  // over to `toName` (merging into an existing row for toName if there
+  // is one). toName === null means "remove the assignment entirely"
+  // (subject deleted).
+  function retargetTeacherAssignments(teachers, cls, fromName, toName) {
+    return teachers.map(t => {
+      const rows = t.markEntrySubjects || [];
+      const idx = rows.findIndex(r => r.subject === fromName && (r.classes || []).includes(cls));
+      if (idx === -1) return t;
+      let newRows = rows
+        .map((r, i) => i === idx ? { ...r, classes: r.classes.filter(c => c !== cls) } : r)
+        .filter(r => r.classes.length > 0);
+      if (toName) {
+        const targetIdx = newRows.findIndex(r => r.subject === toName);
+        if (targetIdx !== -1) {
+          newRows = newRows.map((r, i) => i === targetIdx
+            ? { ...r, classes: r.classes.includes(cls) ? r.classes : [...r.classes, cls] }
+            : r);
+        } else {
+          newRows = [...newRows, { subject: toName, classes: [cls] }];
+        }
+      }
+      return { ...t, markEntrySubjects: newRows };
+    });
+  }
+
+  // Toggle one teacher's marks-entry assignment for one Setup Subject in selClass.
+  function toggleTeacherSubjectAssignment(teacherId, subjectName) {
+    setData(d => ({
+      ...d,
+      teachers: (d.teachers || []).map(t => {
+        if (t.id !== teacherId) return t;
+        const rows = t.markEntrySubjects || [];
+        const idx = rows.findIndex(r => r.subject === subjectName);
+        if (idx === -1) {
+          return { ...t, markEntrySubjects: [...rows, { subject: subjectName, classes: [selClass] }] };
+        }
+        const alreadyIn = (rows[idx].classes || []).includes(selClass);
+        const newRows = rows.map((r, i) => {
+          if (i !== idx) return r;
+          const classes = alreadyIn ? r.classes.filter(c => c !== selClass) : [...r.classes, selClass];
+          return { ...r, classes };
+        }).filter(r => r.classes.length > 0);
+        return { ...t, markEntrySubjects: newRows };
+      }),
+    }));
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
+  // Teacher marks-entry rows for selClass whose subject name is NOT in
+  // the current Setup Subjects list — leftovers from renames/merges done
+  // before this screen existed. Surfaced so the admin can fix them
+  // instead of silently losing marks-entry access.
+  function getStaleTeacherAssignments() {
+    const current = new Set(getSubjectsForClass(selClass, data));
+    const out = [];
+    (data.teachers || []).forEach(t => {
+      (t.markEntrySubjects || []).forEach(r => {
+        if ((r.classes || []).includes(selClass) && !current.has(r.subject)) {
+          out.push({ teacherId: t.id, teacherName: t.name, subject: r.subject });
+        }
+      });
+    });
+    return out;
+  }
+
+  function fixStaleAssignment(teacherId, subject) {
+    const key = `${teacherId}__${subject}`;
+    const target = (staleReassignInput[key] || '').trim();
+    if (!target) { alert('Choose the current subject to reassign this to.'); return; }
+    // Scoped to just this teacher's row — so fixing one person's stale
+    // assignment can't accidentally touch another teacher who happens to
+    // share the same old subject name for a different reason.
+    setData(d => ({
+      ...d,
+      teachers: (d.teachers || []).map(t => {
+        if (t.id !== teacherId) return t;
+        return retargetTeacherAssignments([t], selClass, subject, target)[0];
+      }),
+    }));
+    setStaleReassignInput(m => { const n = { ...m }; delete n[key]; return n; });
+    if (flushSave) setTimeout(() => flushSave(), 50);
+  }
+
+  function removeStaleAssignment(teacherId, subject) {
+    setData(d => ({
+      ...d,
+      teachers: (d.teachers || []).map(t => {
+        if (t.id !== teacherId) return t;
+        return retargetTeacherAssignments([t], selClass, subject, null)[0];
+      }),
+    }));
     if (flushSave) setTimeout(() => flushSave(), 50);
   }
 
@@ -668,6 +785,11 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
               setShowSetupSubjects(true);
             }}>
               📚 Setup Subjects
+            </Btn>
+          )}
+          {isPrincipal && (
+            <Btn variant="ghost" onClick={() => setShowAssignTeachers(true)}>
+              👤 Assign Teachers
             </Btn>
           )}
         </div>
@@ -958,11 +1080,119 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                     return { ...ex, results: newResults };
                   }),
                 };
+                // Also move any teacher's marks-entry assignment from the old
+                // subject name to the new one, so renaming/combining a
+                // subject here doesn't silently strip a teacher's access —
+                // the exact confusion that made admins enter all the marks
+                // themselves.
+                let teachersNext = d.teachers || [];
+                renames.forEach(({ from, to }) => {
+                  teachersNext = retargetTeacherAssignments(teachersNext, selClass, from, to);
+                });
+                next = { ...next, teachers: teachersNext };
               }
               return next;
             });
             setShowSetupSubjects(false);
           }}>Save Subjects</Btn>
+        </div>
+      </Modal>
+
+      {/* Assign Teachers Modal — assigns marks-entry access using the ──
+          CURRENT Setup Subjects names for selClass, so there's no risk of
+          typing a subject name that's since been renamed or merged. */}
+      <Modal show={showAssignTeachers} onClose={() => setShowAssignTeachers(false)} title={`Assign Teachers — ${selClass}`} wide>
+        <Alert type="info">
+          Tick a teacher next to a subject to let them enter marks for it in <strong>{selClass}</strong>. This list always matches the current Setup Subjects — it's the same list used when a teacher enters marks for an exam.
+          <br/><strong>This is separate from the subjects assigned on the Teachers screen</strong> (which are for teaching/timetable only). Being assigned to teach a subject does <strong>not</strong> by itself let a teacher enter marks for it — only ticking them here does.
+        </Alert>
+
+        {(() => {
+          const currentSubjects = getSubjectsForClass(selClass, data);
+          const teachingStaff = (data.teachers || []).filter(isTeachingStaff);
+          if (currentSubjects.length === 0) {
+            return <Alert type="warning">No subjects set up for {selClass} yet — add them in 📚 Setup Subjects first.</Alert>;
+          }
+          if (teachingStaff.length === 0) {
+            return <Alert type="warning">No teaching staff found yet — add teachers first.</Alert>;
+          }
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {currentSubjects.map(sub => {
+                const assignedIds = new Set(
+                  teachingStaff
+                    .filter(t => (t.markEntrySubjects || []).some(r => r.subject === sub && (r.classes || []).includes(selClass)))
+                    .map(t => t.id)
+                );
+                return (
+                  <div key={sub} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{sub}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      {teachingStaff.map(t => (
+                        <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer', background: assignedIds.has(t.id) ? 'var(--accent)15' : 'transparent', padding: '4px 8px', borderRadius: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={assignedIds.has(t.id)}
+                            onChange={() => toggleTeacherSubjectAssignment(t.id, sub)}
+                          />
+                          {t.name}{t.canEnterAllMarks ? ' (all subjects)' : ''}
+                        </label>
+                      ))}
+                    </div>
+                    {assignedIds.size === 0 && (
+                      <div style={{ fontSize: 11.5, color: '#f59e0b', marginTop: 6 }}>
+                        ⚠ No teacher assigned — only the principal/class teacher can enter marks for this subject.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {(() => {
+          const stale = getStaleTeacherAssignments();
+          const currentSubjects = getSubjectsForClass(selClass, data);
+          if (stale.length === 0) return null;
+          return (
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#f59e0b', marginBottom: 4 }}>
+                ⚠ Assignments pointing at old subject names ({stale.length})
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                These teachers are assigned to a subject name that no longer exists in Setup Subjects for {selClass} — likely from before a rename or merge. They currently can't enter marks under the new name. Point each one at the correct current subject, or remove it.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {stale.map(({ teacherId, teacherName, subject }) => {
+                  const key = `${teacherId}__${subject}`;
+                  return (
+                    <div key={key} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <strong>{teacherName}</strong> → <span style={{ color: '#f59e0b' }}>{subject}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select
+                          value={staleReassignInput[key] || ''}
+                          onChange={e => setStaleReassignInput(m => ({ ...m, [key]: e.target.value }))}
+                          style={{ flex: 1, fontSize: 12 }}
+                        >
+                          <option value="">— Reassign to current subject —</option>
+                          {currentSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <Btn size="sm" variant="ghost" onClick={() => fixStaleAssignment(teacherId, subject)}>Fix</Btn>
+                        <Btn size="sm" variant="danger" onClick={() => removeStaleAssignment(teacherId, subject)}>Remove</Btn>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <Btn variant="ghost" onClick={() => setShowAssignTeachers(false)}>Close</Btn>
         </div>
       </Modal>
 

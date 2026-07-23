@@ -370,6 +370,7 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
         <div style={{ fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
           Add each subject this teacher teaches and select the classes.
           <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> Subject list filters to match selected classes.</span>
+          <br/><span style={{ color: '#f59e0b', fontSize: 11 }}>This is for teaching/timetable only — it does not give marks-entry access. To let a teacher enter exam marks, use "👤 Assign Teachers" in Exams → Setup Subjects.</span>
         </div>
 
         {/* Lower Primary quick-assign panel */}

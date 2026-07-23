@@ -22,6 +22,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
     isClassTeacher:   liveRecord?.isClassTeacher   ?? loginUser.isClassTeacher   ?? false,
     classTeacherOf:   liveRecord?.classTeacherOf   ?? loginUser.classTeacherOf   ?? null,
     teacherSubjects:  liveRecord?.subjects          ?? loginUser.teacherSubjects  ?? [],
+    markEntrySubjects: liveRecord?.markEntrySubjects ?? loginUser.markEntrySubjects ?? [],
     canEnterAllMarks: liveRecord?.canEnterAllMarks  ?? loginUser.canEnterAllMarks ?? false,
     canSeeFees:       liveRecord?.canSeeFees        ?? loginUser.canSeeFees       ?? false,
     dept:             liveRecord?.dept              ?? loginUser.dept              ?? '',
@@ -212,7 +213,8 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
 
 /* ══════════════════ HOME DASHBOARD ══════════════════ */
 function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = [], setPage }) {
-  const mySubjects     = user.teacherSubjects || [];
+  const mySubjects     = user.teacherSubjects || [];         // teaching assignment — used for lesson counts
+  const myMarkEntrySubjects = user.markEntrySubjects || [];  // marks-entry assignment — used below
   const myClasses      = [...new Set(mySubjects.flatMap(s => s.classes))];
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
@@ -223,7 +225,7 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
 
   const stats = [
     { label: isClassTeacher ? 'My Students' : 'Classes I Teach', value: isClassTeacher ? myStudents.length : myClasses.length, color: '#4f8ef7', icon: isClassTeacher ? '👨‍🎓' : '🏫', page: isClassTeacher ? 'class' : null },
-    { label: 'Subjects', value: mySubjects.length, color: '#10b981', icon: '📚', page: 'marks' },
+    { label: 'Subjects I Can Mark', value: myMarkEntrySubjects.length, color: '#10b981', icon: '📚', page: 'marks' },
     { label: "Today's Lessons", value: timetableToday.length, color: '#f59e0b', icon: '📅', page: 'lessons' },
     { label: 'Notifications', value: myNotifs.length, color: myNotifs.length > 0 ? '#ef4444' : 'var(--text-muted)', icon: '🔔', page: 'notifs' },
   ];
@@ -285,11 +287,11 @@ function TeacherHome({ user, data, timetableToday, myNotifs, pendingApprovals = 
         )}
       </Card>
 
-      {mySubjects.length > 0 && (
+      {myMarkEntrySubjects.length > 0 && (
         <Card>
-          <SectionTitle icon="book">My Subject Assignments</SectionTitle>
+          <SectionTitle icon="book">Subjects I Can Enter Marks For</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {mySubjects.map((s, i) => (
+            {myMarkEntrySubjects.map((s, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', flex: 1, minWidth: 120 }}>{s.subject}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -358,18 +360,23 @@ function TeacherLessons({ user, data }) {
 
 /* ══════════════════ ENTER MARKS ══════════════════ */
 function TeacherMarks({ user, data, setData }) {
-  const mySubjects     = user.teacherSubjects || [];
+  // Marks entry is gated by markEntrySubjects — assigned via the principal's
+  // "👤 Assign Teachers" screen in Exams → Setup Subjects. This is
+  // deliberately separate from teacherSubjects (the subjects a teacher is
+  // assigned to TEACH, set in Teachers/Settings) — being assigned to teach
+  // a subject does NOT by itself grant marks-entry access.
+  const myMarkEntrySubjects = user.markEntrySubjects || [];
   const isClassTeacher = user.isClassTeacher;
   const myClass        = user.classTeacherOf;
   const canEnterAll    = user.canEnterAllMarks || false;
   const isPrincipal    = user.role === 'principal';
 
-  const myTeachingClasses = [...new Set(mySubjects.flatMap(s => s.classes))];
+  const myMarkEntryClasses = [...new Set(myMarkEntrySubjects.flatMap(s => s.classes))];
   const allClasses        = getAllClasses(data);
 
   const availableClasses = canEnterAll
     ? allClasses
-    : [...new Set([...myTeachingClasses, ...(isClassTeacher && myClass ? [myClass] : [])])];
+    : [...new Set([...myMarkEntryClasses, ...(isClassTeacher && myClass ? [myClass] : [])])];
 
   const [selClass,   setSelClass]   = useState(availableClasses[0] || '');
   const [selExamId,  setSelExamId]  = useState('');
@@ -382,7 +389,7 @@ function TeacherMarks({ user, data, setData }) {
   function getClassSubjects(cls) {
     if (!cls) return [];
     if (canEnterAll || (isClassTeacher && cls === myClass)) return getSubjectsForClass(cls, data);
-    return mySubjects.filter(s => (s.classes||[]).includes(cls)).map(s => s.subject);
+    return myMarkEntrySubjects.filter(s => (s.classes||[]).includes(cls)).map(s => s.subject);
   }
 
   const classSubjects = getClassSubjects(selClass);

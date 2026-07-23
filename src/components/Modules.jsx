@@ -1186,6 +1186,10 @@ export function Settings({ data, setData }) {
             ...sub,
             classes: (sub.classes || []).map(r),
           })),
+          markEntrySubjects: (t.markEntrySubjects || []).map(sub => ({
+            ...sub,
+            classes: (sub.classes || []).map(r),
+          })),
         })),
         exams: (d.exams || []).map(e => ({ ...e, class: r(e.class) })),
         subjectsByClass: Object.fromEntries(

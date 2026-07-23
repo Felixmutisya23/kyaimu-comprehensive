@@ -825,6 +825,7 @@ export default function App() {
             isClassTeacher:     teacherRecord?.isClassTeacher  || teacher.is_class_teacher  || false,
             classTeacherOf:     teacherRecord?.classTeacherOf  || teacher.class_teacher_of  || null,
             teacherSubjects:    teacherRecord?.subjects        || [],
+            markEntrySubjects: teacherRecord?.markEntrySubjects || [],
             admin:              teacher.admin                  || false,
             dept:               teacherRecord?.dept            || '',
             canSeeFees:         teacherRecord?.canSeeFees      || false,
