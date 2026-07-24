@@ -644,13 +644,12 @@ async function syncExamsMetadata(schoolId, exams) {
   await setSchoolContext(schoolId);
   for (const exam of exams) {
     const localId = String(exam.id || exam._uuid || generateId());
-    const { data: existing, error: fetchErr } = await getSupabase()
-      .from('exams').select('data').eq('school_id', schoolId).eq('local_id', localId).maybeSingle();
-    if (fetchErr) { console.error('[EduManage] syncExamsMetadata fetch FAILED:', fetchErr.message, fetchErr); continue; }
-    const merged = { ...exam, results: existing?.data?.results || exam.results || {} };
-    const { error: upsertErr } = await getSupabase().from('exams')
-      .upsert({ school_id: schoolId, local_id: localId, data: merged }, { onConflict: 'school_id,local_id' });
-    if (upsertErr) console.error('[EduManage] syncExamsMetadata save FAILED:', upsertErr.message, upsertErr);
+    const metadata = { ...exam };
+    delete metadata.results; // NEVER include results here — see merge_exam_metadata
+    const { error } = await getSupabase().rpc('merge_exam_metadata', {
+      p_school_id: schoolId, p_local_id: localId, p_metadata: metadata,
+    });
+    if (error) console.error('[EduManage] syncExamsMetadata save FAILED:', error.message, error);
   }
 }
 // notifications, etc.) — call at the moment of deletion in the UI.
@@ -670,22 +669,14 @@ export async function deleteJsonRowDirect(table, schoolId, localId) {
 // submittedBy, locked }].
 export async function applyExamScorePatch(schoolId, examLocalId, patches) {
   await setSchoolContext(schoolId);
-  const { data: row, error: fetchErr } = await getSupabase()
-    .from('exams').select('data').eq('school_id', schoolId).eq('local_id', String(examLocalId)).maybeSingle();
-  if (fetchErr) { console.error('[EduManage] applyExamScorePatch fetch FAILED:', fetchErr.message, fetchErr); throw new Error('Save failed (marks): ' + fetchErr.message); }
-  const current = row?.data || {};
-  const results = { ...(current.results || {}) };
-  patches.forEach(p => {
-    results[p.studentName] = { ...(results[p.studentName] || {}) };
-    results[p.studentName][p.subject] = {
-      ...(results[p.studentName][p.subject] || {}),
-      score: p.score, submittedBy: p.submittedBy, locked: p.locked || false,
-    };
+  // Applied atomically inside the database (apply_exam_score_patches):
+  // no fetch-then-write gap on this end at all, so nothing entered by
+  // another teacher, or written by the background metadata sync, can be
+  // read-then-overwritten by this call, or vice versa.
+  const { data: merged, error } = await getSupabase().rpc('apply_exam_score_patches', {
+    p_school_id: schoolId, p_local_id: String(examLocalId), p_patches: patches,
   });
-  const merged = { ...current, results };
-  const { error: upsertErr } = await getSupabase().from('exams')
-    .upsert({ school_id: schoolId, local_id: String(examLocalId), data: merged }, { onConflict: 'school_id,local_id' });
-  if (upsertErr) { console.error('[EduManage] applyExamScorePatch save FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed (marks): ' + upsertErr.message); }
+  if (error) { console.error('[EduManage] applyExamScorePatch FAILED:', error.message, error); throw new Error('Save failed (marks): ' + error.message); }
   return merged;
 }
 
@@ -693,20 +684,11 @@ export async function applyExamScorePatch(schoolId, examLocalId, patches) {
 // subject from an exam, fetched fresh and merged the same safe way.
 export async function removeExamScore(schoolId, examLocalId, studentName, subject) {
   await setSchoolContext(schoolId);
-  const { data: row, error: fetchErr } = await getSupabase()
-    .from('exams').select('data').eq('school_id', schoolId).eq('local_id', String(examLocalId)).maybeSingle();
-  if (fetchErr) { console.error('[EduManage] removeExamScore fetch FAILED:', fetchErr.message, fetchErr); throw new Error('Save failed: ' + fetchErr.message); }
-  const current = row?.data || {};
-  const results = { ...(current.results || {}) };
-  if (results[studentName]) {
-    const studentRow = { ...results[studentName] };
-    delete studentRow[subject];
-    results[studentName] = studentRow;
-  }
-  const merged = { ...current, results };
-  const { error: upsertErr } = await getSupabase().from('exams')
-    .upsert({ school_id: schoolId, local_id: String(examLocalId), data: merged }, { onConflict: 'school_id,local_id' });
-  if (upsertErr) { console.error('[EduManage] removeExamScore save FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed: ' + upsertErr.message); }
+  const { data: merged, error } = await getSupabase().rpc('remove_exam_score', {
+    p_school_id: schoolId, p_local_id: String(examLocalId),
+    p_student_name: studentName, p_subject: subject,
+  });
+  if (error) { console.error('[EduManage] removeExamScore FAILED:', error.message, error); throw new Error('Save failed: ' + error.message); }
   return merged;
 }
 // other class's list — fetches the school's current subjects_by_class

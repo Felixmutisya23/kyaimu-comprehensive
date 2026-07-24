@@ -251,13 +251,41 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       targetClasses = [examForm.class];
     }
 
+    // Guard against duplicate exam records: if a class already has an exam
+    // with this same name/term/year, creating another one silently splits
+    // that class's marks across two independent rows — whichever one a
+    // given screen has loaded is the one new marks get saved into, so the
+    // OTHER screen appears to have "lost" them even though they're safe in
+    // the sibling record. Skip classes that already have a match instead.
+    const wantedTerm = Number(examForm.term);
+    const wantedYear = examForm.year;
+    const already = new Set(
+      data.exams
+        .filter(ex =>
+          ex.name === finalName &&
+          Number(ex.term) === wantedTerm &&
+          String(ex.year) === String(wantedYear)
+        )
+        .map(ex => ex.class)
+    );
+    const skipped = targetClasses.filter(cls => already.has(cls));
+    targetClasses = targetClasses.filter(cls => !already.has(cls));
+
+    if (targetClasses.length === 0) {
+      alert(skipped.length
+        ? `"${finalName}" already exists for ${skipped.length === 1 ? skipped[0] : 'all selected classes'}. Opening it instead of creating a duplicate — use "Enter My Scores" on the existing exam.`
+        : `Please select at least one class.`);
+      if (skipped.length) setShowAdd(false);
+      return;
+    }
+
     const newExams = targetClasses.map(cls => ({
       id: Date.now() + Math.random(),
       name: finalName,
-      term: Number(examForm.term),
+      term: wantedTerm,
       type: examForm.type,
       class: cls,
-      year: examForm.year,
+      year: wantedYear,
       results: {},
     }));
 
@@ -265,6 +293,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     setShowAdd(false);
     setExamForm(blankExamForm());
     if (newExams.length > 1) alert(`Exam "${finalName}" created for ${newExams.length} classes.`);
+    if (skipped.length) alert(`Note: "${finalName}" already existed for ${skipped.join(', ')} — skipped those to avoid creating duplicates. The existing exam and its marks for ${skipped.length === 1 ? 'that class' : 'those classes'} are untouched.`);
   }
 
   /* ── Edit exam metadata ───────────────────────────── */
