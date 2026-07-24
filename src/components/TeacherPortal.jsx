@@ -80,7 +80,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
     { id: 'marks',   icon: '✏️',  label: 'Enter Marks' },
     { id: 'results', icon: '📊', label: 'View Results' },
     ...(isClassTeacher ? [{ id: 'class', icon: '👩‍🏫', label: 'My Class' }] : []),
-    ...(user.canManageStudents ? [{ id: 'students', icon: '👨‍🎓', label: 'Students' }] : []),
+    ...((user.canManageStudents || isClassTeacher || (user.markEntrySubjects || []).length > 0) ? [{ id: 'students', icon: '👨‍🎓', label: 'Students' }] : []),
     ...(user.canMessageParents ? [{ id: 'parentmsg', icon: '💬', label: 'Message Parents' }] : []),
     ...(pendingApprovals.length > 0 ? [{ id: 'approvals', icon: '✅', label: `Approve Marks (${pendingApprovals.length})` }] : []),
     { id: 'notifs',  icon: '🔔', label: `Notifications${myNotifs.length > 0 ? ` (${myNotifs.length})` : ''}` },
@@ -197,7 +197,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
         {page === 'class'     && isClassTeacher && <TeacherClass user={user} data={data} setData={setData} />}
         {page === 'approvals' && <TeacherApprovals user={user} data={data} setData={setData} />}
         {page === 'notifs'    && <TeacherNotifs user={user} data={data} setData={setData} />}
-        {page === 'students'  && user.canManageStudents && <Students data={data} setData={setData} user={user} />}
+        {page === 'students'  && (user.canManageStudents || isClassTeacher || (user.markEntrySubjects || []).length > 0) && <Students data={data} setData={setData} user={user} />}
         {page === 'parentmsg' && user.canMessageParents && <ParentMessaging data={data} setData={setData} user={user} />}
       </main>
 

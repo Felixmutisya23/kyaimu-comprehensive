@@ -259,14 +259,31 @@ export function computeRankings(exam, allStudents, data) {
     return { total, mean, grade: getGrade(Math.round(mean)), results: res, subjects: subs };
   }
 
+  // A student only counts toward the class list / ranking once they have a
+  // recorded score for EVERY subject set up for their class — a student
+  // missing even one subject's mark is excluded entirely (not shown with
+  // zeros, not counted in the mean or position of anyone else).
+  function hasCompletedAllExams(studentClass, res) {
+    const expected = getSubjectsForClass(studentClass, data);
+    if (expected.length === 0) return false;
+    return expected.every(sub => {
+      const cell = res[sub];
+      return cell !== undefined && cell !== null && getScore(cell) !== null && getScore(cell) !== undefined;
+    });
+  }
+
   // Overall: across ALL sibling streams — each student ranked using their OWN stream's exam
-  const allSiblingStudents = allStudents.filter(s => siblingClasses.includes(s.class));
+  const allSiblingStudents = allStudents
+    .filter(s => siblingClasses.includes(s.class))
+    .filter(s => hasCompletedAllExams(s.class, (siblingExamMap[s.class] || exam.results || {})[s.name] || {}));
   const overallSorted = [...allSiblingStudents]
     .map(s => ({ name: s.name, class: s.class, ...calcStatsForStudent(s) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   // Stream: within this exam's class only — uses this exam's results
-  const streamStudents = allStudents.filter(s => s.class === exam.class);
+  const streamStudents = allStudents
+    .filter(s => s.class === exam.class)
+    .filter(s => hasCompletedAllExams(s.class, (exam.results || {})[s.name] || {}));
   const streamSorted = [...streamStudents]
     .map(s => ({ name: s.name, class: s.class, ...calcStatsFromResults(s.name, exam.results || {}) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
@@ -424,6 +441,10 @@ function renderResultSheet({
     const res   = resultsMap[s.name] || {};
     const subs  = subjects.filter(k => res[k] !== undefined);
     const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const points = subs.reduce((a, k) => {
+      const sc = getScore(res[k]);
+      return a + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
+    }, 0);
     const mean  = subs.length ? (total / subs.length).toFixed(1) : '—';
     const g     = getGrade(Math.round(parseFloat(mean) || 0));
     const pos   = s[posKey] || (idx + 1);
@@ -448,6 +469,7 @@ function renderResultSheet({
         ${showStream ? `<td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:10px;color:#64748b;font-weight:600">${s.stream || s.class || ''}</td>` : ''}
         ${subCells}
         <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:900;font-size:11px">${total}</td>
+        <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:#7c3aed;font-size:11px">${points}</td>
         <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:11px">${mean}</td>
         <td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center">
           <span style="background:${gradeColor(g.label)}22;color:${gradeColor(g.label)};padding:1px 6px;border-radius:8px;font-weight:700;font-size:10px">${g.label}</span>
@@ -513,6 +535,7 @@ function renderResultSheet({
             ${showStream ? `<th style="padding:7px 6px;border:1px solid ${p};text-align:center">STREAM</th>` : ''}
             ${subTHs}
             <th style="padding:7px 6px;border:1px solid ${p};text-align:center">TOTAL</th>
+            <th style="padding:7px 6px;border:1px solid ${p};text-align:center">POINTS</th>
             <th style="padding:7px 6px;border:1px solid ${p};text-align:center">MEAN</th>
             <th style="padding:7px 6px;border:1px solid ${p};text-align:center">GRADE</th>
             <th style="padding:7px 6px;border:1px solid ${p};text-align:center">POSITION</th>

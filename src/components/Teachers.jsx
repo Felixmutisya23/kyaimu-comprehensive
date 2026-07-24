@@ -332,12 +332,27 @@ export default function Teachers({ data, setData , isDark, themeVars }) {
                 <span style={{ marginLeft: 12, color: '#4f8ef7' }}>Password: {t.password || t.staffId}</span>
               </div>
               {t.subjects && t.subjects.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {t.subjects.map((s, i) => (
-                    <span key={i} style={{ background: '#4f8ef710', border: '1px solid #4f8ef730', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: '#4f8ef7' }}>
-                      {s.subject}: {s.classes.join(', ')}
-                    </span>
-                  ))}
+                <div style={{ marginBottom: t.markEntrySubjects && t.markEntrySubjects.length > 0 ? 6 : 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 }}>Teaching (timetable only — not marks access)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {t.subjects.map((s, i) => (
+                      <span key={i} style={{ background: '#4f8ef710', border: '1px solid #4f8ef730', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: '#4f8ef7' }}>
+                        {s.subject}: {s.classes.join(', ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {t.markEntrySubjects && t.markEntrySubjects.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 }}>✎ Can enter marks for</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {t.markEntrySubjects.map((s, i) => (
+                      <span key={i} style={{ background: '#10b98110', border: '1px solid #10b98130', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: '#10b981', fontWeight: 600 }}>
+                        {s.subject}: {s.classes.join(', ')}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

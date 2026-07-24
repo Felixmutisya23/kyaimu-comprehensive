@@ -25,6 +25,16 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
   // being the principal or a class teacher. Deleting a student record is
   // deliberately still principal-only.
   const canManageAllStudents = isPrincipal || !!user.canManageStudents;
+  // Every teacher — not just Registrar — can add/edit students in classes
+  // they're directly responsible for: their own class (if class teacher)
+  // and any class they're assigned to enter marks for. This is deliberately
+  // narrower than canManageAllStudents (no access to classes they have no
+  // connection to), and never includes delete.
+  const myOwnClasses = [...new Set([
+    ...(isClassTeacher && myClass ? [myClass] : []),
+    ...((user.markEntrySubjects || []).flatMap(s => s.classes || [])),
+  ])];
+  const canManageOwnClasses = !canManageAllStudents && myOwnClasses.length > 0;
 
   const admMode = data.admissionSetting || 'manual';
   // manual = Type A: required, admin types
@@ -36,7 +46,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
     if (!canManageAllStudents) {
       if (isClassTeacher) students = students.filter(s => s.class === myClass);
       else {
-        const myClasses = (user.teacherSubjects || []).flatMap(s => s.classes);
+        const myClasses = [...new Set([...(user.teacherSubjects || []).flatMap(s => s.classes), ...myOwnClasses])];
         students = students.filter(s => myClasses.includes(s.class));
       }
     }
@@ -219,15 +229,15 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
     setUploadRows([]);
   }
 
-  const canAdd         = canManageAllStudents || isClassTeacher;
-  const addableClasses = canManageAllStudents ? getAllClasses(data) : isClassTeacher ? [myClass] : [];
+  const canAdd         = canManageAllStudents || isClassTeacher || canManageOwnClasses;
+  const addableClasses = canManageAllStudents ? getAllClasses(data) : isClassTeacher ? [myClass] : myOwnClasses;
 
   function save() {
     if (!form.firstName.trim() && !form.lastName.trim()) {
       alert('Please enter at least a first name or last name.');
       return;
     }
-    if (!canManageAllStudents && isClassTeacher && form.class !== myClass) {
+    if (!canManageAllStudents && !canManageOwnClasses && isClassTeacher && form.class !== myClass) {
       alert(`You can only add students to your class: ${myClass}`);
       return;
     }
@@ -357,7 +367,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
   const allClasses     = getAllClasses(data);
   const visibleClasses = canManageAllStudents ? allClasses
     : isClassTeacher ? [myClass]
-    : (user.teacherSubjects || []).flatMap(s => s.classes).filter((v, i, a) => a.indexOf(v) === i);
+    : [...new Set([...(user.teacherSubjects || []).flatMap(s => s.classes), ...myOwnClasses])].filter((v, i, a) => a.indexOf(v) === i);
 
   /* ── Student detail view ──────────────────────────── */
   if (viewStudent) {
@@ -624,7 +634,7 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
                     <td style={TS.td}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <Btn size="sm" variant="ghost" onClick={() => setViewStudent(s)}><Icon name="eye" size={13} /></Btn>
-                        {(canManageAllStudents || isClassTeacher) && <Btn size="sm" variant="ghost" onClick={() => openEdit(s)}><Icon name="edit" size={13} /></Btn>}
+                        {(canManageAllStudents || isClassTeacher || myOwnClasses.includes(s.class)) && <Btn size="sm" variant="ghost" onClick={() => openEdit(s)}><Icon name="edit" size={13} /></Btn>}
                         {isPrincipal && <Btn size="sm" variant="danger" onClick={() => deleteStudent(s.id)}><Icon name="trash" size={13} /></Btn>}
                       </div>
                     </td>
@@ -850,8 +860,8 @@ export default function Students({ data, setData, user, isUnlocked = true , isDa
           <FormRow>
             <FormGroup label="Class">
               <select value={editForm.class} onChange={e=>setEditForm({...editForm,class:e.target.value})}
-                disabled={isClassTeacher&&!canManageAllStudents}>
-                {(canManageAllStudents ? getAllClasses(data) : [myClass]).map(c=><option key={c} value={c}>{c}</option>)}
+                disabled={isClassTeacher&&!canManageAllStudents&&!canManageOwnClasses}>
+                {(canManageAllStudents ? getAllClasses(data) : (isClassTeacher ? [myClass] : myOwnClasses)).map(c=><option key={c} value={c}>{c}</option>)}
               </select>
             </FormGroup>
             <FormGroup label="Date of Birth">

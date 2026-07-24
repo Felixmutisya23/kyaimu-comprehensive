@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
-import { deleteJsonRowDirect, applyExamScorePatch, saveSubjectsByClassDirect } from '../supabase';
+import { deleteJsonRowDirect, applyExamScorePatch, removeExamScore, saveSubjectsByClassDirect } from '../supabase';
 
 export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
   const _bg = themeVars ? themeVars['--bg'] : 'var(--bg)';
@@ -186,13 +186,33 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       const subs  = Object.keys(res);
       const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
       const mean  = subs.length ? Math.round(total / subs.length) : 0;
-      return { total, mean, grade: getGrade(mean), results: res, subs };
+      const points = subs.reduce((a, k) => {
+        const sc = getScore(res[k]);
+        return a + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
+      }, 0);
+      return { total, mean, grade: getGrade(mean), results: res, subs, points };
+    }
+
+    // A student only appears on the class list / counts toward anyone's
+    // position once they have a recorded score for EVERY subject set up
+    // for their class — missing even one subject excludes them entirely,
+    // rather than showing them with zeros and letting them affect the mean.
+    function hasCompletedAllExams(student) {
+      const expected = getSubjectsForClass(student.class, data);
+      if (expected.length === 0) return false;
+      const sibExam    = findSiblingExam(student.class);
+      const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
+      const res = resultsObj[student.name] || {};
+      return expected.every(sub => {
+        const sc = getScore(res[sub]);
+        return sc !== null && sc !== undefined;
+      });
     }
 
     // This stream's students only
-    const streamStudents = data.students.filter(s => s.class === exam.class);
+    const streamStudents = data.students.filter(s => s.class === exam.class && hasCompletedAllExams(s));
     // All sibling streams students
-    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class));
+    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class) && hasCompletedAllExams(s));
 
     const overallRanked = allSiblings
       .map(s => ({ ...s, ...calcStats(s) }))
@@ -318,124 +338,46 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     setShowEditReq(true);
   }
 
-  function submitEditRequest() {
+  async function submitEditRequest() {
     const newScore = Number(editNewScore);
     if (isNaN(newScore) || newScore < 0 || newScore > 100) { alert('Please enter a valid score (0–100)'); return; }
-    // Only block "no-op" edits for the approval-request flow — a principal's
-    // direct edit is harmless even if re-entering the same number, and
-    // blocking it here was an unnecessary restriction on the admin.
     if (!isPrincipal && newScore === editTarget.currentScore) { alert('New score is the same as current score.'); return; }
 
-    // Principal edits marks directly — no approval needed
-    if (isPrincipal) {
+    // Anyone who can see this edit button (principal, the assigned subject
+    // teacher, or the class teacher — gated by canRequestEdit) can save the
+    // change directly. There is no more approval queue for marks edits —
+    // it only added delay and was where changes could go missing.
+    try {
+      const merged = await applyExamScorePatch(data._schoolId, editTarget.examId, [{
+        studentName: editTarget.studentName, subject: editTarget.subject,
+        score: newScore, submittedBy: user.staffId, locked: false,
+      }]);
       setData(d => ({
         ...d,
-        exams: d.exams.map(ex => {
-          if (ex.id !== editTarget.examId) return ex;
-          const newResults = { ...ex.results };
-          if (!newResults[editTarget.studentName]) newResults[editTarget.studentName] = {};
-          newResults[editTarget.studentName] = {
-            ...newResults[editTarget.studentName],
-            [editTarget.subject]: { score: newScore, submittedBy: user.staffId, locked: false, editedByPrincipal: true },
-          };
-          return { ...ex, results: newResults };
-        }),
+        exams: d.exams.map(ex => ex.id === editTarget.examId ? { ...ex, results: merged.results } : ex),
       }));
       setShowEditReq(false);
-      if (flushSave) setTimeout(() => flushSave(), 50);
-      return;
+    } catch (e) {
+      console.error('Edit failed:', e);
+      alert('Could not save — check your connection and try again.');
     }
-
-    const ctStaffId = getClassTeacherStaffId(selClass, data);
-
-    const req = {
-      id: Date.now(),
-      examId: editTarget.examId,
-      studentName: editTarget.studentName,
-      subject: editTarget.subject,
-      oldScore: editTarget.currentScore,
-      newScore,
-      requestedBy: user.staffId,
-      requestedByName: user.name,
-      approvals: {
-        classTeacher: (user.isClassTeacher && user.classTeacherOf === selClass) ? 'approved' : null,
-        principal:    isPrincipal ? 'approved' : null,
-      },
-      status: 'pending',
-      date: new Date().toISOString().split('T')[0],
-    };
-
-    // Check if both are already approved (e.g. principal is class teacher)
-    let finalReq = req;
-    let finalData = data;
-    if (req.approvals.classTeacher === 'approved' && req.approvals.principal === 'approved') {
-      finalReq = { ...req, status: 'approved' };
-      // Apply immediately
-      finalData = applyEditRequest(data, finalReq);
-    }
-
-    const notifications = [...(finalData.notifications || [])];
-    // Notify class teacher
-    if (ctStaffId && ctStaffId !== user.staffId) {
-      notifications.push({ id: Date.now() + 1, to: ctStaffId, from: user.name, message: `Edit request: ${editTarget.studentName} — ${editTarget.subject} (${editTarget.currentScore}→${newScore}). Requested by ${user.name}. Your approval needed.`, date: new Date().toISOString().split('T')[0], read: false });
-    }
-    // Notify principal
-    if (!isPrincipal) {
-      notifications.push({ id: Date.now() + 2, to: data.teachers.find(t => t.admin)?.staffId || 'T000', from: user.name, message: `Edit request: ${editTarget.studentName} — ${editTarget.subject} (${editTarget.currentScore}→${newScore}). Requested by ${user.name}. Your approval needed.`, date: new Date().toISOString().split('T')[0], read: false });
-    }
-    // Notify teacher who originally submitted (if different)
-    const origTeacher = data.exams.find(e => e.id === editTarget.examId)?.results?.[editTarget.studentName]?.[editTarget.subject]?.submittedBy;
-    if (origTeacher && origTeacher !== user.staffId && origTeacher !== ctStaffId) {
-      notifications.push({ id: Date.now() + 3, to: origTeacher, from: user.name, message: `Edit request on your mark: ${editTarget.studentName} — ${editTarget.subject} (${editTarget.currentScore}→${newScore}). Requested by ${user.name}.`, date: new Date().toISOString().split('T')[0], read: false });
-    }
-
-    setData(d => ({
-      ...finalData,
-      editRequests: [...(finalData.editRequests || []), finalReq],
-      notifications,
-    }));
-
-    setShowEditReq(false);
-    if (finalReq.status === 'approved') {
-      alert('Score updated immediately (all approvals already granted).');
-    } else {
-      alert('Edit request submitted. Approval needed from class teacher and principal.');
-    }
-  }
-
-  function applyEditRequest(d, req) {
-    return {
-      ...d,
-      exams: d.exams.map(ex => {
-        if (ex.id !== req.examId) return ex;
-        const r = { ...ex.results };
-        if (r[req.studentName]?.[req.subject]) {
-          r[req.studentName] = { ...r[req.studentName], [req.subject]: { ...r[req.studentName][req.subject], score: req.newScore } };
-        }
-        return { ...ex, results: r };
-      }),
-    };
   }
 
   /* ── Remove a mark entirely (principal only, direct — no approval,
      no restriction) ───────────────────────────────────────────── */
-  function clearScore(studentName, subject, examId) {
+  async function clearScore(studentName, subject, examId) {
     if (!isPrincipal) return;
     if (!window.confirm(`Remove the ${subject} score for ${studentName}? This cannot be undone.`)) return;
-    setData(d => ({
-      ...d,
-      exams: d.exams.map(ex => {
-        if (ex.id !== examId) return ex;
-        const newResults = { ...ex.results };
-        if (newResults[studentName]) {
-          const updated = { ...newResults[studentName] };
-          delete updated[subject];
-          newResults[studentName] = updated;
-        }
-        return { ...ex, results: newResults };
-      }),
-    }));
-    if (flushSave) setTimeout(() => flushSave(), 50);
+    try {
+      const merged = await removeExamScore(data._schoolId, examId, studentName, subject);
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => ex.id === examId ? { ...ex, results: merged.results } : ex),
+      }));
+    } catch (e) {
+      console.error('Clear score failed:', e);
+      alert('Could not save — check your connection and try again.');
+    }
   }
 
   /* ── Edit a GROUP column (e.g. "English" = Grammar + Composition) ──
@@ -451,7 +393,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     setShowEditGroup(true);
   }
 
-  function saveGroupEdit() {
+  async function saveGroupEdit() {
     const { studentName, examId, column, values } = editGroupTarget;
     for (const c of column.components) {
       const v = values[c];
@@ -460,24 +402,19 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
         return;
       }
     }
-    setData(d => ({
-      ...d,
-      exams: d.exams.map(ex => {
-        if (ex.id !== examId) return ex;
-        const newResults = { ...ex.results };
-        const studentResults = { ...(newResults[studentName] || {}) };
-        column.components.forEach(c => {
-          const v = values[c];
-          if (v === '' || v === null || v === undefined) {
-            delete studentResults[c];
-          } else {
-            studentResults[c] = { score: Number(v), submittedBy: user.staffId, locked: false, editedByPrincipal: true };
-          }
-        });
-        newResults[studentName] = studentResults;
-        return { ...ex, results: newResults };
-      }),
-    }));
+    const patches = column.components
+      .filter(c => values[c] !== '' && values[c] !== null && values[c] !== undefined)
+      .map(c => ({ studentName, subject: c, score: Number(values[c]), submittedBy: user.staffId, locked: false }));
+    try {
+      const merged = await applyExamScorePatch(data._schoolId, examId, patches);
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => ex.id === examId ? { ...ex, results: merged.results } : ex),
+      }));
+    } catch (e) {
+      console.error('Save failed:', e);
+      alert('Could not save — check your connection and try again.');
+    }
     setShowEditGroup(false);
     if (flushSave) setTimeout(() => flushSave(), 50);
   }
@@ -842,7 +779,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                   <th style={{ ...TS.th, position: 'sticky', left: 32, zIndex: 20, background: 'var(--table-header-bg, #1e40af)', minWidth: 140 }}>Name</th>
                   <th style={TS.th}>Adm No</th>
                   {visibleSubjects.map(s => <th key={s} style={{ ...TS.th, whiteSpace: 'nowrap' }}>{s}</th>)}
-                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
+                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Points</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
                   <th style={TS.th}>Action</th>
                 </tr>
               </thead>
@@ -890,6 +827,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                     {(isClassTeacher || isPrincipal) && (
                       <>
                         <td style={{ ...TS.td, fontWeight: 700 }}>{s.total}</td>
+                        <td style={{ ...TS.td, fontWeight: 700, color: '#7c3aed' }}>{s.points}</td>
                         <td style={TS.td}>{s.mean}</td>
                         <td style={TS.td}><GradeBadge score={s.mean} /></td>
                         <td style={{ ...TS.td, fontWeight: 700, color: '#f59e0b' }}>

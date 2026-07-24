@@ -660,7 +660,26 @@ export async function applyExamScorePatch(schoolId, examLocalId, patches) {
   return merged;
 }
 
-// Safely set the Setup Subjects list for ONE class without touching any
+// Companion to applyExamScorePatch: removes one student's score for one
+// subject from an exam, fetched fresh and merged the same safe way.
+export async function removeExamScore(schoolId, examLocalId, studentName, subject) {
+  await setSchoolContext(schoolId);
+  const { data: row, error: fetchErr } = await getSupabase()
+    .from('exams').select('data').eq('school_id', schoolId).eq('local_id', String(examLocalId)).maybeSingle();
+  if (fetchErr) { console.error('[EduManage] removeExamScore fetch FAILED:', fetchErr.message, fetchErr); throw new Error('Save failed: ' + fetchErr.message); }
+  const current = row?.data || {};
+  const results = { ...(current.results || {}) };
+  if (results[studentName]) {
+    const studentRow = { ...results[studentName] };
+    delete studentRow[subject];
+    results[studentName] = studentRow;
+  }
+  const merged = { ...current, results };
+  const { error: upsertErr } = await getSupabase().from('exams')
+    .upsert({ school_id: schoolId, local_id: String(examLocalId), data: merged }, { onConflict: 'school_id,local_id' });
+  if (upsertErr) { console.error('[EduManage] removeExamScore save FAILED:', upsertErr.message, upsertErr); throw new Error('Save failed: ' + upsertErr.message); }
+  return merged;
+}
 // other class's list — fetches the school's current subjects_by_class
 // straight from the database, updates just this one class's key, and
 // writes back immediately. This is what stops Setup Subjects from
