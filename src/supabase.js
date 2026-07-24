@@ -470,7 +470,7 @@ export async function saveSchoolData(data) {
   }
 
   const jsonTables = [
-    ['exams', data.exams], ['terms', data.terms], ['roll_calls', data.rollCalls],
+    ['terms', data.terms], ['roll_calls', data.rollCalls],
     ['permissions', data.permissions], ['status_alerts', data.statusAlerts],
     ['notifications', data.notifications], ['messages', data.messages],
     ['parent_messages', data.parentMessages], ['inventory', data.inventory],
@@ -481,6 +481,13 @@ export async function saveSchoolData(data) {
       await syncJsonTable(table, schoolId, items || []);
       markClean(schoolId, table, items);
     }
+  }
+  // Exams get their own sync (below) — it deliberately NEVER touches the
+  // `results` field, so a teacher on another device with a stale copy of
+  // other classes' marks can't wipe them out just by saving anything.
+  if (isDirty(schoolId, 'exams', data.exams)) {
+    await syncExamsMetadata(schoolId, data.exams || []);
+    markClean(schoolId, 'exams', data.exams);
   }
 
   if (isDirty(schoolId, 'fee_types', data.feeTypes)) {
@@ -623,7 +630,29 @@ async function syncJsonTable(table, schoolId, items) {
   if (upsertErr) { console.error(`[EduManage] ${table}.upsert FAILED:`, upsertErr.message, upsertErr); throw new Error(`Save failed (${table}): ` + upsertErr.message); }
 }
 
-// Explicit, immediate delete for one row in a json-blob table (exams,
+// Exams get a dedicated sync, deliberately separate from syncJsonTable,
+// because `results` (the actual marks) must NEVER be overwritten by this
+// general path — only by applyExamScorePatch / removeExamScore, which
+// fetch-merge-write against the database's current state. This function
+// saves everything ELSE about an exam (name, class, term, year, any other
+// metadata) safely, while always preserving whatever is currently in the
+// database for `results`, no matter what this device's local copy of
+// `results` looks like. This is what stops "a teacher saves something
+// unrelated and it silently erases another class's marks."
+async function syncExamsMetadata(schoolId, exams) {
+  if (!exams || !exams.length) return;
+  await setSchoolContext(schoolId);
+  for (const exam of exams) {
+    const localId = String(exam.id || exam._uuid || generateId());
+    const { data: existing, error: fetchErr } = await getSupabase()
+      .from('exams').select('data').eq('school_id', schoolId).eq('local_id', localId).maybeSingle();
+    if (fetchErr) { console.error('[EduManage] syncExamsMetadata fetch FAILED:', fetchErr.message, fetchErr); continue; }
+    const merged = { ...exam, results: existing?.data?.results || exam.results || {} };
+    const { error: upsertErr } = await getSupabase().from('exams')
+      .upsert({ school_id: schoolId, local_id: localId, data: merged }, { onConflict: 'school_id,local_id' });
+    if (upsertErr) console.error('[EduManage] syncExamsMetadata save FAILED:', upsertErr.message, upsertErr);
+  }
+}
 // notifications, etc.) — call at the moment of deletion in the UI.
 export async function deleteJsonRowDirect(table, schoolId, localId) {
   await setSchoolContext(schoolId);
