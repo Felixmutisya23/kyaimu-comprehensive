@@ -183,7 +183,15 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       const sibExam   = findSiblingExam(student.class);
       const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
       const res   = resultsObj[student.name] || {};
-      const subs  = Object.keys(res);
+      // Always divide by the FULL set of subjects offered for this
+      // student's class — not just whichever subjects happen to have a
+      // score recorded for this particular student so far. Using
+      // Object.keys(res) here used to mean a student marked in only 1 of
+      // 6 subjects got a "mean" equal to that single score, which could
+      // be wildly higher or lower than a classmate marked in all 6 —
+      // total marks and mean must be computed on the same denominator
+      // for every student to be comparable.
+      const subs  = getSubjectsForClass(student.class, data);
       const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
       const mean  = subs.length ? Math.round(total / subs.length) : 0;
       const points = subs.reduce((a, k) => {
@@ -806,9 +814,9 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                 <tr>
                   <th style={{ ...TS.th, position: 'sticky', left: 0, zIndex: 20, background: 'var(--table-header-bg, #1e40af)' }}>#</th>
                   <th style={{ ...TS.th, position: 'sticky', left: 32, zIndex: 20, background: 'var(--table-header-bg, #1e40af)', minWidth: 140 }}>Name</th>
-                  <th style={TS.th}>Adm No</th>
+                  <th style={{ ...TS.th, borderRight: '2px solid var(--border)' }}>Adm No</th>
                   {visibleSubjects.map(s => <th key={s} style={{ ...TS.th, whiteSpace: 'nowrap' }}>{s}</th>)}
-                  {(isClassTeacher || isPrincipal) && <><th style={TS.th}>Total</th><th style={TS.th}>Points</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
+                  {(isClassTeacher || isPrincipal) && <><th style={{ ...TS.th, borderLeft: '2px solid var(--border)' }}>Total</th><th style={TS.th}>Points</th><th style={TS.th}>Mean</th><th style={TS.th}>Grade</th><th style={TS.th}>Pos</th>{hasStreams && <th style={TS.th}>Strm Pos</th>}</>}
                   <th style={TS.th}>Action</th>
                 </tr>
               </thead>
@@ -821,7 +829,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                       </span>
                     </td>
                     <td style={{ ...TS.td, fontWeight: 500 }}>{s.name}</td>
-                    <td style={TS.td}>{s.admNo}</td>
+                    <td style={{ ...TS.td, borderRight: '2px solid var(--border)' }}>{s.admNo}</td>
                     {visibleSubjects.map(colName => {
                       const col   = examColumns.find(c => c.name === colName) || { name: colName, type: 'single', subject: colName };
                       const score = computeColumnScore(col, s.results);
@@ -855,7 +863,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                     })}
                     {(isClassTeacher || isPrincipal) && (
                       <>
-                        <td style={{ ...TS.td, fontWeight: 700 }}>{s.total}</td>
+                        <td style={{ ...TS.td, fontWeight: 700, borderLeft: '2px solid var(--border)' }}>{s.total}</td>
                         <td style={{ ...TS.td, fontWeight: 700, color: '#7c3aed' }}>{s.points}</td>
                         <td style={TS.td}>{s.mean}</td>
                         <td style={TS.td}><GradeBadge score={s.mean} /></td>
@@ -1448,6 +1456,6 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
 
 const TS = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
-  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' },
+  th:    { textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', background: 'var(--surface2)', whiteSpace: 'nowrap' },
+  td:    { padding: '10px 12px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', color: 'var(--text)' },
 };
