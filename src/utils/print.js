@@ -482,42 +482,12 @@ function renderResultSheet({
       </tr>`;
   }).join('');
 
-  // Column totals — sum of every student's score in each subject, for the
-  // footer row under the table (marks entered for that subject only;
-  // students missing that subject just don't contribute to its sum).
-  const subjectTotals = subjects.map(sub => {
-    let sum = 0, count = 0;
-    students.forEach(s => {
-      const score = getScore((resultsMap[s.name] || {})[sub]);
-      if (score !== null && score !== undefined) { sum += score; count++; }
-    });
-    return { sum, count };
-  });
-  const grandTotal = students.reduce((a, s) => {
-    const res  = resultsMap[s.name] || {};
-    return a + subjects.reduce((aa, k) => aa + (getScore(res[k]) ?? 0), 0);
-  }, 0);
-  const totalsRow = `
-    <tr style="background:${p}18">
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">SUBJECT TOTAL</td>
-      ${showStream ? `<td style="padding:5px 6px;border:1px solid ${gridLine}"></td>` : ''}
-      ${subjectTotals.map(t => `<td style="padding:5px 4px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${t.sum}</td>`).join('')}
-      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${grandTotal}</td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-    </tr>`;
-
-  // Best and weakest subject
-  const best    = subjectStats[0];
-  const weakest = subjectStats[subjectStats.length - 1];
-
-  // Summary stats — class mean must be the average of each student's
-  // per-subject MEAN (0–100 scale), not the average of their totals
-  // (sum across all subjects), otherwise it blows past 100 and getGrade()
-  // falls through to its last band (BE2) for every student every time.
+  // Class mean — average of each student's own mean (0–100 scale). Not
+  // grand-total-of-marks ÷ students, since that isn't on a 0–100 scale
+  // once there's more than one subject (e.g. 4 subjects → totals up near
+  // 400), which would push getGrade() to fall through to its lowest band
+  // for every student. Averaging each student's own (already 0–100) mean
+  // keeps this comparable to any individual student's Mean column.
   const allMeans = students.map(s => {
     const res  = resultsMap[s.name] || {};
     const hasAnyScore = subjects.some(k => { const sc = getScore(res[k]); return sc !== null && sc !== undefined; });
@@ -531,6 +501,54 @@ function renderResultSheet({
     ? (allMeans.reduce((a, b) => a + b, 0) / allMeans.length).toFixed(1)
     : '—';
   const classGrade = getGrade(Math.round(parseFloat(classMean) || 0));
+
+  // Column totals — sum of every student's score in each subject, for the
+  // footer row under the table (marks entered for that subject only;
+  // students missing that subject just don't contribute to its sum).
+  const subjectTotals = subjects.map(sub => {
+    let sum = 0, count = 0;
+    students.forEach(s => {
+      const score = getScore((resultsMap[s.name] || {})[sub]);
+      if (score !== null && score !== undefined) { sum += score; count++; }
+    });
+    return { sum, count };
+  });
+  // Per-subject class average = that subject's total ÷ students who have a
+  // score in it (same method as the Subject Performance Analysis table
+  // below, so the two agree with each other).
+  const subjectMeans = subjectTotals.map(t => t.count ? Math.round((t.sum / t.count) * 10) / 10 : 0);
+  const grandTotal = students.reduce((a, s) => {
+    const res  = resultsMap[s.name] || {};
+    return a + subjects.reduce((aa, k) => aa + (getScore(res[k]) ?? 0), 0);
+  }, 0);
+  // Average total marks per student = grand total ÷ number of students.
+  // NOTE: this is on a "sum of all subjects" scale (e.g. out of 400 for 4
+  // subjects), not the 0–100 "Mean" column.
+  const avgTotalPerStudent = students.length ? Math.round((grandTotal / students.length) * 10) / 10 : 0;
+  const totalsRow = `
+    <tr style="background:${p}18">
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">SUBJECT TOTAL</td>
+      ${showStream ? `<td style="padding:5px 6px;border:1px solid ${gridLine}"></td>` : ''}
+      ${subjectTotals.map(t => `<td style="padding:5px 4px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${t.sum}</td>`).join('')}
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}" colspan="4">TOTAL (ALL SUBJECTS COMBINED): ${grandTotal}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+    </tr>
+    <tr style="background:${p}0d">
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">SUBJECT MEAN</td>
+      ${showStream ? `<td style="padding:5px 6px;border:1px solid ${gridLine}"></td>` : ''}
+      ${subjectMeans.map(m => `<td style="padding:5px 4px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${a}">${m}</td>`).join('')}
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:700;font-size:9px;color:${a}">Avg total/student: ${avgTotalPerStudent}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${a}">${classMean}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+    </tr>`;
+
+  // Best and weakest subject
+  const best    = subjectStats[0];
+  const weakest = subjectStats[subjectStats.length - 1];
 
   return `
     ${hdr}
