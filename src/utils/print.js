@@ -521,28 +521,34 @@ function renderResultSheet({
     const res  = resultsMap[s.name] || {};
     return a + subjects.reduce((aa, k) => aa + (getScore(res[k]) ?? 0), 0);
   }, 0);
-  // Average total marks per student = grand total ÷ number of students.
-  // NOTE: this is on a "sum of all subjects" scale (e.g. out of 400 for 4
-  // subjects), not the 0–100 "Mean" column.
-  const avgTotalPerStudent = students.length ? Math.round((grandTotal / students.length) * 10) / 10 : 0;
+  const totalPoints = students.reduce((a, s) => {
+    const res = resultsMap[s.name] || {};
+    return a + subjects.reduce((aa, k) => {
+      const sc = getScore(res[k]);
+      return aa + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
+    }, 0);
+  }, 0);
+  const avgPoints = students.length ? Math.round((totalPoints / students.length) * 10) / 10 : 0;
+
+  // Every summary column (Total / Points / Mean / Grade) gets its own real
+  // value here — no colspan skipping past a column, so nothing is left
+  // uncomputed under any header.
   const totalsRow = `
     <tr style="background:${p}18">
       <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">SUBJECT TOTAL</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">CLASS TOTAL / MEAN</td>
       ${showStream ? `<td style="padding:5px 6px;border:1px solid ${gridLine}"></td>` : ''}
-      ${subjectTotals.map(t => `<td style="padding:5px 4px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${t.sum}</td>`).join('')}
-      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}" colspan="4">TOTAL (ALL SUBJECTS COMBINED): ${grandTotal}</td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-    </tr>
-    <tr style="background:${p}0d">
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine};font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">SUBJECT MEAN</td>
-      ${showStream ? `<td style="padding:5px 6px;border:1px solid ${gridLine}"></td>` : ''}
-      ${subjectMeans.map(m => `<td style="padding:5px 4px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${a}">${m}</td>`).join('')}
-      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:700;font-size:9px;color:${a}">Avg total/student: ${avgTotalPerStudent}</td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${a}">${classMean}</td>
-      <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
+      ${subjectTotals.map((t, i) => `
+        <td style="padding:3px 4px;border:1px solid ${gridLine};text-align:center;vertical-align:middle">
+          <div style="font-weight:900;font-size:10px;color:${p}">${t.sum}</div>
+          <div style="font-size:8px;font-weight:700;color:${a}">avg ${subjectMeans[i]}</div>
+        </td>`).join('')}
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${grandTotal}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${avgPoints}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${classMean}</td>
+      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center">
+        <span style="background:${gradeColor(classGrade.label)}22;color:${gradeColor(classGrade.label)};padding:1px 6px;border-radius:8px;font-weight:700;font-size:10px">${classGrade.label}</span>
+      </td>
       <td style="padding:5px 6px;border:1px solid ${gridLine}"></td>
     </tr>`;
 
