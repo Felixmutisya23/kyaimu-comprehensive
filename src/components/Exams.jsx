@@ -210,9 +210,9 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     }
 
     // This stream's students only
-    const streamStudents = data.students.filter(s => s.class === exam.class && hasCompletedAllExams(s));
+    const streamStudents = data.students.filter(s => s.class === exam.class);
     // All sibling streams students
-    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class) && hasCompletedAllExams(s));
+    const allSiblings    = data.students.filter(s => siblingClasses.includes(s.class));
 
     const overallRanked = allSiblings
       .map(s => ({ ...s, ...calcStats(s) }))

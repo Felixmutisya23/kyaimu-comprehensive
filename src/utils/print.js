@@ -273,17 +273,13 @@ export function computeRankings(exam, allStudents, data) {
   }
 
   // Overall: across ALL sibling streams — each student ranked using their OWN stream's exam
-  const allSiblingStudents = allStudents
-    .filter(s => siblingClasses.includes(s.class))
-    .filter(s => hasCompletedAllExams(s.class, (siblingExamMap[s.class] || exam.results || {})[s.name] || {}));
+  const allSiblingStudents = allStudents.filter(s => siblingClasses.includes(s.class));
   const overallSorted = [...allSiblingStudents]
     .map(s => ({ name: s.name, class: s.class, ...calcStatsForStudent(s) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   // Stream: within this exam's class only — uses this exam's results
-  const streamStudents = allStudents
-    .filter(s => s.class === exam.class)
-    .filter(s => hasCompletedAllExams(s.class, (exam.results || {})[s.name] || {}));
+  const streamStudents = allStudents.filter(s => s.class === exam.class);
   const streamSorted = [...streamStudents]
     .map(s => ({ name: s.name, class: s.class, ...calcStatsFromResults(s.name, exam.results || {}) }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
