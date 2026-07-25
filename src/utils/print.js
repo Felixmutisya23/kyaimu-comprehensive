@@ -472,7 +472,10 @@ function renderResultSheet({
         <td style="padding:4px 6px;border:1px solid ${gridLine};font-weight:700;font-size:11px;white-space:nowrap">${s.name.toUpperCase()}</td>
         ${showStream ? `<td style="padding:4px 6px;border:1px solid ${gridLine};text-align:center;font-size:10px;color:#64748b;font-weight:600">${s.stream || s.class || ''}</td>` : ''}
         ${subCells}
-        <td style="padding:4px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px">${total}</td>
+        <td style="padding:3px 6px;border:1px solid ${gridLine};text-align:center;vertical-align:middle">
+          <div style="font-weight:900;font-size:11px">${total}</div>
+          <div style="font-size:8px;font-weight:700;color:${a}">avg ${mean}</div>
+        </td>
         <td style="padding:4px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;color:#7c3aed;font-size:11px">${points}</td>
         <td style="padding:4px 6px;border:1px solid ${gridLine};text-align:center;font-size:11px">${mean}</td>
         <td style="padding:4px 6px;border:1px solid ${gridLine};text-align:center">
@@ -529,6 +532,10 @@ function renderResultSheet({
     }, 0);
   }, 0);
   const avgPoints = students.length ? Math.round((totalPoints / students.length) * 10) / 10 : 0;
+  // Average total marks per student = grand total ÷ number of students —
+  // on the "all subjects added together" scale (e.g. out of 400 for 4
+  // subjects), shown right under the grand total itself.
+  const avgTotalPerStudent = students.length ? Math.round((grandTotal / students.length) * 10) / 10 : 0;
 
   // Every summary column (Total / Points / Mean / Grade) gets its own real
   // value here — no colspan skipping past a column, so nothing is left
@@ -543,7 +550,10 @@ function renderResultSheet({
           <div style="font-weight:900;font-size:10px;color:${p}">${t.sum}</div>
           <div style="font-size:8px;font-weight:700;color:${a}">avg ${subjectMeans[i]}</div>
         </td>`).join('')}
-      <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${grandTotal}</td>
+      <td style="padding:3px 6px;border:1px solid ${gridLine};text-align:center;vertical-align:middle">
+        <div style="font-weight:900;font-size:11px;color:${p}">${grandTotal}</div>
+        <div style="font-size:8px;font-weight:700;color:${a}">avg ${avgTotalPerStudent}</div>
+      </td>
       <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${avgPoints}</td>
       <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center;font-weight:900;font-size:11px;color:${p}">${classMean}</td>
       <td style="padding:5px 6px;border:1px solid ${gridLine};text-align:center">
