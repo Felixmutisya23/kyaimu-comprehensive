@@ -677,7 +677,20 @@ export function printClassList(ranked, subjects, exam, data) {
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Stream List — ${exam.class} — ${exam.name}</title>
-    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
+    <style>
+      ${PRINT_BASE_CSS}
+      /* Result sheets have many subject columns (position, name, stream,
+         one column per subject, total, points, mean, grade, pos/of) — on
+         A4 portrait that regularly runs wider than the printable page, so
+         the right-most columns (avg, mean, grade, position) get clipped
+         off the printed sheet entirely instead of just shrinking to fit.
+         Landscape gives ~50% more usable width and the auto table layout
+         lets columns compress instead of spilling off the page. */
+      @page { size: A4 landscape; margin: 8mm; }
+      body { padding: 14px; font-size: 11px; }
+      table { table-layout: auto; width: 100%; }
+      th, td { overflow-wrap: break-word; }
+    </style>
   </head><body>
     ${html}
     <div class="no-print">
@@ -815,7 +828,17 @@ export function printOverallClassList(exam, data) {
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Overall Class List — ${baseClass} — ${exam.name}</title>
-    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
+    <style>
+      ${PRINT_BASE_CSS}
+      /* Same fix as the Stream List sheet — the Overall Class List has the
+         same wide column set (often even more subjects, since it merges
+         streams), so it needs the same landscape/auto-fit treatment or its
+         rightmost columns get clipped off the printed page. */
+      @page { size: A4 landscape; margin: 8mm; }
+      body { padding: 14px; font-size: 11px; }
+      table { table-layout: auto; width: 100%; }
+      th, td { overflow-wrap: break-word; }
+    </style>
   </head><body>
     ${html}
     <div class="no-print">
