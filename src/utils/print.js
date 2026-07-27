@@ -31,16 +31,22 @@ function getFeeBalance(student, term, year, data) {
 }
 
 function getNextTermDate(exam, data) {
-  const terms    = data.terms || [];
+  const terms = data.terms || [];
+  // The admin sets "Next Term Opening Date" on the term record they're
+  // CURRENTLY managing (e.g. while on Term 2, they enter the date Term 3
+  // opens) — so look it up on THIS exam's own term/year, not term+1's
+  // record (which would only have a value if someone had separately gone
+  // in and set Term 3's "next term" date too, i.e. Term 4's opening —
+  // almost never the case, which is why it always looked blank/wrong).
+  const current = terms.find(t => Number(t.term) === Number(exam.term) && Number(t.year) === Number(exam.year));
+  if (current && current.nextTermOpeningDate) {
+    return new Date(current.nextTermOpeningDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  // Fall back to the actual next term's own start date, if it exists.
   const nextTerm = exam.term < 3 ? exam.term + 1 : 1;
   const nextYear = exam.term < 3 ? exam.year : (Number(exam.year) || 0) + 1;
   const found    = terms.find(t => Number(t.term) === nextTerm && Number(t.year) === nextYear);
-
-  // Use explicitly set nextTermOpeningDate if available (set in Term Calendar)
-  if (found && found.nextTermOpeningDate) {
-    return new Date(found.nextTermOpeningDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
-  }
-  // Fall back to the term's startDate
   if (found && found.startDate) {
     return new Date(found.startDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
   }
