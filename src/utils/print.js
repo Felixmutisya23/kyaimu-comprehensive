@@ -421,6 +421,19 @@ const PRINT_BASE_CSS = `
   .no-print { text-align:center; padding:14px; }
 `;
 
+// Wide results tables (stream list / overall class list) can have up to
+// ~9 subject columns plus TOTAL/POINTS/MEAN/GRADE/POSITION — that does
+// not fit A4 portrait width, which is what was clipping the right-hand
+// columns (MEAN, GRADE, POSITION) off the printed/PDF page.
+// Landscape gives ~277mm of usable width instead of ~190mm.
+const PRINT_LANDSCAPE_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; }
+  @page { size: A4 landscape; margin: 8mm; }
+  @media print { .no-print { display: none !important; } }
+  .no-print { text-align:center; padding:14px; }
+`;
+
 /* ═══════════════════════════════════════════════════════
    STREAM RESULT SHEET  (one stream, sorted by stream pos)
    + OVERALL CLASS RESULT SHEET (all streams combined)
@@ -700,7 +713,7 @@ export function printClassList(ranked, subjects, exam, data, onlyCompleted = fal
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Stream List — ${exam.class} — ${exam.name}</title>
-    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
+    <style>${PRINT_LANDSCAPE_CSS} body { padding: 14px; font-size: 11px; }</style>
   </head><body>
     ${html}
     <div class="no-print">
@@ -857,7 +870,7 @@ export function printOverallClassList(exam, data, onlyCompleted = false) {
   w.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Overall Class List — ${baseClass} — ${exam.name}</title>
-    <style>${PRINT_BASE_CSS} body { padding: 14px; font-size: 11px; }</style>
+    <style>${PRINT_LANDSCAPE_CSS} body { padding: 14px; font-size: 11px; }</style>
   </head><body>
     ${html}
     <div class="no-print">
