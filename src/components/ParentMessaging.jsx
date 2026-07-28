@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Btn, FormGroup, SectionTitle, Alert, Tag, Icon } from './UI';
-import { getAllClasses, getGrade, getScore } from '../data/initialData';
+import { getAllClasses, getGrade, getScore, getClassSortIndex, getExamTypeRank, getSubjectsForClass } from '../data/initialData';
+import { computeRankings } from '../utils/print';
 
 /* ═══════════════════════════════════════════════════════
    PARENT MESSAGING SYSTEM
@@ -96,6 +97,19 @@ async function sendSMSViaSenderId(phones, message, config) {
   return { ok: false, error: 'SMS provider not configured' };
 }
 
+function QuickPhoneInput({ student, onSave }) {
+  const [val, setVal] = useState('');
+  return (
+    <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+      <input autoFocus value={val} onChange={e => setVal(e.target.value)} placeholder="07XXXXXXXX"
+        style={{ flex: 1, padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--text)' }} />
+      <button onClick={() => onSave(student.id, val)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+        Save Number
+      </button>
+    </div>
+  );
+}
+
 export default function ParentMessaging({ data, setData, user }) {
   const isPrincipal = user.role === 'principal';
   const classes     = getAllClasses(data);
@@ -111,32 +125,115 @@ export default function ParentMessaging({ data, setData, user }) {
   const [testSending, setTestSend]  = useState(false);
   const [testResult, setTestResult] = useState(null); // { ok, detail }
 
+  // Recipient targeting — either the whole class(es) as before, or one
+  // specific student (so a secretary/teacher can message just one parent
+  // without broadcasting to the whole class).
+  const [recipientMode, setRecipientMode] = useState('class'); // 'class' | 'student'
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selStudentId, setSelStudentId]   = useState('');
+
+  // Fast phone-number tools — see students missing a parent phone number
+  // and add/fix one inline, right from the messaging page, instead of
+  // navigating away to Students first.
+  const [showNoPhonePanel, setShowNoPhonePanel] = useState(false);
+  const [phoneNoDraft, setPhoneNoDraft]         = useState({}); // { [studentId]: draftValue }
+  const [editingPhoneId, setEditingPhoneId]     = useState(null);
+  const [showAddStudent, setShowAddStudent]     = useState(false);
+  const [newStudentForm, setNewStudentForm]     = useState({ name: '', admNo: '', class: '', parentName: '', parentPhone: '' });
+
+  const SMS_LIMIT = 160;
+
   const logs = data.parentMessages || [];
 
-  // Gather phones for selected class
+  // Gather phones for selected class — or, in single-student mode, just
+  // that one student's parent.
   function getTargetStudents() {
     const students = data.students || [];
+    if (recipientMode === 'student') {
+      const one = students.find(s => String(s.id) === String(selStudentId));
+      return one && one.parentPhone ? [one] : [];
+    }
     if (selClass === 'ALL') return students.filter(s => s.parentPhone);
     return students.filter(s => s.class === selClass && s.parentPhone);
+  }
+
+  // Students matching the search box, for the individual-recipient picker
+  // — searches name and admission number so it's fast to find one kid in
+  // a big school.
+  const searchResults = studentSearch.trim()
+    ? (data.students || []).filter(s => {
+        const q = studentSearch.trim().toLowerCase();
+        return s.name?.toLowerCase().includes(q) || String(s.admNo || '').toLowerCase().includes(q);
+      }).slice(0, 20)
+    : [];
+  const selectedStudent = (data.students || []).find(s => String(s.id) === String(selStudentId));
+
+  // Students missing a parent phone number — scoped to the class filter
+  // when one's picked, otherwise the whole school — so it's fast to spot
+  // and fix exactly the gaps that would otherwise silently exclude a
+  // parent from a broadcast.
+  const studentsWithoutPhone = (data.students || []).filter(s =>
+    !s.parentPhone && (selClass === 'ALL' || s.class === selClass)
+  );
+
+  function savePhoneNumber(studentId, value) {
+    if (!value || !value.trim()) return;
+    setData(d => ({
+      ...d,
+      students: d.students.map(s => s.id === studentId ? { ...s, parentPhone: value.trim() } : s),
+    }));
+    setEditingPhoneId(null);
+    setPhoneNoDraft(f => { const n = { ...f }; delete n[studentId]; return n; });
+  }
+
+  function addStudentQuick() {
+    if (!newStudentForm.name.trim() || !newStudentForm.class) { alert('Name and class are required.'); return; }
+    setData(d => ({
+      ...d,
+      students: [...(d.students || []), {
+        id: Date.now(), ...newStudentForm, name: newStudentForm.name.trim(),
+      }],
+    }));
+    setShowAddStudent(false);
+    setNewStudentForm({ name: '', admNo: '', class: '', parentName: '', parentPhone: '' });
   }
 
   const targets = getTargetStudents();
   const uniquePhones = [...new Set(targets.map(s => s.parentPhone).filter(Boolean))];
 
-  function buildResultMessage(student, exam) {
+  function buildResultMessage(student, exam, posMap, hasStreams) {
     if (!exam) return '';
     const res     = exam.results[student.name] || {};
-    const subjects = Object.keys(res);
-    if (!subjects.length) return '';
-    const scores  = subjects.map(sub => {
+    const entered = Object.keys(res); // which subjects to actually list in the SMS
+    if (!entered.length) return '';
+    const scores  = entered.map(sub => {
       const sc = getScore(res[sub]);
       const gr = sc !== null ? getGrade(sc) : null;
       return `${sub}: ${sc ?? '-'}${gr ? ' (' + gr.label + ')' : ''}`;
     });
-    const total   = subjects.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean    = subjects.length ? Math.round(total / subjects.length) : 0;
-    const grade   = getGrade(mean);
-    return `${data.schoolName || 'School'}\n${exam.name} Results\nStudent: ${student.name}\nAdm: ${student.admNo}\n${scores.join(', ')}\nMean: ${mean} (${grade.label})\nRegards, School Administration`;
+    // Total/mean/points must be divided by the FULL subject list for the
+    // class, not just the subjects this student happens to have entered —
+    // same fix as everywhere else this was wrong (Exams.jsx, print.js).
+    const expected = getSubjectsForClass(student.class, data);
+    const total    = expected.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
+    const mean     = expected.length ? Math.round(total / expected.length) : 0;
+    const grade    = getGrade(mean);
+    const points   = expected.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
+
+    const pos = posMap?.[student.name];
+    let posLine = '';
+    if (pos) {
+      // A class with streams gets BOTH: this student's position within
+      // their own stream, and their position across the whole grade
+      // (all streams combined) — a single "Position" figure would hide
+      // whichever one wasn't shown, and parents in a streamed school
+      // usually want to see both.
+      posLine = hasStreams && pos.streamPos
+        ? `Position: ${pos.streamPos}/${pos.streamOf} in stream, ${pos.overallPos}/${pos.overallOf} in grade\n`
+        : `Position: ${pos.overallPos}/${pos.overallOf}\n`;
+    }
+
+    return `${data.schoolName || 'School'}\n${exam.name} Results\nStudent: ${student.name}\nAdm: ${student.admNo}\n${scores.join(', ')}\nMean: ${mean} (${grade.label}) · Points: ${points}\n${posLine}Regards, School Administration`;
   }
 
   // Gives every broadcast the same school-name heading that result messages
@@ -149,8 +246,14 @@ export default function ParentMessaging({ data, setData, user }) {
 
   async function broadcastMessage() {
     if (!message.trim()) { alert('Please type a message first'); return; }
-    if (uniquePhones.length === 0) { alert('No parent phone numbers found for the selected class. Add phone numbers in Student records.'); return; }
-    if (!window.confirm(`Send message to ${uniquePhones.length} parent(s)?`)) return;
+    if (uniquePhones.length === 0) {
+      alert(recipientMode === 'student' ? 'This student has no parent phone number on file. Add one below first.' : 'No parent phone numbers found for the selected class. Add phone numbers in Student records.');
+      return;
+    }
+    const fullMessageCheck = buildBroadcastMessage(message);
+    if (fullMessageCheck.length > SMS_LIMIT) { alert(`Message is over the ${SMS_LIMIT}-character SMS limit. Shorten it before sending.`); return; }
+    const recipientLabel = recipientMode === 'student' ? (selectedStudent?.name || 'this student') + "'s parent" : `${uniquePhones.length} parent(s)`;
+    if (!window.confirm(`Send message to ${recipientLabel}?`)) return;
     setSend(true);
     const conf = getSMSGatewayConfig(data);
 
@@ -159,7 +262,7 @@ export default function ParentMessaging({ data, setData, user }) {
     if (conf.provider === 'manual') {
       const log = {
         id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
-        message: fullMessage, class: selClass, recipientCount: uniquePhones.length,
+        message: fullMessage, class: recipientMode === 'student' ? `${selectedStudent?.name} (individual)` : selClass, recipientCount: uniquePhones.length,
         sentBy: user.name, delivered: false,
       };
       setData(d => ({ ...d, parentMessages: [log, ...(d.parentMessages || [])] }));
@@ -205,7 +308,7 @@ export default function ParentMessaging({ data, setData, user }) {
     const result = await sendSMSViaSenderId(uniqueValidPhones, fullMessage, conf);
     const log = {
       id: Date.now(), date: new Date().toISOString(), type: 'broadcast',
-      message: fullMessage, class: selClass, recipientCount: uniqueValidPhones.length,
+      message: fullMessage, class: recipientMode === 'student' ? `${selectedStudent?.name} (individual)` : selClass, recipientCount: uniqueValidPhones.length,
       skippedCount: badNumbers.length, skippedDetails: badNumbers,
       sentBy: user.name, delivered: result.ok,
     };
@@ -248,8 +351,12 @@ export default function ParentMessaging({ data, setData, user }) {
 
     let sentCount = 0;
     const failures = []; // [{ name, phone, error }] — real failures, not guesses
+    // Computed once for the whole exam — computeRankings sorts every
+    // student in the sibling streams, so doing this per-student inside the
+    // loop below would be needlessly expensive for a big class.
+    const { posMap, hasStreams } = computeRankings(exam, data.students, data);
     for (const student of students) {
-      const msg = buildResultMessage(student, exam);
+      const msg = buildResultMessage(student, exam, posMap, hasStreams);
       if (!msg) continue;
       if (conf.provider === 'manual') {
         sentCount++; // manual/print mode — no delivery to verify
@@ -310,8 +417,9 @@ export default function ParentMessaging({ data, setData, user }) {
   }
 
   function printAllResultSMS(students, exam, data) {
+    const { posMap, hasStreams } = computeRankings(exam, data.students, data);
     const rows = students.map(s => {
-      const msg = buildResultMessage(s, exam);
+      const msg = buildResultMessage(s, exam, posMap, hasStreams);
       return `<tr><td style="padding:5px 8px;border:1px solid #ddd;vertical-align:top">${s.name}</td>
         <td style="padding:5px 8px;border:1px solid #ddd">${s.parentPhone}</td>
         <td style="padding:5px 8px;border:1px solid #ddd;white-space:pre-line;font-size:11px">${msg}</td></tr>`;
@@ -396,18 +504,105 @@ export default function ParentMessaging({ data, setData, user }) {
       {tab === 'broadcast' && (
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>
-            Send Message to All Parents
+            Send Message to Parents
           </div>
-          <FormGroup label="Target Class">
-            <select value={selClass} onChange={e => setSel(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-              <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.parentPhone).length} parents with phones)</option>
-              {classes.map(c => {
-                const count = (data.students||[]).filter(s=>s.class===c&&s.parentPhone).length;
-                return <option key={c} value={c}>{c} ({count} parents)</option>;
-              })}
-            </select>
-          </FormGroup>
+
+          {/* Recipient mode toggle */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            {[['class','👨‍👩‍👧 By Class'],['student','🔍 One Parent']].map(([m,l]) => (
+              <button key={m} onClick={() => { setRecipientMode(m); setStudentSearch(''); setSelStudentId(''); }} style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer',
+                background: recipientMode === m ? '#4f8ef715' : 'var(--bg)',
+                borderColor: recipientMode === m ? '#4f8ef7' : 'var(--border)',
+                color: recipientMode === m ? '#4f8ef7' : 'var(--text-sub)', fontWeight: 600, fontSize: 13,
+              }}>{l}</button>
+            ))}
+          </div>
+
+          {recipientMode === 'class' ? (
+            <FormGroup label="Target Class">
+              <select value={selClass} onChange={e => setSel(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+                <option value="ALL">All Classes ({(data.students||[]).filter(s=>s.parentPhone).length} parents with phones)</option>
+                {classes.map(c => {
+                  const count = (data.students||[]).filter(s=>s.class===c&&s.parentPhone).length;
+                  return <option key={c} value={c}>{c} ({count} parents)</option>;
+                })}
+              </select>
+            </FormGroup>
+          ) : (
+            <FormGroup label="Search for a student">
+              <input value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setSelStudentId(''); }}
+                placeholder="Type a name or admission number..."
+                style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+              {studentSearch.trim() && !selStudentId && (
+                <div style={{ marginTop: 6, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+                  {searchResults.length === 0
+                    ? <div style={{ padding: 10, fontSize: 12, color: 'var(--text-muted)' }}>No students match "{studentSearch}".</div>
+                    : searchResults.map(s => (
+                      <div key={s.id} onClick={() => { setSelStudentId(s.id); setStudentSearch(''); }}
+                        style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13, display: 'flex', justifyContent: 'space-between' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <span>{s.name} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>· {s.class}{s.admNo ? ` · Adm ${s.admNo}` : ''}</span></span>
+                        {!s.parentPhone && <span style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>NO PHONE</span>}
+                      </div>
+                    ))}
+                </div>
+              )}
+              {selectedStudent && (
+                <div style={{ marginTop: 8, padding: 10, background: 'var(--surface2)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{selectedStudent.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {selectedStudent.class} · Parent: {selectedStudent.parentName || '—'} ·{' '}
+                      {selectedStudent.parentPhone
+                        ? <span style={{ color: '#10b981' }}>{selectedStudent.parentPhone}</span>
+                        : <span style={{ color: '#ef4444', fontWeight: 700 }}>No phone number on file</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => setSelStudentId('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+              )}
+              {selectedStudent && !selectedStudent.parentPhone && (
+                <QuickPhoneInput student={selectedStudent} onSave={savePhoneNumber} />
+              )}
+            </FormGroup>
+          )}
+
+          {/* Missing phone numbers — fast to see and fix without leaving this page */}
+          <div style={{ marginTop: 4, marginBottom: 14 }}>
+            <button onClick={() => setShowNoPhonePanel(v => !v)} style={{
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              color: studentsWithoutPhone.length ? '#f59e0b' : 'var(--text-muted)', padding: 0,
+            }}>
+              {showNoPhonePanel ? '▾' : '▸'} {studentsWithoutPhone.length} student(s) {selClass !== 'ALL' && recipientMode==='class' ? `in ${selClass} ` : ''}missing a parent phone number
+            </button>
+            {showNoPhonePanel && (
+              <div style={{ marginTop: 8, border: '1px solid var(--border)', borderRadius: 8, maxHeight: 260, overflowY: 'auto' }}>
+                {studentsWithoutPhone.length === 0 ? (
+                  <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)' }}>Everyone has a phone number on file. 🎉</div>
+                ) : studentsWithoutPhone.map(s => (
+                  <div key={s.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 13 }}>{s.name} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>· {s.class}</span></div>
+                    {editingPhoneId === s.id ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input autoFocus value={phoneNoDraft[s.id] ?? ''} onChange={e => setPhoneNoDraft(f => ({ ...f, [s.id]: e.target.value }))}
+                          placeholder="07XXXXXXXX" style={{ width: 130, padding: '4px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--text)' }} />
+                        <button onClick={() => savePhoneNumber(s.id, phoneNoDraft[s.id])} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>Save</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setEditingPhoneId(s.id)} style={{ background: 'none', border: '1px solid #4f8ef7', color: '#4f8ef7', borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>+ Add number</button>
+                    )}
+                  </div>
+                ))}
+                <div style={{ padding: 8 }}>
+                  <button onClick={() => setShowAddStudent(true)} style={{ background: 'none', border: 'none', color: '#4f8ef7', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>+ Add a new student</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <FormGroup label="Message">
             <textarea value={message} onChange={e => setMsg(e.target.value)} rows={5}
               placeholder={`Dear Parent/Guardian,\n\n[Your message here]\n\nRegards,\n${data.schoolName || 'School'} Administration`}
@@ -445,19 +640,79 @@ export default function ParentMessaging({ data, setData, user }) {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Btn onClick={broadcastMessage} disabled={sending || !message.trim()} style={{ background: '#10b981' }}>
-              {sending ? '⏳ Sending...' : `📤 Send to ${uniquePhones.length} Parent(s)`}
-            </Btn>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {buildBroadcastMessage(message).length} characters
-              {buildBroadcastMessage(message).length > 160 && ` · ${Math.ceil(buildBroadcastMessage(message).length / 153)} SMS parts`}
-            </span>
-          </div>
+          {(() => {
+            const fullLen = buildBroadcastMessage(message).length;
+            const over = fullLen > SMS_LIMIT;
+            const targetCount = recipientMode === 'student' ? (selectedStudent && selectedStudent.parentPhone ? 1 : 0) : uniquePhones.length;
+            return (
+              <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Btn onClick={broadcastMessage} disabled={sending || !message.trim() || over || targetCount === 0} style={{ background: over ? 'var(--text-muted)' : '#10b981' }}>
+                    {sending ? '⏳ Sending...' : `📤 Send to ${targetCount} Parent(s)`}
+                  </Btn>
+                  <span style={{ fontSize: 12, fontWeight: over ? 700 : 400, color: over ? '#ef4444' : 'var(--text-muted)' }}>
+                    {fullLen} / {SMS_LIMIT} characters{over ? ' — too long, shorten your message' : ''}
+                  </span>
+                </div>
+                {/* Only Send Results messages are allowed past the standard
+                    single-SMS length — a results message legitimately needs
+                    room for every subject's score and grade, but a general
+                    broadcast staying under 160 chars keeps it as one SMS
+                    (cheaper, and avoids messages arriving out of order across
+                    multiple parts on older phones). */}
+                {over && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Broadcast messages are capped at {SMS_LIMIT} characters (one SMS). Only exam results messages are allowed to be longer.
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {!getSMSGatewayConfig(data).apiKey && (
             <Alert type="warning" style={{ marginTop: 12 }}>
               ⚠ SMS gateway not configured. Click "SMS Setup" to add your API key. Until then, a printable list will open instead.
             </Alert>
+          )}
+
+          {/* ── Quick Add Student Modal ── */}
+          {showAddStudent && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+              onClick={() => setShowAddStudent(false)}>
+              <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, width: 340, maxWidth: '90vw' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>+ Add New Student</div>
+                <FormGroup label="Full Name *">
+                  <input value={newStudentForm.name} onChange={e => setNewStudentForm(f => ({ ...f, name: e.target.value }))}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                </FormGroup>
+                <FormGroup label="Class *">
+                  <select value={newStudentForm.class} onChange={e => setNewStudentForm(f => ({ ...f, class: e.target.value }))}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+                    <option value="">Select class...</option>
+                    {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </FormGroup>
+                <FormGroup label="Admission No.">
+                  <input value={newStudentForm.admNo} onChange={e => setNewStudentForm(f => ({ ...f, admNo: e.target.value }))}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                </FormGroup>
+                <FormGroup label="Parent Name">
+                  <input value={newStudentForm.parentName} onChange={e => setNewStudentForm(f => ({ ...f, parentName: e.target.value }))}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                </FormGroup>
+                <FormGroup label="Parent Phone">
+                  <input value={newStudentForm.parentPhone} onChange={e => setNewStudentForm(f => ({ ...f, parentPhone: e.target.value }))}
+                    placeholder="07XXXXXXXX"
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                </FormGroup>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                  This adds the student with the essentials needed for messaging. Add fees, streams, and other details later from Students.
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <Btn variant="ghost" onClick={() => setShowAddStudent(false)}>Cancel</Btn>
+                  <Btn onClick={addStudentQuick}>Add Student</Btn>
+                </div>
+              </div>
+            </div>
           )}
         </Card>
       )}
@@ -493,7 +748,13 @@ export default function ParentMessaging({ data, setData, user }) {
               {exams
                 .filter(e => selClass === 'ALL' || e.class === selClass)
                 .slice()
-                .sort((a, b) => (a.class || '').localeCompare(b.class || '') || (a.name || '').localeCompare(b.name || ''))
+                .sort((a, b) =>
+                  getClassSortIndex(a.class, data) - getClassSortIndex(b.class, data) ||
+                  Number(a.year) - Number(b.year) ||
+                  Number(a.term) - Number(b.term) ||
+                  getExamTypeRank(a.name) - getExamTypeRank(b.name) ||
+                  (a.name || '').localeCompare(b.name || '')
+                )
                 .map(e => (
                   <option key={e.id} value={e.id}>{e.class} · {e.name} · Term {e.term} {e.year}</option>
                 ))}

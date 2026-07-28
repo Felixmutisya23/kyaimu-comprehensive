@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff, getExamTypeRank } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 import { deleteJsonRowDirect, applyExamScorePatch, removeExamScore, saveSubjectsByClassDirect } from '../supabase';
 
@@ -647,6 +647,11 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             if (!byYear[yr]) byYear[yr] = [];
             byYear[yr].push(e);
           });
+          Object.values(byYear).forEach(list => list.sort((a, b) =>
+            Number(a.term) - Number(b.term) ||
+            getExamTypeRank(a.name) - getExamTypeRank(b.name) ||
+            (a.name || '').localeCompare(b.name || '')
+          ));
           const years = Object.keys(byYear).sort((a, b) => b - a); // newest first
           return (
             <select value={selExamId || ''} onChange={e => setSelExamId(Number(e.target.value) || null)}

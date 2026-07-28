@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
-import { getAllClasses } from '../data/initialData';
+import { getAllClasses, getClassSortIndex } from '../data/initialData';
 import { printFeeReceipt } from '../utils/print';
 
 /* ═══════════════════════════════════════════════════════
@@ -929,7 +929,7 @@ function FeeStructure({ data, setData }) {
     lunchType: 'term',         // term | daily (for lunch fees)
   });
   const [schedForm, setSchedForm] = useState({
-    feeTypeId: '', class: 'ALL', category: 'ALL',
+    feeTypeId: '', classMode: 'ALL', classes: [], category: 'ALL',
     term: '1', year: String(curYear()), amount: '',
   });
 
@@ -953,14 +953,27 @@ function FeeStructure({ data, setData }) {
 
   function addSched() {
     if (!schedForm.feeTypeId || !schedForm.amount) return;
-    const sch = {
-      id: String(Date.now()), ...schedForm,
+    const targetClasses = schedForm.classMode === 'ALL' ? ['ALL'] : schedForm.classes;
+    if (!targetClasses.length) return;
+    const base = {
+      feeTypeId: schedForm.feeTypeId, category: schedForm.category,
       term: Number(schedForm.term), year: Number(schedForm.year),
       amount: Number(schedForm.amount),
     };
-    setData(d => ({ ...d, feeSchedule: [...(d.feeSchedule || []), sch] }));
+    // One row per selected class — this is how several classes end up
+    // "sharing" the same fee amount in a single action instead of
+    // repeating Set Amount once per class.
+    const newRows = targetClasses.map((cls, i) => ({ id: String(Date.now() + i), class: cls, ...base }));
+    setData(d => ({ ...d, feeSchedule: [...(d.feeSchedule || []), ...newRows] }));
     setShowAddSched(false);
-    setSchedForm({ feeTypeId: '', class: 'ALL', category: 'ALL', term: '1', year: String(curYear()), amount: '' });
+    setSchedForm({ feeTypeId: '', classMode: 'ALL', classes: [], category: 'ALL', term: '1', year: String(curYear()), amount: '' });
+  }
+
+  function toggleSchedClass(cls) {
+    setSchedForm(f => ({
+      ...f,
+      classes: f.classes.includes(cls) ? f.classes.filter(c => c !== cls) : [...f.classes, cls],
+    }));
   }
 
   function toggleClass(cls) {
@@ -1063,7 +1076,16 @@ function FeeStructure({ data, setData }) {
                       <th key={h} style={TS.th}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {feeSchedule.map(sch => {
+                    {feeSchedule
+                      .slice()
+                      .sort((a, b) =>
+                        getClassSortIndex(a.class === 'ALL' ? '' : a.class, data) - getClassSortIndex(b.class === 'ALL' ? '' : b.class, data) ||
+                        (a.class === 'ALL' ? -1 : 0) - (b.class === 'ALL' ? -1 : 0) ||
+                        Number(a.term) - Number(b.term) ||
+                        Number(a.year) - Number(b.year) ||
+                        (feeTypes.find(f => f.id == a.feeTypeId)?.name || '').localeCompare(feeTypes.find(f => f.id == b.feeTypeId)?.name || '')
+                      )
+                      .map(sch => {
                       const ft = feeTypes.find(f => f.id == sch.feeTypeId);
                       return (
                         <tr key={sch.id}>
@@ -1262,11 +1284,28 @@ function FeeStructure({ data, setData }) {
           </select>
         </FormGroup>
         <FormRow>
-          <FormGroup label="Class">
-            <select value={schedForm.class} onChange={e => setSchedForm({ ...schedForm, class: e.target.value })}>
-              <option value="ALL">All Classes</option>
-              {(getAllClasses(data)||[]).map(c => <option key={c} value={c}>{c}</option>)}
+          <FormGroup label="Class(es)">
+            <select value={schedForm.classMode} onChange={e => setSchedForm({ ...schedForm, classMode: e.target.value, classes: [] })}>
+              <option value="ALL">All Classes (whole school shares this amount)</option>
+              <option value="PICK">Choose specific classes (these will share this amount)</option>
             </select>
+            {schedForm.classMode === 'PICK' && (
+              <div style={{ marginTop: 8, maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                {(getAllClasses(data) || []).map(c => (
+                  <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={schedForm.classes.includes(c)} onChange={() => toggleSchedClass(c)} />
+                    {c}
+                  </label>
+                ))}
+              </div>
+            )}
+            {schedForm.classMode === 'PICK' && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                {schedForm.classes.length
+                  ? `${schedForm.classes.length} class(es) selected — this amount will apply to all of them for the term/year below.`
+                  : 'Tick every class that should pay this same amount.'}
+              </div>
+            )}
           </FormGroup>
           {hasBoarding && (
             <FormGroup label="For Category">
@@ -1296,7 +1335,7 @@ function FeeStructure({ data, setData }) {
         </FormGroup>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowAddSched(false)}>Cancel</Btn>
-          <Btn onClick={addSched} disabled={!schedForm.feeTypeId || !schedForm.amount}>Set Amount</Btn>
+          <Btn onClick={addSched} disabled={!schedForm.feeTypeId || !schedForm.amount || (schedForm.classMode === 'PICK' && !schedForm.classes.length)}>Set Amount</Btn>
         </div>
       </Modal>
     </div>

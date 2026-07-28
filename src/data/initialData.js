@@ -421,6 +421,32 @@ export function getAllClasses(data) {
   return list;
 }
 
+// Gives the school's own configured position for a class name (PP1, PP2,
+// Grade 1, Grade 1 East, ... in the order set up under Class Groups) —
+// used anywhere a list needs to show classes/exams/fees in the same
+// sensible order the school already uses, instead of plain alphabetical
+// (which scrambles "Grade 10" before "Grade 2", and mixes up streams).
+// Unrecognised class names (e.g. a stray typo like "GRADE 3 East" that
+// doesn't exactly match a configured class) sort to the end, alphabetically
+// among themselves, rather than disappearing or crashing.
+export function getClassSortIndex(className, data) {
+  const order = getAllClasses(data);
+  const idx = order.indexOf(className);
+  return idx === -1 ? order.length + 1000 : idx;
+}
+
+// Canonical position of an exam within a term's sequence — used together
+// with getClassSortIndex + term/year to put exam lists in the order a
+// human expects (Opener → Mid-Term → End-Term), instead of alphabetical
+// (which puts "End-Term" before "Mid-Term" before "Opener").
+export function getExamTypeRank(examName) {
+  const n = (examName || '').toLowerCase();
+  if (n.includes('open'))  return 0;
+  if (n.includes('mid'))   return 1;
+  if (n.includes('end'))   return 2;
+  return 3;
+}
+
 export function getStreamFromClass(className, data) {
   if (!className) return null;
   for (const g of (data.classGroups || [])) {
