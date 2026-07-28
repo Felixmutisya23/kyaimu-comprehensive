@@ -946,6 +946,27 @@ function FeeStructure({ data, setData }) {
 
   function addType() {
     if (!typeForm.name.trim()) return;
+    // Same class of bug as duplicate exams: nothing previously stopped
+    // "Add Type" from creating a second "Tuition fees" a minute after the
+    // first — usually because the first save didn't look like it worked
+    // (e.g. its applicable classes were misconfigured so it never showed
+    // up anywhere), so the admin tried again. Block the duplicate instead
+    // and point at the existing one.
+    const normalized = typeForm.name.trim().toLowerCase();
+    const existing = (data.feeTypes || []).find(ft => ft.name.trim().toLowerCase() === normalized);
+    if (existing) {
+      alert(`A fee type named "${existing.name}" already exists. Edit that one (or set its amounts under "Amounts Per Class/Term") instead of creating a duplicate.`);
+      return;
+    }
+    // A fee type that isn't "Applies to All" but also has no classes
+    // picked applies to NOBODY — it'll never show up on any class's fee
+    // structure even after amounts are set for it, which is exactly what
+    // silently swallowed a real, fully-filled-in fee type here. Catch it
+    // at save time instead of letting it disappear invisibly.
+    if (!typeForm.appliesToAll && (!typeForm.applicableClasses || typeForm.applicableClasses.length === 0)) {
+      alert('Select at least one class this fee applies to, or turn on "Applies to All" — otherwise this fee type won\'t show up for any class.');
+      return;
+    }
     setData(d => ({ ...d, feeTypes: [...(d.feeTypes || []), { id: String(Date.now()), ...typeForm }] }));
     setShowAddType(false);
     setTypeForm({ name: '', description: '', appliesToAll: true, applicableClasses: [], applicableCategories: [], isOptional: false, optionalType: 'transport', optionalLabel: '', lunchType: 'term' });

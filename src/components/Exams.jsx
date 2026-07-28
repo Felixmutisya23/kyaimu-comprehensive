@@ -49,6 +49,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   const [showAssignTeachers, setShowAssignTeachers] = useState(false);
   const [staleReassignInput, setStaleReassignInput] = useState({}); // { [teacherId__subject]: targetSubjectName }
   const [selExamId, setSelExamId] = useState(null);
+  const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [showAdd, setShowAdd]   = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showEnter, setShowEnter] = useState(false);
@@ -676,10 +677,14 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           )}
           {selExam && (isClassTeacher || isPrincipal) && (
             <>
-              <Btn variant="ghost" size="sm" onClick={() => printClassList(ranked, visibleSubjects, selExam, data)}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', marginRight: 4, cursor: 'pointer' }}>
+                <input type="checkbox" checked={onlyCompleted} onChange={e => setOnlyCompleted(e.target.checked)} />
+                Exclude students who didn't sit every subject
+              </label>
+              <Btn variant="ghost" size="sm" onClick={() => printClassList(ranked, visibleSubjects, selExam, data, onlyCompleted)}>
                 <Icon name="print" size={13} /> Stream List
               </Btn>
-              <Btn variant="ghost" size="sm" onClick={() => printOverallClassList(selExam, data)}>
+              <Btn variant="ghost" size="sm" onClick={() => printOverallClassList(selExam, data, onlyCompleted)}>
                 🏫 Overall Class List
               </Btn>
               <Btn variant="ghost" size="sm" onClick={() => printAllReportForms(selExam, data)}>

@@ -639,7 +639,7 @@ function renderResultSheet({
    PUBLIC: STREAM CLASS LIST  (what the old printClassList did)
    — prints the current stream only, sorted by stream position
 ═══════════════════════════════════════════════════════ */
-export function printClassList(ranked, subjects, exam, data) {
+export function printClassList(ranked, subjects, exam, data, onlyCompleted = false) {
   if (!ranked || ranked.length === 0) { alert('No results to print.'); return; }
 
   const { primary: pri, accent: acc } = schoolColors(data);
@@ -648,7 +648,29 @@ export function printClassList(ranked, subjects, exam, data) {
   const hasStreams = getSiblingStreams(exam.class, data).length > 1;
 
   // ranked is already sorted by streamPos (lowest first) by rankStudents()
-  const streamSorted = [...ranked].sort((a, b) => (a.streamPos || 0) - (b.streamPos || 0));
+  let streamSorted = [...ranked].sort((a, b) => (a.streamPos || 0) - (b.streamPos || 0));
+
+  const excludedCount0 = streamSorted.length;
+  if (onlyCompleted) {
+    // Drop anyone missing a score in even one expected subject, then
+    // re-number stream position within just this filtered group — so
+    // "3 / 20" reflects 20 students who all sat everything, not 27 minus
+    // gaps for students who didn't.
+    streamSorted = streamSorted.filter(s => {
+      const expected = getSubjectsForClass(s.class, data);
+      const res = s.results || {};
+      return expected.length > 0 && expected.every(k => {
+        const sc = getScore(res[k]);
+        return sc !== null && sc !== undefined;
+      });
+    });
+    if (!streamSorted.length) { alert('No students completed every subject in this exam — nothing to print.'); return; }
+    streamSorted = streamSorted
+      .slice()
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+      .map((s, i) => ({ ...s, streamPos: i + 1, streamOf: streamSorted.length }));
+  }
+  const excludedCount = excludedCount0 - streamSorted.length;
 
   // Build a resultsMap: studentName → results object
   const resultsMap = {};
@@ -657,8 +679,9 @@ export function printClassList(ranked, subjects, exam, data) {
   // Subject stats for this stream only
   const subjectStats = buildSubjectStats(streamSorted, resultsMap, subjects);
 
-  const title    = `${baseClass}${stream ? ' — ' + stream.toUpperCase() + ' STREAM' : ''} · ${exam.name}`;
-  const subtitle = `Term ${exam.term} · ${exam.year}  ·  Stream Result Sheet`;
+  const title    = `${baseClass}${stream ? ' — ' + stream.toUpperCase() + ' STREAM' : ''} · ${exam.name}${onlyCompleted ? ' (Completed Students Only)' : ''}`;
+  const subtitle = `Term ${exam.term} · ${exam.year}  ·  Stream Result Sheet`
+    + (onlyCompleted ? `  ·  ${excludedCount} student(s) who didn't sit every subject excluded` : '');
 
   const html = renderResultSheet({
     title, subtitle,
@@ -693,7 +716,7 @@ export function printClassList(ranked, subjects, exam, data) {
    PUBLIC: OVERALL CLASS LIST  (all streams combined)
    Sorted overall position 1 → last
 ═══════════════════════════════════════════════════════ */
-export function printOverallClassList(exam, data) {
+export function printOverallClassList(exam, data, onlyCompleted = false) {
   if (!exam) return;
 
   const { primary: pri, accent: acc } = schoolColors(data);
@@ -776,8 +799,25 @@ export function printOverallClassList(exam, data) {
     ...[...usedSubjects].filter(s => !canonicalSubjects.includes(s)),
   ];
 
+  // When requested, drop any student who is missing a score in even one
+  // expected subject BEFORE ranking/mean is computed — so the mean,
+  // totals, and every position number reflect only students who actually
+  // sat the whole exam, not a mix that's diluted by partial/no-shows.
+  let rankPool = allStudents;
+  if (onlyCompleted) {
+    rankPool = allStudents.filter(s => {
+      const res = resultsMap[s.name] || {};
+      const expected = getSubjectsForClass(s.class, data);
+      return expected.length > 0 && expected.every(k => {
+        const sc = getScore(res[k]);
+        return sc !== null && sc !== undefined;
+      });
+    });
+    if (!rankPool.length) { alert('No students completed every subject in this exam — nothing to print.'); return; }
+  }
+
   // Rank overall — sorted by total descending
-  const withStats = allStudents.map(s => {
+  const withStats = rankPool.map(s => {
     const res   = resultsMap[s.name] || {};
     const subs  = subjects;
     const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
@@ -795,8 +835,10 @@ export function printOverallClassList(exam, data) {
 
   const subjectStats = buildSubjectStats(overallSorted, resultsMap, subjects);
 
-  const title    = `${baseClass} — OVERALL CLASS RESULT · ${exam.name}`;
-  const subtitle = `Term ${exam.term} · ${exam.year}  ·  All Streams Combined · ${siblingClasses.join(', ')}`;
+  const excludedCount = allStudents.length - rankPool.length;
+  const title    = `${baseClass} — OVERALL CLASS RESULT · ${exam.name}${onlyCompleted ? ' (Completed Students Only)' : ''}`;
+  const subtitle = `Term ${exam.term} · ${exam.year}  ·  All Streams Combined · ${siblingClasses.join(', ')}`
+    + (onlyCompleted ? `  ·  ${excludedCount} student(s) who didn't sit every subject excluded` : '');
 
   const html = renderResultSheet({
     title, subtitle,
