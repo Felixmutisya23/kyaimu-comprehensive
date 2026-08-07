@@ -955,3 +955,137 @@ export async function deleteGalleryPhoto(fileName) {
     .remove([fileName]);
   if (error) console.warn('Gallery delete error:', error.message);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCHEMES OF WORK MARKETPLACE
+   ─────────────────────────────────────────────────────────────────
+   Owner-uploaded PDF schemes of work, sold per-subject (or as a termly
+   bundle to in-system teachers). Files live in Supabase Storage; the
+   `schemes_of_work` / `scheme_purchases` tables (see
+   supabase/schemes_of_work_migration.sql) hold the catalog + unlock
+   records. See supabase/schemes_of_work_migration.sql for setup.
+═══════════════════════════════════════════════════════════════════ */
+
+// ── Owner-only: upload a new scheme PDF ─────────────────────────────
+export async function uploadSchemeFile(file, subject, className) {
+  const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
+  const safeClass   = className.replace(/[^a-zA-Z0-9]/g, '_');
+  const path = `${safeSubject}_${safeClass}_${Date.now()}.pdf`;
+
+  const { error } = await getSupabase()
+    .storage
+    .from('schemes-of-work')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: 'application/pdf' });
+
+  if (error) throw new Error('Upload failed: ' + error.message);
+  return path;
+}
+
+// ── Owner-only: create the catalog row after a successful file upload
+export async function createSchemeRecord({ subject, className, term, curriculum, title, storagePath, priceSystem, pricePublic, pageCount }) {
+  const { data, error } = await getSupabase()
+    .from('schemes_of_work')
+    .insert({
+      subject, class_name: className, term, curriculum: curriculum || null,
+      title: title || null, storage_path: storagePath,
+      price_system: priceSystem ?? 40, price_public: pricePublic ?? 70,
+      page_count: pageCount || null, active: true,
+    })
+    .select().single();
+  if (error) throw new Error('Failed to save scheme record: ' + error.message);
+  return data;
+}
+
+// ── Owner-only: list every scheme in the catalog (active + inactive) ─
+export async function listAllSchemes() {
+  const { data, error } = await getSupabase()
+    .from('schemes_of_work')
+    .select('*')
+    .order('uploaded_at', { ascending: false });
+  if (error) throw new Error('Failed to load schemes: ' + error.message);
+  return data || [];
+}
+
+// ── Public: list only active schemes (for the marketplace / portal) ──
+export async function listActiveSchemes() {
+  const { data, error } = await getSupabase()
+    .from('schemes_of_work')
+    .select('*')
+    .eq('active', true)
+    .order('subject', { ascending: true });
+  if (error) throw new Error('Failed to load schemes: ' + error.message);
+  return data || [];
+}
+
+// ── Owner-only: permanently delete a scheme (file + catalog row) ────
+export async function deleteScheme(schemeId, storagePath) {
+  if (storagePath) {
+    const { error: storageErr } = await getSupabase().storage.from('schemes-of-work').remove([storagePath]);
+    if (storageErr) console.warn('Scheme file delete warning:', storageErr.message);
+  }
+  const { error } = await getSupabase().from('schemes_of_work').delete().eq('id', schemeId);
+  if (error) throw new Error('Failed to delete scheme: ' + error.message);
+}
+
+// ── Owner-only: toggle a scheme active/inactive without deleting it ──
+export async function setSchemeActive(schemeId, active) {
+  const { error } = await getSupabase().from('schemes_of_work').update({ active }).eq('id', schemeId);
+  if (error) throw new Error('Failed to update scheme: ' + error.message);
+}
+
+// ── Get a temporary signed URL to VIEW a PDF (used for the 2-page
+//    preview — safe to call for anyone, since only 2 pages are ever
+//    rendered client-side regardless of what the signed URL points to)
+export async function getSchemePreviewUrl(storagePath) {
+  const { data, error } = await getSupabase()
+    .storage.from('schemes-of-work')
+    .createSignedUrl(storagePath, 300); // 5 minutes — plenty for a preview render
+  if (error) throw new Error('Failed to load preview: ' + error.message);
+  return data.signedUrl;
+}
+
+// ── Get a temporary signed URL to DOWNLOAD the full PDF — only ever
+//    called AFTER a verified purchase (see checkSchemeAccess below)
+export async function getSchemeDownloadUrl(storagePath) {
+  const { data, error } = await getSupabase()
+    .storage.from('schemes-of-work')
+    .createSignedUrl(storagePath, 3600); // 1 hour — enough to download, not a permanent link
+  if (error) throw new Error('Failed to load download link: ' + error.message);
+  return data.signedUrl;
+}
+
+// ── Record a completed payment (called after InstaSend confirms) ────
+export async function recordSchemePurchase({ buyerPhone, buyerName, schemeId, isTermlyBundle, termlySchoolId, termlyTeacherId, termlySubjects, amountPaid, paymentRef }) {
+  const { error } = await getSupabase().from('scheme_purchases').insert({
+    buyer_phone: buyerPhone, buyer_name: buyerName || null,
+    scheme_id: schemeId || null,
+    is_termly_bundle: !!isTermlyBundle,
+    termly_school_id: termlySchoolId || null,
+    termly_teacher_id: termlyTeacherId || null,
+    termly_subjects: termlySubjects || null,
+    amount_paid: amountPaid, payment_ref: paymentRef || null,
+  });
+  if (error) throw new Error('Failed to record purchase: ' + error.message);
+}
+
+// ── Check what a given phone number has already unlocked — used both
+//    to skip re-payment for a returning buyer, and to gate downloads.
+//    Returns { unlockedSchemeIds: Set, hasTermlyBundle(schoolId, teacherId) }
+export async function getSchemeAccessFor(phone) {
+  const normalizedPhone = String(phone || '').replace(/\D/g, '');
+  const { data, error } = await getSupabase()
+    .from('scheme_purchases')
+    .select('*')
+    .ilike('buyer_phone', `%${normalizedPhone.slice(-9)}`); // match on last 9 digits — tolerant of 0/254/+254 formatting differences
+  if (error) throw new Error('Failed to check purchase history: ' + error.message);
+
+  const unlockedSchemeIds = new Set((data || []).filter(p => p.scheme_id).map(p => p.scheme_id));
+  const termlyBundles = (data || []).filter(p => p.is_termly_bundle);
+
+  return {
+    unlockedSchemeIds,
+    hasTermlyBundleFor(schoolId, teacherId) {
+      return termlyBundles.some(b => b.termly_school_id === schoolId && b.termly_teacher_id === teacherId);
+    },
+  };
+}

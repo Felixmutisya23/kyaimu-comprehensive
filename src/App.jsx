@@ -18,6 +18,8 @@ import TeacherPortal from './components/TeacherPortal';
 import { TeacherRegisterPage } from './components/TeacherRegistration';
 import { StudentPortal, ParentPortal } from './components/StudentHistory';
 import PublicPage from './components/PublicPage';
+import OwnerDashboard from './components/OwnerDashboard';
+import PublicSchemes from './components/PublicSchemes';
 import AuditLog from './components/AuditLog';
 import { logAction } from './components/AuditLog';
 import {
@@ -355,6 +357,8 @@ export default function App() {
   const [user, setUser]           = React.useState(null);
   const [page, setPage]           = React.useState('dashboard');
   const [showTeacherRegister]     = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'register');
+  const [showOwnerDashboard]      = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'owner');
+  const [showPublicSchemes]       = React.useState(() => new URLSearchParams(window.location.search).get('action') == 'schemes');
   const [studentUser, setStudentUser] = React.useState(null);
   const [parentUser,  setParentUser]  = React.useState(null);
   const [collapsed, setCollapsed] = React.useState(() => window.innerWidth < 768);
@@ -602,6 +606,17 @@ export default function App() {
 
   // Early returns AFTER all hooks — loading must be here too so hooks run every render
 
+  // Owner Dashboard and the public Schemes marketplace are completely
+  // independent of any school's data/login state — check these FIRST,
+  // before the loading spinner or any school-data logic, so they work
+  // even if no school data has loaded (or ever will, for a visitor who
+  // isn't part of any school at all).
+  if (showOwnerDashboard) {
+    return <OwnerDashboard />;
+  }
+  if (showPublicSchemes) {
+    return <PublicSchemes onBack={() => { window.location.search = ''; }} />;
+  }
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 16 }}>

@@ -3,6 +3,7 @@ import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Al
 import { getAllClasses, getGrade, getScore, GRADES_CBC, getSubjectsForClass } from '../data/initialData';
 import { applyExamScorePatch } from '../supabase';
 import Students from './Students';
+import SchemesMarketplace from './SchemesMarketplace';
 import ParentMessaging from './ParentMessaging';
 
 /* ═══════════════════════════════════════════════════════════
@@ -83,6 +84,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
     ...((user.canManageStudents || isClassTeacher || (user.markEntrySubjects || []).length > 0) ? [{ id: 'students', icon: '👨‍🎓', label: 'Students' }] : []),
     ...(user.canMessageParents ? [{ id: 'parentmsg', icon: '💬', label: 'Message Parents' }] : []),
     ...(pendingApprovals.length > 0 ? [{ id: 'approvals', icon: '✅', label: `Approve Marks (${pendingApprovals.length})` }] : []),
+    { id: 'schemes', icon: '📘', label: 'Schemes of Work' },
     { id: 'notifs',  icon: '🔔', label: `Notifications${myNotifs.length > 0 ? ` (${myNotifs.length})` : ''}` },
   ];
 
@@ -197,6 +199,7 @@ export default function TeacherPortal({ data, setData, user: loginUser, onLogout
         {page === 'class'     && isClassTeacher && <TeacherClass user={user} data={data} setData={setData} />}
         {page === 'approvals' && <TeacherApprovals user={user} data={data} setData={setData} />}
         {page === 'notifs'    && <TeacherNotifs user={user} data={data} setData={setData} />}
+        {page === 'schemes'   && <TeacherSchemes user={user} data={data} mySubjects={mySubjects} />}
         {page === 'students'  && (user.canManageStudents || isClassTeacher || (user.markEntrySubjects || []).length > 0) && <Students data={data} setData={setData} user={user} />}
         {page === 'parentmsg' && user.canMessageParents && <ParentMessaging data={data} setData={setData} user={user} />}
       </main>
@@ -937,6 +940,30 @@ function TeacherApprovals({ user, data, setData }) {
         </>
       )}
     </div>
+  );
+}
+
+function TeacherSchemes({ user, data, mySubjects }) {
+  const subjectNames = [...new Set(mySubjects.map(s => s.subject))];
+  if (subjectNames.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+        You don't have any subjects assigned yet — schemes of work will appear here once subjects are assigned to you.
+      </div>
+    );
+  }
+  return (
+    <SchemesMarketplace
+      mode="portal"
+      filterSubjects={subjectNames}
+      defaultPhone={user.phone || ''}
+      defaultName={user.name || ''}
+      termlyBundle={{
+        schoolId: data._schoolId,
+        teacherId: user.staffId,
+        subjects: subjectNames,
+      }}
+    />
   );
 }
 
