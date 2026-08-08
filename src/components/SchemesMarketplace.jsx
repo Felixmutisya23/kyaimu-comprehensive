@@ -10,6 +10,32 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const VERIFY_PAYMENT_URL = '/.netlify/functions/verify-payment';
 
+// Orders schemes properly: Subject (A–Z), then Grade number (1, 2, 3…
+// not alphabetically, which would put "Grade 10" before "Grade 2"),
+// then Year, then Term number. Plain alphabetical sorting on the raw
+// text fields (the old behavior) scattered grades within each subject
+// in whatever order they were uploaded/inserted, since "Term 3 2026"
+// as a string doesn't sort numerically and class names aren't numeric
+// text either.
+function parseGradeNum(className) {
+  const m = String(className || '').match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 999; // unparseable class names sort last, not lost
+}
+function parseTermYear(term) {
+  const m = String(term || '').match(/(\d+)\D+(\d{4})/);
+  return { termNum: m ? parseInt(m[1], 10) : 99, year: m ? parseInt(m[2], 10) : 9999 };
+}
+function sortSchemes(list) {
+  return [...list].sort((a, b) => {
+    if (a.subject !== b.subject) return a.subject.localeCompare(b.subject);
+    const gDiff = parseGradeNum(a.class_name) - parseGradeNum(b.class_name);
+    if (gDiff !== 0) return gDiff;
+    const ta = parseTermYear(a.term), tb = parseTermYear(b.term);
+    if (ta.year !== tb.year) return ta.year - tb.year;
+    return ta.termNum - tb.termNum;
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    SCHEMES OF WORK MARKETPLACE
    ─────────────────────────────────────────────────────────────────
@@ -47,7 +73,7 @@ export default function SchemesMarketplace({
         const filtered = filterSubjects
           ? all.filter(s => filterSubjects.includes(s.subject))
           : all;
-        setSchemes(filtered);
+        setSchemes(sortSchemes(filtered));
       })
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));

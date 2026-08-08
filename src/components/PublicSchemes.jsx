@@ -19,7 +19,7 @@ export default function PublicSchemes({ onBack }) {
         )}
         <h1 style={{ margin: '0 0 4px' }}>📘 Schemes of Work Marketplace</h1>
         <p style={{ color: '#64748b', margin: 0 }}>
-          Ready-made schemes of work for CBC and 8-4-4 — preview 2 pages free, unlock the full document for KES 70 per subject via M-Pesa.
+          Ready-made CBC schemes of work — preview 2 pages free, unlock the full document for KES 70 per subject via M-Pesa.
         </p>
       </div>
       <SchemesMarketplace mode="public" />

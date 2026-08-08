@@ -182,6 +182,12 @@ function guessLevelKeyForGrade(gradeNum) {
   if (gradeNum >= 1 && gradeNum <= 3) return 'LOWER_PRIMARY';
   if (gradeNum >= 4 && gradeNum <= 6) return 'UPPER_PRIMARY';
   if (gradeNum >= 7 && gradeNum <= 9) return 'JUNIOR_SECONDARY';
+  // Grades 10–12 (CBC Senior Secondary) were missing entirely here —
+  // any Grade 10+ file silently fell through to the LOWER_PRIMARY
+  // default below, whose class list only goes up to Grade 3. That's
+  // exactly why uploading a Grade 10 file failed: "Grade 10" simply
+  // didn't exist in the dropdown it was being matched against.
+  if (gradeNum >= 10 && gradeNum <= 12) return 'SENIOR_SECONDARY';
   return 'LOWER_PRIMARY';
 }
 

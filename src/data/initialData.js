@@ -76,8 +76,8 @@ export const CURRICULUM_LEVELS = {
     ],
   },
   SENIOR_SECONDARY: {
-    label: 'Senior Secondary (Form 1–4)',
-    classes: ['Form 1', 'Form 2', 'Form 3', 'Form 4'],
+    label: 'Senior Secondary (Grade 10–12)',
+    classes: ['Grade 10', 'Grade 11', 'Grade 12'],
     subjects: [
       'English',
       'Kiswahili',

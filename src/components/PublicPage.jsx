@@ -185,7 +185,7 @@ export default function PublicPage({ data, onLoginClick }) {
               <div style={{ fontWeight:700,fontSize:14,color:C.text }}>{cls}</div>
             </div>
           ))}
-          {allClasses.length === 0 && ['Grade 1–3','Grade 4–6','Grade 7–9','Form 1–4'].map(c => (
+          {allClasses.length === 0 && ['Grade 1–3','Grade 4–6','Grade 7–9','Grade 10–12'].map(c => (
             <div key={c} style={{ background:C.white,border:`1.5px solid ${C.border}`,borderRadius:12,padding:'18px 20px',display:'flex',alignItems:'center',gap:12 }}>
               <div style={{ width:40,height:40,borderRadius:10,background:'#eff6ff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18 }}>📚</div>
               <div style={{ fontWeight:700,fontSize:14,color:C.text }}>{c}</div>
@@ -288,7 +288,7 @@ export default function PublicPage({ data, onLoginClick }) {
                   style={{ width:'100%',padding:'11px 14px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:14,color:C.text,background:C.white,outline:'none' }}>
                   <option value="">Select class...</option>
                   {allClasses.map(c=><option key={c} value={c}>{c}</option>)}
-                  {allClasses.length===0 && ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Form 1','Form 2','Form 3','Form 4'].map(c=><option key={c} value={c}>{c}</option>)}
+                  {allClasses.length===0 && ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'].map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom:14 }}>
