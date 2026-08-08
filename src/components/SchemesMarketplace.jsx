@@ -259,13 +259,19 @@ export default function SchemesMarketplace({
 
 /* ── 2-page real PDF preview, rendered via pdf.js to canvas ────────── */
 function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
-  const [urls, setUrls] = useState(null);
-  const [err, setErr]   = useState('');
+  const [err, setErr]         = useState('');
+  const [isPdf, setIsPdf]     = useState(true);
   const canvas1 = useRef(null);
   const canvas2 = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
+    // Word documents (.doc/.docx) can't be rendered page-by-page in the
+    // browser the way PDFs can — show a clear "no preview" message
+    // instead of letting pdf.js fail trying to parse a non-PDF file.
+    const isWordDoc = /\.(docx?|DOCX?)$/i.test(scheme.storage_path);
+    if (isWordDoc) { setIsPdf(false); return; }
+
     getSchemePreviewUrl(scheme.storage_path)
       .then(async url => {
         const doc = await pdfjsLib.getDocument(url).promise;
@@ -294,10 +300,16 @@ function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
         {err && <div style={{ color: '#ef4444' }}>{err}</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', margin: '16px 0' }}>
-          <canvas ref={canvas1} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
-          <canvas ref={canvas2} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
-        </div>
+        {!isPdf ? (
+          <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-muted, #64748b)' }}>
+            📄 This is a Word document — a page preview isn't available, but the full document is exactly as described. Unlock to download.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', margin: '16px 0' }}>
+            <canvas ref={canvas1} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
+            <canvas ref={canvas2} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
+          </div>
+        )}
         <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted, #64748b)', marginBottom: 12 }}>
           This is a 2-page preview — unlock to view and download the full document.
         </div>

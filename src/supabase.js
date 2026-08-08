@@ -970,12 +970,22 @@ export async function deleteGalleryPhoto(fileName) {
 export async function uploadSchemeFile(file, subject, className) {
   const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
   const safeClass   = className.replace(/[^a-zA-Z0-9]/g, '_');
-  const path = `${safeSubject}_${safeClass}_${Date.now()}.pdf`;
+  // Preserve the REAL extension/content-type of the uploaded file. This
+  // used to hardcode ".pdf" and contentType "application/pdf" for every
+  // upload regardless of what was actually selected — a Word document
+  // (.docx) uploaded this way would get silently saved under a .pdf
+  // filename with a lying content-type, corrupting the file on download.
+  const extMatch = /\.([a-zA-Z0-9]+)$/.exec(file.name || '');
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'pdf';
+  const contentType = file.type || (ext === 'docx'
+    ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    : ext === 'doc' ? 'application/msword' : 'application/pdf');
+  const path = `${safeSubject}_${safeClass}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
 
   const { error } = await getSupabase()
     .storage
     .from('schemes-of-work')
-    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: 'application/pdf' });
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType });
 
   if (error) throw new Error('Upload failed: ' + error.message);
   return path;
