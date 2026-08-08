@@ -1,3 +1,15 @@
+// IMPORTANT — domain and auth fix:
+// The company is "IntaSend" (intasend.com) — this file was calling
+// "app.instasend.io", a domain that does not exist (note the extra "s"
+// and wrong TLD). That's exactly why every request failed at the
+// network level with "fetch failed" — Node couldn't even resolve the
+// hostname, let alone get a response. Confirmed the real domain and
+// auth method directly against IntaSend's own developer docs
+// (developers.intasend.com): live API base is https://payment.intasend.com,
+// and requests must carry "Authorization: Bearer <secret key>" — NOT
+// the "X-insta-token" header this file was sending.
+const INTASEND_BASE = 'https://payment.intasend.com/api/v1';
+
 export const handler = async (event) => {
   const method = event.httpMethod;
 
@@ -9,14 +21,6 @@ export const handler = async (event) => {
     return { statusCode: 405, headers: { 'Access-Control-Allow-Origin': '*' }, body: 'Method Not Allowed' };
   }
 
-  // Everything below used to have NO error handling at all — any hiccup
-  // from InstaSend (timeout, non-JSON response, wrong/missing API key,
-  // their service being briefly down) caused an unhandled exception,
-  // which Netlify reports to the browser as a raw, unreadable
-  // "502 Bad Gateway" with zero information about what actually went
-  // wrong. Wrapping this in try/catch means a real failure reason
-  // reaches the app instead — for BOTH the license/subscription flow
-  // and the Schemes of Work flow, since they share this same function.
   try {
     const body = JSON.parse(event.body || '{}');
 
@@ -28,25 +32,32 @@ export const handler = async (event) => {
       };
     }
 
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.INSTASEND_SECRET_KEY}`,
+    };
+
     // ── INITIATE STK PUSH (POST with body.action = 'initiate') ────────
+    // Uses the direct M-Pesa STK push endpoint (prompts the phone
+    // immediately) rather than the "payment-links" checkout-link flow,
+    // which generates a shareable URL instead — the app's UI expects an
+    // immediate phone prompt, matching what "collection.mpesa_stk_push()"
+    // does in IntaSend's own SDKs.
     if (body.action === 'initiate') {
       const { phone, amount, apiRef, name, email } = body;
       if (!phone || !amount) {
         return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Missing phone or amount.' }) };
       }
 
-      const res = await fetch('https://app.instasend.io/api/v1/payment-links/one-time/', {
+      const res = await fetch(`${INTASEND_BASE}/payment/mpesa-stk-push/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-insta-token': process.env.INSTASEND_SECRET_KEY,
-        },
+        headers: authHeaders,
         body: JSON.stringify({
           amount,
           currency: 'KES',
           phone_number: phone,
           api_ref: apiRef,
-          name,
+          first_name: name,
           email,
         }),
       });
@@ -59,11 +70,17 @@ export const handler = async (event) => {
         return {
           statusCode: 200,
           headers: { 'Access-Control-Allow-Origin': '*' },
-          body: JSON.stringify({ error: (data && (data.detail || data.message)) || rawText || `InstaSend returned HTTP ${res.status}` }),
+          body: JSON.stringify({ error: (data && (data.detail || data.message || JSON.stringify(data))) || rawText || `IntaSend returned HTTP ${res.status}` }),
         };
       }
 
-      return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data) };
+      // Normalize to the shape the frontend expects: json.invoice.invoice_id
+      const invoiceId = data.invoice?.invoice_id || data.id || data.invoice_id;
+      return {
+        statusCode: 200,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ invoice: { invoice_id: invoiceId, ...data.invoice }, raw: data }),
+      };
     }
 
     // ── POLL STATUS (POST with body.invoiceId) ─────────────────────────
@@ -73,8 +90,8 @@ export const handler = async (event) => {
     }
 
     const res = await fetch(
-      `https://app.instasend.io/api/v1/payment-links/${invoiceId}/`,
-      { headers: { 'X-insta-token': process.env.INSTASEND_SECRET_KEY } }
+      `${INTASEND_BASE}/payment/status/${invoiceId}/`,
+      { headers: authHeaders }
     );
 
     const rawText = await res.text();
@@ -85,11 +102,11 @@ export const handler = async (event) => {
       return {
         statusCode: 200,
         headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: (data && (data.detail || data.message)) || rawText || `InstaSend returned HTTP ${res.status}` }),
+        body: JSON.stringify({ error: (data && (data.detail || data.message || JSON.stringify(data))) || rawText || `IntaSend returned HTTP ${res.status}` }),
       };
     }
 
-    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state }) };
+    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state || data.state }) };
 
   } catch (e) {
     // Last-resort catch — guarantees the browser NEVER sees a raw 502
