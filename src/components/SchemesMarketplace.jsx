@@ -108,7 +108,7 @@ export default function SchemesMarketplace({
       });
       const json = await res.json();
       if (!json.invoice?.invoice_id) {
-        alert(`Payment initiation failed: ${json.message || json.detail || 'Unknown error'}`);
+        alert(`Payment initiation failed: ${json.error || json.message || json.detail || 'Unknown error'}`);
         setPaying(false);
         return;
       }
