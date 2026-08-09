@@ -50,7 +50,6 @@ function sortSchemes(list) {
 ═══════════════════════════════════════════════════════════════════ */
 export default function SchemesMarketplace({
   mode = 'public',            // 'portal' | 'public'
-  filterSubjects = null,      // portal mode: restrict to these subject names
   defaultPhone = '',
   defaultName = '',
   termlyBundle = null,        // portal mode: { schoolId, teacherId, subjects: [...] }
@@ -63,21 +62,41 @@ export default function SchemesMarketplace({
   const [access, setAccess]     = useState({ unlockedSchemeIds: new Set(), hasTermlyBundleFor: () => false });
   const [checkingAccess, setCheckingAccess] = useState(false);
 
+  // Drill-down browse filters, as requested: pick a Year, then a Class,
+  // then a Term, and see everything available for that combination —
+  // instead of the system silently guessing which subjects to show
+  // (which broke whenever a subject name didn't match exactly, e.g. a
+  // teacher's assignment says "Kiswahili" but the catalog has "KIS").
+  // '' means "any" for that filter level.
+  const [fYear, setFYear]   = useState('');
+  const [fClass, setFClass] = useState('');
+  const [fTerm, setFTerm]   = useState('');
+
   const [previewScheme, setPreviewScheme] = useState(null);
   const [payTarget, setPayTarget]         = useState(null); // scheme object, or 'TERMLY' marker
   const [paying, setPaying]               = useState(false);
 
   useEffect(() => {
     listActiveSchemes()
-      .then(all => {
-        const filtered = filterSubjects
-          ? all.filter(s => filterSubjects.includes(s.subject))
-          : all;
-        setSchemes(sortSchemes(filtered));
-      })
+      .then(all => setSchemes(sortSchemes(all)))
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [filterSubjects]);
+  }, []);
+
+  // Distinct, sensibly-ordered option lists built from what's actually
+  // in the catalog — so the dropdowns never offer an option with zero
+  // results.
+  const years = [...new Set(schemes.map(s => parseTermYear(s.term).year))].sort((a, b) => a - b);
+  const classes = [...new Set(schemes.map(s => s.class_name))].sort((a, b) => parseGradeNum(a) - parseGradeNum(b));
+  const termNums = [...new Set(schemes.map(s => parseTermYear(s.term).termNum))].sort((a, b) => a - b);
+
+  const visibleSchemes = schemes.filter(s => {
+    const ty = parseTermYear(s.term);
+    if (fYear && String(ty.year) !== String(fYear)) return false;
+    if (fClass && s.class_name !== fClass) return false;
+    if (fTerm && String(ty.termNum) !== String(fTerm)) return false;
+    return true;
+  });
 
   async function checkAccess(p) {
     if (!p || p.replace(/\D/g, '').length < 9) return;
@@ -222,14 +241,45 @@ export default function SchemesMarketplace({
 
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted, #64748b)' }}>Loading schemes of work…</div>}
       {err && <div style={{ color: '#ef4444', padding: 16 }}>{err}</div>}
-      {!loading && schemes.length === 0 && (
+
+      {!loading && schemes.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)', display: 'block', marginBottom: 4 }}>Year</label>
+            <select value={fYear} onChange={e => setFYear(e.target.value)} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }}>
+              <option value="">All years</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)', display: 'block', marginBottom: 4 }}>Class</label>
+            <select value={fClass} onChange={e => setFClass(e.target.value)} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }}>
+              <option value="">All classes</option>
+              {classes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)', display: 'block', marginBottom: 4 }}>Term</label>
+            <select value={fTerm} onChange={e => setFTerm(e.target.value)} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }}>
+              <option value="">All terms</option>
+              {termNums.map(t => <option key={t} value={t}>Term {t}</option>)}
+            </select>
+          </div>
+          {(fYear || fClass || fTerm) && (
+            <button onClick={() => { setFYear(''); setFClass(''); setFTerm(''); }}
+              style={{ ...btnGhost, alignSelf: 'flex-end' }}>Clear filters</button>
+          )}
+        </div>
+      )}
+
+      {!loading && visibleSchemes.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted, #64748b)' }}>
-          No schemes of work available {filterSubjects ? 'for your subjects' : ''} yet — check back soon.
+          {schemes.length === 0 ? 'No schemes of work available yet — check back soon.' : 'Nothing matches these filters — try a different Year, Class, or Term.'}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-        {schemes.map(s => {
+        {visibleSchemes.map(s => {
           const unlocked = isUnlocked(s);
           return (
             <div key={s.id} style={{ border: '1px solid var(--border, #e2e8f0)', borderRadius: 10, padding: 14, background: 'var(--surface, #fff)' }}>

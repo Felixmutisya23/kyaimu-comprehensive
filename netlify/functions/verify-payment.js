@@ -1,14 +1,16 @@
-// IMPORTANT — domain and auth fix:
-// The company is "IntaSend" (intasend.com) — this file was calling
-// "app.instasend.io", a domain that does not exist (note the extra "s"
-// and wrong TLD). That's exactly why every request failed at the
-// network level with "fetch failed" — Node couldn't even resolve the
-// hostname, let alone get a response. Confirmed the real domain and
-// auth method directly against IntaSend's own developer docs
-// (developers.intasend.com): live API base is https://payment.intasend.com,
-// and requests must carry "Authorization: Bearer <secret key>" — NOT
-// the "X-insta-token" header this file was sending.
-const INTASEND_BASE = 'https://payment.intasend.com/api/v1';
+// IMPORTANT — verified directly against IntaSend's official OpenAPI spec
+// (developers.intasend.com/llms.txt → reference pages), since the SDK
+// docs alone don't show raw REST paths:
+//   - Server is https://api.intasend.com (NOT payment.intasend.com,
+//     and NOT app.instasend.io, which never existed at all)
+//   - Status check is a POST to /api/v1/payment/status/ with
+//     { invoice_id } in the JSON BODY — not a GET with the id in the
+//     URL path. This was the exact bug behind payments not being
+//     detected as complete: the previous status check was malformed
+//     (wrong method AND wrong request shape), so it was very likely
+//     failing or returning nothing usable every single time it polled,
+//     regardless of whether the real M-Pesa payment had gone through.
+const INTASEND_BASE = 'https://api.intasend.com/api/v1';
 
 export const handler = async (event) => {
   const method = event.httpMethod;
@@ -38,13 +40,12 @@ export const handler = async (event) => {
     };
 
     // ── INITIATE STK PUSH (POST with body.action = 'initiate') ────────
-    // Uses the direct M-Pesa STK push endpoint (prompts the phone
-    // immediately) rather than the "payment-links" checkout-link flow,
-    // which generates a shareable URL instead — the app's UI expects an
-    // immediate phone prompt, matching what "collection.mpesa_stk_push()"
-    // does in IntaSend's own SDKs.
+    // Request body matches the MPesaSTKPushInit schema exactly: only
+    // amount, phone_number, and api_ref are real fields on this
+    // endpoint — currency/first_name/email (sent previously) aren't
+    // part of this schema at all.
     if (body.action === 'initiate') {
-      const { phone, amount, apiRef, name, email } = body;
+      const { phone, amount, apiRef } = body;
       if (!phone || !amount) {
         return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Missing phone or amount.' }) };
       }
@@ -54,11 +55,8 @@ export const handler = async (event) => {
         headers: authHeaders,
         body: JSON.stringify({
           amount,
-          currency: 'KES',
           phone_number: phone,
           api_ref: apiRef,
-          first_name: name,
-          email,
         }),
       });
 
@@ -74,13 +72,7 @@ export const handler = async (event) => {
         };
       }
 
-      // Normalize to the shape the frontend expects: json.invoice.invoice_id
-      const invoiceId = data.invoice?.invoice_id || data.id || data.invoice_id;
-      return {
-        statusCode: 200,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ invoice: { invoice_id: invoiceId, ...data.invoice }, raw: data }),
-      };
+      return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data) };
     }
 
     // ── POLL STATUS (POST with body.invoiceId) ─────────────────────────
@@ -89,10 +81,11 @@ export const handler = async (event) => {
       return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Missing invoiceId.' }) };
     }
 
-    const res = await fetch(
-      `${INTASEND_BASE}/payment/status/${invoiceId}/`,
-      { headers: authHeaders }
-    );
+    const res = await fetch(`${INTASEND_BASE}/payment/status/`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
 
     const rawText = await res.text();
     let data;
@@ -106,7 +99,7 @@ export const handler = async (event) => {
       };
     }
 
-    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state || data.state }) };
+    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state }) };
 
   } catch (e) {
     // Last-resort catch — guarantees the browser NEVER sees a raw 502

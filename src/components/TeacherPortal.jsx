@@ -945,24 +945,16 @@ function TeacherApprovals({ user, data, setData }) {
 
 function TeacherSchemes({ user, data, mySubjects }) {
   const subjectNames = [...new Set(mySubjects.map(s => s.subject))];
-  if (subjectNames.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-        You don't have any subjects assigned yet — schemes of work will appear here once subjects are assigned to you.
-      </div>
-    );
-  }
   return (
     <SchemesMarketplace
       mode="portal"
-      filterSubjects={subjectNames}
       defaultPhone={user.phone || ''}
       defaultName={user.name || ''}
-      termlyBundle={{
+      termlyBundle={subjectNames.length > 0 ? {
         schoolId: data._schoolId,
         teacherId: user.staffId,
         subjects: subjectNames,
-      }}
+      } : null}
     />
   );
 }
