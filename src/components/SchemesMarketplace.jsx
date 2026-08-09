@@ -108,6 +108,17 @@ export default function SchemesMarketplace({
     setCheckingAccess(false);
   }
 
+  // Auto-check as soon as a complete-looking number is present — covers
+  // both the pre-filled case (teacher portal passes defaultPhone) and
+  // someone typing their number without ever clicking away from the
+  // field. Previously this only ran on blur, so a returning buyer could
+  // easily see everything as "locked" and think they had to pay again,
+  // purely because the check never fired.
+  useEffect(() => {
+    const t = setTimeout(() => { if (phone) checkAccess(phone); }, 500);
+    return () => clearTimeout(t);
+  }, [phone]);
+
   const price = s => mode === 'portal' ? Number(s.price_system) : Number(s.price_public);
   const termlyPrice = termlyBundle ? 40 * termlyBundle.subjects.length : 0;
   const hasTermlyAccess = termlyBundle
