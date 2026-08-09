@@ -176,9 +176,15 @@ export default function SchemesMarketplace({
           body: JSON.stringify({ invoiceId }),
         });
         const json = await res.json();
-        const status = json.state?.toLowerCase();
+        // IntaSend's real state values are uppercase: PENDING, PROCESSING,
+        // COMPLETE, FAILED, CANCELED, PARTIAL, RETRY. Only COMPLETE was
+        // ever checked for — FAILED/CANCELED (e.g. the user cancels the
+        // M-Pesa prompt instead of entering their PIN) looked exactly
+        // like "still pending" and silently kept polling for the full
+        // 3-minute timeout with no indication anything had gone wrong.
+        const status = (json.state || '').toUpperCase();
 
-        if (status === 'complete' || status === 'paid') {
+        if (status === 'COMPLETE') {
           clearInterval(interval);
           await recordSchemePurchase({
             buyerPhone: phone, buyerName: name,
@@ -193,6 +199,13 @@ export default function SchemesMarketplace({
           setPaying(false);
           setPayTarget(null);
           alert(`✅ Payment confirmed! KES ${amount} received. You can now download.`);
+        } else if (status === 'FAILED' || status === 'CANCELED') {
+          clearInterval(interval);
+          setPaying(false);
+          const reason = json.failedReason ? ` (${json.failedReason})` : '';
+          alert(status === 'CANCELED'
+            ? '❌ Payment was cancelled — nothing was charged. Tap "Pay Now" again if you\'d like to retry.'
+            : `❌ Payment failed${reason}. Nothing was charged — check your M-Pesa balance/PIN and try again.`);
         } else if (attempts >= maxAttempts) {
           clearInterval(interval);
           setPaying(false);

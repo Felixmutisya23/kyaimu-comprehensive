@@ -99,7 +99,7 @@ export const handler = async (event) => {
       };
     }
 
-    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state }) };
+    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ state: data.invoice?.state, failedReason: data.invoice?.failed_reason }) };
 
   } catch (e) {
     // Last-resort catch — guarantees the browser NEVER sees a raw 502
