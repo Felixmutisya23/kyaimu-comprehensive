@@ -964,18 +964,42 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
         <Alert type="info">
           This is the exam subject list for <strong>{selClass}</strong> — controls what shows when entering new marks. Rename a subject and marks move with it automatically.
           <strong style={{ color: '#f59e0b' }}> Removing a subject here takes it out of this list for good (it won't come back on its own) — but if it already has marks in a past exam, those marks stay visible when viewing that exam's results, they just won't be offered again for new entry.</strong>
-          <br/>Changes here do <strong>not</strong> affect Settings subjects used for timetable or teacher assignment.
+          <br/>Once you set a custom list here for {selClass}, it also <strong>replaces</strong> the Settings subject list for Timetable Rules and Teacher subject assignment for this exact class — add a subject here and it becomes available in both places too. Tick <strong>No marks</strong> below for subjects that should still appear in Timetable/Teacher assignment but never get an exam column.
         </Alert>
 
         <FormGroup label={`Subjects (${setupSubjectRows.length})`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {setupSubjectRows.map((row, i) => (
+            {setupSubjectRows.map((row, i) => {
+              const noMarks = (data.nonExaminableSubjects || []).includes(row.current.trim());
+              return (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   value={row.current}
                   onChange={e => setSetupSubjectRows(rows => rows.map((r, ri) => ri === i ? { ...r, current: e.target.value } : r))}
                   style={{ flex: 1 }}
                 />
+                <label
+                  title="Subject still appears on Timetable and can be assigned to a teacher — it just won't get an exam-marks column."
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: noMarks ? '#f59e0b' : 'var(--text-muted)', whiteSpace: 'nowrap', cursor: row.current.trim() ? 'pointer' : 'not-allowed' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={noMarks}
+                    disabled={!row.current.trim()}
+                    onChange={() => {
+                      const name = row.current.trim();
+                      if (!name) return;
+                      setData(d => {
+                        const current = d.nonExaminableSubjects || [];
+                        const next = current.includes(name)
+                          ? current.filter(s => s !== name)
+                          : [...current, name];
+                        return { ...d, nonExaminableSubjects: next };
+                      });
+                    }}
+                  />
+                  No marks
+                </label>
                 <Btn size="sm" variant="danger" onClick={() => {
                   if (row.original && !window.confirm(`Remove "${row.original}" from ${selClass}? Any marks already entered for this subject will be KEPT in the exam data but it will no longer appear in the subject list or in new mark entry.`)) return;
                   setSetupSubjectRows(rows => rows.filter((_, ri) => ri !== i));
@@ -983,9 +1007,14 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                   <Icon name="trash" size={12} />
                 </Btn>
               </div>
-            ))}
+              );
+            })}
           </div>
         </FormGroup>
+
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -4, marginBottom: 10 }}>
+          Tick <strong>No marks</strong> for subjects like Music or P.E. that are taught and timetabled but never graded — this applies school-wide by subject name, not just to {selClass}.
+        </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input

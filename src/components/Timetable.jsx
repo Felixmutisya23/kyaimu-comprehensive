@@ -862,15 +862,20 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
             const rule = rules.find(r => r.subject === subject) || { ...DEFAULT_RULE };
             const active = !!rules.find(r => r.subject === subject);
             return (
-              <tr key={subject} style={{ opacity: active ? 1 : 0.45 }}>
-                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text)', fontWeight: active ? 600 : 400 }}>
-                  {subject}
+              <tr key={subject}>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', color: active ? 'var(--text)' : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}>
+                  {subject}{!active && <span style={{ fontSize: 9, marginLeft: 6, opacity: 0.7 }}>(no rule yet — edit any field to add one)</span>}
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <input
-                    type="number" min="1" max="10" value={rule.freq}
-                    onChange={e => onUpsert(subject, { freq: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
-                    style={{ width: 54, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
+                    type="text" inputMode="numeric" pattern="[0-9]*" value={rule.freq}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/[^0-9]/g, '');
+                      if (digits === '') { onUpsert(subject, { freq: '' }); return; }
+                      onUpsert(subject, { freq: Math.max(1, Math.min(10, parseInt(digits, 10))) });
+                    }}
+                    onBlur={() => { if (rule.freq === '') onUpsert(subject, { freq: 1 }); }}
+                    style={{ width: 54, minHeight: 32, padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 14 }}
                   />
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
