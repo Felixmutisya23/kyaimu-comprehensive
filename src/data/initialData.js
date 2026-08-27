@@ -151,23 +151,31 @@ export function getSubjectsForClass(className, data) {
  * The function ALWAYS filters out any subject not present in the school's
  * Settings (getSubjectsForClass) so rogue subjects like "Guidance & Counselling"
  * that were assigned to a teacher but never added to Settings never appear.
+ *
+ * It also filters out any subject flagged in data.nonExaminableSubjects
+ * (toggled per-subject in Settings → Curriculum Subjects). Those subjects
+ * still exist for Timetable rules and Teacher subject assignment via
+ * getSubjectsForClass — they just never get an exam-marks column. Use this
+ * for subjects like Music/PE that are taught and timetabled but not graded.
  */
 export function getExamColumnsForClass(className, data, examOverrides) {
   const settingsSubjects = new Set(getSubjectsForClass(className, data));
+  const nonExaminable = new Set(data.nonExaminableSubjects || []);
+  const examSubjects = new Set([...settingsSubjects].filter(s => !nonExaminable.has(s)));
   const level = getCurriculumLevel(className);
 
   // If exam has its own column overrides, use those
   if (examOverrides && examOverrides.length > 0) {
     return examOverrides
       .filter(col => {
-        if (col.type === 'single') return settingsSubjects.has(col.subject);
-        if (col.type === 'group')  return col.components.some(c => settingsSubjects.has(c));
+        if (col.type === 'single') return examSubjects.has(col.subject);
+        if (col.type === 'group')  return col.components.some(c => examSubjects.has(c));
         return false;
       })
       .map(col => ({
         ...col,
         components: col.type === 'group'
-          ? col.components.filter(c => settingsSubjects.has(c))
+          ? col.components.filter(c => examSubjects.has(c))
           : undefined,
       }));
   }
@@ -183,7 +191,7 @@ export function getExamColumnsForClass(className, data, examOverrides) {
 
       // Add group columns first (in order defined)
       groups.forEach(g => {
-        const validComponents = g.components.filter(c => settingsSubjects.has(c));
+        const validComponents = g.components.filter(c => examSubjects.has(c));
         if (validComponents.length === 0) return;
         if (validComponents.length === 1) {
           // Only one component left — treat as single
@@ -194,7 +202,7 @@ export function getExamColumnsForClass(className, data, examOverrides) {
       });
 
       // Add ungrouped subjects as plain columns
-      [...settingsSubjects].forEach(sub => {
+      [...examSubjects].forEach(sub => {
         if (!groupedSubjects.has(sub)) {
           columns.push({ name: sub, type: 'single', subject: sub });
         }
@@ -205,7 +213,7 @@ export function getExamColumnsForClass(className, data, examOverrides) {
   }
 
   // Default — one column per subject, no grouping
-  return [...settingsSubjects].map(sub => ({ name: sub, type: 'single', subject: sub }));
+  return [...examSubjects].map(sub => ({ name: sub, type: 'single', subject: sub }));
 }
 
 /**

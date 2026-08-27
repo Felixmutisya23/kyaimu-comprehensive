@@ -311,11 +311,17 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
   const personalSessions = view === 'personal' ? buildPersonalTimetable() : [];
 
   /* ── Edit cell ──────────────────────────────────────── */
-  function updateCell(day, idx, value) {
+  // patch: { subject? , teacherId? } — merged onto whatever was already in the
+  // cell so manual edits never silently drop the teacherId (which is required
+  // for teacher-collision detection to see the slot at all).
+  function updateCell(day, idx, patch) {
     const newTT = { ...tt };
     if (!newTT[day]) newTT[day] = data.bells.map(() => null);
     const arr = [...(newTT[day] || [])];
-    arr[idx] = value ? { subject: value } : null;
+    const prev = resolveSlot(arr[idx]) || {};
+    const subject   = patch.subject   !== undefined ? patch.subject   : prev.subject;
+    const teacherId = patch.teacherId !== undefined ? patch.teacherId : (prev.teacherId || '');
+    arr[idx] = subject ? { ...prev, subject, teacherId } : null;
     newTT[day] = arr;
     setData(d => ({ ...d, timetable: { ...d.timetable, [selClass]: newTT } }));
   }
@@ -632,11 +638,36 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
                             outlineOffset: -2,
                           }}>
                             {editMode && !isSpecial && isPrincipal ? (
-                              <input
-                                value={slot?.subject || ''}
-                                onChange={e => updateCell(day, i, e.target.value)}
-                                style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}
-                              />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                <input
+                                  value={slot?.subject || ''}
+                                  onChange={e => {
+                                    const value = e.target.value;
+                                    // If this subject has a Rules-assigned teacher and the
+                                    // cell doesn't already have one, adopt it automatically
+                                    // so the cell stays visible to collision detection.
+                                    const rule = rules.find(r => r.cls === selClass && r.subject === value);
+                                    const patch = { subject: value };
+                                    if (rule && rule.teacherId && !slot?.teacherId) patch.teacherId = rule.teacherId;
+                                    updateCell(day, i, patch);
+                                  }}
+                                  placeholder="Subject"
+                                  style={{ width: '100%', padding: '4px 6px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}
+                                />
+                                <select
+                                  value={slot?.teacherId || ''}
+                                  onChange={e => updateCell(day, i, { teacherId: e.target.value })}
+                                  title="Teacher for this slot — required for collision detection to catch double-bookings"
+                                  style={{ width: '100%', padding: '3px 4px', fontSize: 10, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}
+                                >
+                                  <option value="">— No teacher —</option>
+                                  {(data.teachers || [])
+                                    .filter(t => t.staffType === 'teaching' || (t.subjects && t.subjects.length > 0))
+                                    .map(t => (
+                                      <option key={t.staffId || t.id} value={t.staffId || t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+                              </div>
                             ) : displayLabel ? (
                               <div style={{
                                 background: `${col}20`,
@@ -815,7 +846,10 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
 
   return (
     <div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      {/* overflowX lets the table scroll sideways on phones instead of
+          squeezing every column (esp. "Per week") down to an unusable size */}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr>
             {['Subject', 'Per week', 'Allow double', 'Pref. time', 'Teacher', ''].map(h => (
@@ -887,8 +921,9 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
           })}
         </tbody>
       </table>
+      </div>
       <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
-        Rows dim when no rule is saved. Editing any field auto-saves the rule for that subject.
+        Rows dim when no rule is saved. Editing any field auto-saves the rule for that subject. On a phone, swipe the table sideways to reach "Per week" and the other columns.
       </p>
     </div>
   );

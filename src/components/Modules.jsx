@@ -1057,6 +1057,19 @@ export function Settings({ data, setData }) {
     });
   }
 
+  // Subjects taught & timetabled but never given exam marks (e.g. Music, PE).
+  // Toggling this does NOT remove the subject from Timetable Rules or Teacher
+  // subject assignment — only from exam mark-entry / report cards.
+  function toggleNonExaminable(subName) {
+    setData(d => {
+      const current = d.nonExaminableSubjects || [];
+      const next = current.includes(subName)
+        ? current.filter(s => s !== subName)
+        : [...current, subName];
+      return { ...d, nonExaminableSubjects: next };
+    });
+  }
+
   // Class management
   const [showAddClass, setShowAddClass] = useState(false);
   const [newClassLevel, setNewClassLevel] = useState('');
@@ -1340,6 +1353,7 @@ export function Settings({ data, setData }) {
                       {allSubs.map(s => {
                         const isExtra    = extras.includes(s);
                         const isThisEdit = isEditing && editingSubject.oldName === s;
+                        const noMarks    = (data.nonExaminableSubjects || []).includes(s);
 
                         if (isThisEdit) {
                           return (
@@ -1377,6 +1391,18 @@ export function Settings({ data, setData }) {
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                           }}>
                             {s}
+                            {noMarks && (
+                              <span title="Timetabled only — excluded from exam marks entry" style={{
+                                fontSize: 9, fontWeight: 700, color: '#f59e0b', background: '#f59e0b20',
+                                border: '1px solid #f59e0b40', borderRadius: 6, padding: '1px 5px',
+                              }}>NO MARKS</span>
+                            )}
+                            <button
+                              onClick={() => toggleNonExaminable(s)}
+                              title={noMarks ? 'Include in exam marks entry again' : "Exclude from exam marks entry (still shows in Timetable & Teacher assignment)"}
+                              style={{ background: 'none', border: 'none', color: noMarks ? '#f59e0b' : 'var(--text-muted)', cursor: 'pointer', fontSize: 11, padding: '0 1px', lineHeight: 1 }}>
+                              {noMarks ? '📝' : '🚫'}
+                            </button>
                             <button
                               onClick={() => { setEditingSubject({ levelKey: key, oldName: s }); setEditSubjectVal(s); }}
                               title="Rename"
