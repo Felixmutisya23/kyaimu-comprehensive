@@ -36,14 +36,27 @@ function subjectColor(subject) {
    TIMETABLE RULE DEFAULTS
    Stored in data.timetableRules — array of:
    {
-     id, cls, subject, freq, allowDouble, pref, teacherId
-     freq      : lessons per week (1-10)
-     allowDouble: bool — may be placed as two consecutive slots
-     pref      : 'any' | 'morning' | 'noon' | 'afternoon'
-     teacherId : teacher staffId string or ''
+     id, cls, subject, freq, allowDouble, doubleCount, doubleDays, pref, teacherId
+     freq        : lessons per week (1-10)
+     allowDouble : bool — derived from doubleCount > 0, kept for the generator's
+                   internal checks and backward compatibility with older saved rules
+     doubleCount : 0 | 1 | 2 — how many separate double-lesson sessions per week
+     doubleDays  : array (length === doubleCount) of chosen day names, or ''
+                   for "any day" — e.g. ['Monday', ''] = double #1 fixed on
+                   Monday, double #2 auto-picked by the generator
+     pref        : 'any' | 'morning' | 'noon' | 'afternoon'
+     teacherId   : teacher staffId string or ''
    }
 ───────────────────────────────────────────────────────────── */
-const DEFAULT_RULE = { freq: 5, allowDouble: false, pref: 'any', teacherId: '' };
+const DEFAULT_RULE = { freq: 5, allowDouble: false, doubleCount: 0, doubleDays: [], pref: 'any', teacherId: '' };
+
+// Reads a rule's double settings with backward-compatible fallback for rules
+// saved before doubleCount/doubleDays existed (they only had allowDouble).
+function getDoubleSettings(rule) {
+  const doubleCount = rule.doubleCount != null ? rule.doubleCount : (rule.allowDouble ? 1 : 0);
+  const doubleDays = rule.doubleDays || [];
+  return { doubleCount, doubleDays };
+}
 
 /* ─────────────────────────────────────────────────────────────
    SLOT HELPERS
@@ -114,7 +127,7 @@ function detectAllConflicts(timetable, bells) {
 ───────────────────────────────────────────────────────────── */
 function generateForClass(cls, rules, bells, existingTimetable) {
   const clsRules = rules.filter(r => r.cls === cls);
-  if (clsRules.length === 0) return null;
+  if (clsRules.length === 0) return { timetable: null, unmetDoubleRequests: [] };
 
   const lessonSlots = getLessonSlots(bells);
 
@@ -139,13 +152,33 @@ function generateForClass(cls, rules, bells, existingTimetable) {
     return Object.values(grid[day]).filter(v => v && v.subject === subject).length;
   }
 
+  // A subject may appear a 2nd time on the same day ONLY if it forms a
+  // genuine back-to-back double (immediately adjacent bell, no break/lunch
+  // in between) AND the rule actually allows doubles. Otherwise it must
+  // spread to a different day. This is what stops e.g. MATHS (allowDouble:
+  // No) from being scheduled twice in one day with a break in between.
+  function spreadOk(rule, day, bellIdx) {
+    const onDay = countOnDay(rule.subject, day);
+    if (onDay >= 2) return false;
+    if (onDay === 1) {
+      if (!rule.allowDouble) return false;
+      const prevSlot = grid[day][bellIdx - 1];
+      const nextSlot = grid[day][bellIdx + 1];
+      const formsDouble =
+        (prevSlot && prevSlot.subject === rule.subject) ||
+        (nextSlot && nextSlot.subject === rule.subject);
+      if (!formsDouble) return false;
+    }
+    return true;
+  }
+
   // Can we place rule at (day, bellIdx)?
   function canPlace(rule, day, bellIdx) {
     if (grid[day][bellIdx] != null) return false;                         // slot taken
     if (bells[bellIdx] && bells[bellIdx].type !== 'lesson') return false; // not a lesson slot
     if (teacherOccupied(rule.teacherId, day, bellIdx)) return false;      // teacher clash
     if (rule.pref !== 'any' && slotBucket(bellIdx, bells) !== rule.pref) return false; // pref
-    if (countOnDay(rule.subject, day) >= 2) return false;                 // spread
+    if (!spreadOk(rule, day, bellIdx)) return false;                      // spread / double integrity
     return true;
   }
 
@@ -168,32 +201,51 @@ function generateForClass(cls, rules, bells, existingTimetable) {
   const allCombos = [];
   DAYS.forEach(day => lessonSlots.forEach(b => allCombos.push({ day, bellIdx: b.idx })));
 
+  const unmetDoubleRequests = []; // { subject, days } — chosen double-days that couldn't be honored
+
   for (const rule of clsRules) {
     let remaining = rule.freq;
+    const { doubleCount, doubleDays } = getDoubleSettings(rule);
 
-    // ── PASS 1: Try to place doubles first (on preferred or any days) ──
-    if (rule.allowDouble && remaining >= 2) {
-      const shuffledDays = shuffle(DAYS);
-      for (const day of shuffledDays) {
+    // ── PASS 1: Place the requested number of doubles, honoring chosen days ──
+    if (doubleCount > 0 && remaining >= 2) {
+      const attemptsNeeded = Math.min(doubleCount, Math.floor(remaining / 2));
+      const unplacedChosenDays = [];
+      for (let d = 0; d < attemptsNeeded; d++) {
         if (remaining < 2) break;
-        if (countOnDay(rule.subject, day) > 0) continue; // fresh day for doubles
-        // Find consecutive lesson-slot pairs
-        for (let i = 0; i < lessonSlots.length - 1; i++) {
-          const b1 = lessonSlots[i];
-          const b2 = lessonSlots[i + 1];
-          // Must be truly consecutive bells
-          if (b2.idx - b1.idx !== 1) continue;
-          if (!canPlace(rule, day, b1.idx)) continue;
-          if (!canPlace(rule, day, b2.idx)) continue;
-          place(rule, day, b1.idx);
-          place(rule, day, b2.idx);
-          // Mark double linkage for display
-          grid[day][b1.idx].double = true;
-          grid[day][b2.idx].double = true;
-          grid[day][b2.idx].doubleSecond = true;
-          remaining -= 2;
-          break;
+        const chosenDay = doubleDays[d]; // '' / undefined = any day, generator picks
+        const dayOrder = chosenDay ? [chosenDay] : shuffle(DAYS);
+        let placedThisDouble = false;
+        for (const day of dayOrder) {
+          if (countOnDay(rule.subject, day) > 0) continue; // fresh day for doubles
+          // Find consecutive lesson-slot pairs
+          for (let i = 0; i < lessonSlots.length - 1; i++) {
+            const b1 = lessonSlots[i];
+            const b2 = lessonSlots[i + 1];
+            // Must be truly consecutive bells
+            if (b2.idx - b1.idx !== 1) continue;
+            if (!canPlace(rule, day, b1.idx)) continue;
+            if (!canPlace(rule, day, b2.idx)) continue;
+            place(rule, day, b1.idx);
+            place(rule, day, b2.idx);
+            // Mark double linkage for display
+            grid[day][b1.idx].double = true;
+            grid[day][b2.idx].double = true;
+            grid[day][b2.idx].doubleSecond = true;
+            remaining -= 2;
+            placedThisDouble = true;
+            break;
+          }
+          if (placedThisDouble) break;
         }
+        // If a SPECIFIC day was requested but couldn't fit (teacher clash,
+        // no free adjacent pair, etc.), record it — the lesson still gets
+        // placed as normal single lesson(s) via PASS 2/3 below, it just
+        // won't be a double on that particular day.
+        if (!placedThisDouble && chosenDay) unplacedChosenDays.push(chosenDay);
+      }
+      if (unplacedChosenDays.length > 0) {
+        unmetDoubleRequests.push({ subject: rule.subject, days: unplacedChosenDays });
       }
     }
 
@@ -214,12 +266,30 @@ function generateForClass(cls, rules, bells, existingTimetable) {
         if (grid[day][bellIdx] != null) continue;
         if (bells[bellIdx] && bells[bellIdx].type !== 'lesson') continue;
         if (teacherOccupied(rule.teacherId, day, bellIdx)) continue;
-        if (countOnDay(rule.subject, day) >= 2) continue;
+        if (!spreadOk(rule, day, bellIdx)) continue;
         place(rule, day, bellIdx);
         remaining--;
       }
     }
   }
+
+  // Flag every genuinely back-to-back same-subject pair as a "double" for
+  // display purposes — covers doubles formed opportunistically in PASS 2/3,
+  // not just the ones PASS 1 placed on purpose.
+  DAYS.forEach(day => {
+    for (let i = 0; i < lessonSlots.length - 1; i++) {
+      const b1 = lessonSlots[i];
+      const b2 = lessonSlots[i + 1];
+      if (b2.idx - b1.idx !== 1) continue; // not truly adjacent (a break/lunch sits between them)
+      const s1 = grid[day][b1.idx];
+      const s2 = grid[day][b2.idx];
+      if (s1 && s2 && s1.subject === s2.subject) {
+        s1.double = true;
+        s2.double = true;
+        s2.doubleSecond = true;
+      }
+    }
+  });
 
   // Build final day arrays aligned with bells array
   const result = {};
@@ -229,7 +299,7 @@ function generateForClass(cls, rules, bells, existingTimetable) {
       return grid[day][i] || null;
     });
   });
-  return result;
+  return { timetable: result, unmetDoubleRequests };
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -330,22 +400,29 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
   function runGenerate() {
     setGenLoading(true);
     setTimeout(() => { // Let UI update before heavy work
+      const allWarnings = []; // { cls, subject, days }
       if (genAll) {
         let newTimetable = { ...data.timetable };
         classes.forEach(cls => {
-          const generated = generateForClass(cls, rules, data.bells, newTimetable);
+          const { timetable: generated, unmetDoubleRequests } = generateForClass(cls, rules, data.bells, newTimetable);
           if (generated) newTimetable[cls] = generated;
+          unmetDoubleRequests.forEach(w => allWarnings.push({ cls, ...w }));
         });
         setData(d => ({ ...d, timetable: newTimetable }));
       } else {
         const existing = { ...data.timetable };
-        const generated = generateForClass(genClass, rules, data.bells, existing);
+        const { timetable: generated, unmetDoubleRequests } = generateForClass(genClass, rules, data.bells, existing);
         if (generated) {
           setData(d => ({ ...d, timetable: { ...d.timetable, [genClass]: generated } }));
         }
+        unmetDoubleRequests.forEach(w => allWarnings.push({ cls: genClass, ...w }));
       }
       setGenLoading(false);
       setShowGen(false);
+      if (allWarnings.length > 0) {
+        const lines = allWarnings.map(w => `• ${w.cls} — ${w.subject}: couldn't fit a double on ${w.days.join(', ')} (placed as single lessons instead — try a different day, or check that day isn't already full/teacher-busy).`);
+        alert(`Timetable generated, but ${allWarnings.length} chosen double-lesson day${allWarnings.length > 1 ? 's' : ''} could not be honored:\n\n${lines.join('\n')}`);
+      }
     }, 50);
   }
 
@@ -852,7 +929,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
       <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr>
-            {['Subject', 'Per week', 'Allow double', 'Pref. time', 'Teacher', ''].map(h => (
+            {['Subject', 'Per week', 'Double', 'Double day(s)', 'Pref. time', 'Teacher', ''].map(h => (
               <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>{h}</th>
             ))}
           </tr>
@@ -880,13 +957,47 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <select
-                    value={rule.allowDouble ? '1' : '0'}
-                    onChange={e => onUpsert(subject, { allowDouble: e.target.value === '1' })}
+                    value={String(getDoubleSettings(rule).doubleCount)}
+                    onChange={e => {
+                      const doubleCount = parseInt(e.target.value, 10);
+                      const prevDays = getDoubleSettings(rule).doubleDays;
+                      // Trim or pad the days array to match the new count,
+                      // keeping whatever day choices are still relevant.
+                      const doubleDays = Array.from({ length: doubleCount }, (_, i) => prevDays[i] || '');
+                      onUpsert(subject, { allowDouble: doubleCount > 0, doubleCount, doubleDays });
+                    }}
                     style={{ padding: '4px 6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
                   >
                     <option value="0">No</option>
-                    <option value="1">Yes</option>
+                    <option value="1">Once/wk</option>
+                    <option value="2">Twice/wk</option>
                   </select>
+                </td>
+                <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
+                  {(() => {
+                    const { doubleCount, doubleDays } = getDoubleSettings(rule);
+                    if (doubleCount === 0) return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {Array.from({ length: doubleCount }).map((_, i) => (
+                          <select
+                            key={i}
+                            value={doubleDays[i] || ''}
+                            title={`Which day should double #${i + 1} of ${subject} fall on? Leave "Any day" to let the generator pick.`}
+                            onChange={e => {
+                              const nextDays = [...doubleDays];
+                              nextDays[i] = e.target.value;
+                              onUpsert(subject, { doubleDays: nextDays });
+                            }}
+                            style={{ padding: '3px 5px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 11 }}
+                          >
+                            <option value="">Any day</option>
+                            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                          </select>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <select
@@ -928,7 +1039,7 @@ function RulesEditor({ cls, data, rules, onUpsert, onRemove }) {
       </table>
       </div>
       <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
-        Rows dim when no rule is saved. Editing any field auto-saves the rule for that subject. On a phone, swipe the table sideways to reach "Per week" and the other columns.
+        Rows dim when no rule is saved. Editing any field auto-saves the rule for that subject. Set "Double" to Once/Twice a week to pick which day(s) that subject runs as a double lesson — leave "Any day" to let the generator choose. On a phone, swipe the table sideways to reach every column.
       </p>
     </div>
   );
