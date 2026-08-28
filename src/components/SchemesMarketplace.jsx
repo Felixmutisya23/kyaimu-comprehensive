@@ -5,6 +5,7 @@ import {
   listActiveSchemes, getSchemePreviewUrl, getSchemeDownloadUrl,
   getSchemeAccessFor, recordSchemePurchase,
 } from '../supabase';
+import { personalizeScheme } from '../utils/personalizeScheme';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -52,6 +53,7 @@ export default function SchemesMarketplace({
   mode = 'public',            // 'portal' | 'public'
   defaultPhone = '',
   defaultName = '',
+  defaultSchool = '',
   termlyBundle = null,        // portal mode: { schoolId, teacherId, subjects: [...] }
 }) {
   const [schemes, setSchemes]   = useState([]);
@@ -59,6 +61,8 @@ export default function SchemesMarketplace({
   const [err, setErr]           = useState('');
   const [phone, setPhone]       = useState(defaultPhone);
   const [name, setName]         = useState(defaultName);
+  const [tscNumber, setTscNumber] = useState('');
+  const [school, setSchool]     = useState(defaultSchool);
   const [access, setAccess]     = useState({ unlockedSchemeIds: new Set(), hasTermlyBundleFor: () => false });
   const [checkingAccess, setCheckingAccess] = useState(false);
 
@@ -120,7 +124,15 @@ export default function SchemesMarketplace({
   }, [phone]);
 
   const price = s => mode === 'portal' ? Number(s.price_system) : Number(s.price_public);
-  const termlyPrice = termlyBundle ? 40 * termlyBundle.subjects.length : 0;
+  // Was hardcoded to `40 * subjects.length` — silently wrong the moment
+  // prices change (e.g. after a bulk price update in Owner Dashboard).
+  // Now sums the live price_system of each subject actually in the bundle.
+  const termlyPrice = termlyBundle
+    ? termlyBundle.subjects.reduce((sum, subj) => {
+        const match = schemes.find(s => s.subject === subj);
+        return sum + (match ? Number(match.price_system) : 0);
+      }, 0)
+    : 0;
   const hasTermlyAccess = termlyBundle
     ? access.hasTermlyBundleFor(termlyBundle.schoolId, termlyBundle.teacherId)
     : false;
@@ -129,11 +141,43 @@ export default function SchemesMarketplace({
     return access.unlockedSchemeIds.has(scheme.id) || (termlyBundle && hasTermlyAccess);
   }
 
+  const [downloadingId, setDownloadingId] = useState(null);
+
   async function download(scheme) {
+    if (!name.trim() || !tscNumber.trim() || !school.trim()) {
+      alert('Please fill in your Name, TSC Number, and School before downloading — they get printed on your copy of the scheme.');
+      return;
+    }
+    setDownloadingId(scheme.id);
     try {
       const url = await getSchemeDownloadUrl(scheme.storage_path);
-      window.open(url, '_blank');
-    } catch (e) { alert('Download failed: ' + e.message); }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Could not fetch the file');
+      const arrayBuffer = await res.arrayBuffer();
+
+      const personalized = await personalizeScheme(arrayBuffer, scheme.storage_path, {
+        name: name.trim(), tscNumber: tscNumber.trim(), school: school.trim(),
+      });
+
+      const isDocx = /\.docx$/i.test(scheme.storage_path);
+      const mimeType = isDocx
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf';
+      const blob = new Blob([personalized], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      const ext = isDocx ? 'docx' : 'pdf';
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${scheme.subject}_${scheme.class_name}_${scheme.term}`.replace(/\s+/g, '_') + `.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch (e) {
+      console.error(e);
+      alert('Download failed: ' + e.message + '. Please try again.');
+    }
+    setDownloadingId(null);
   }
 
   function normalizePhone(p) {
@@ -199,6 +243,7 @@ export default function SchemesMarketplace({
           clearInterval(interval);
           await recordSchemePurchase({
             buyerPhone: phone, buyerName: name,
+            buyerTsc: tscNumber, buyerSchool: school,
             schemeId: isBundle ? null : target.id,
             isTermlyBundle: isBundle,
             termlySchoolId: isBundle ? termlyBundle.schoolId : null,
@@ -237,15 +282,26 @@ export default function SchemesMarketplace({
           </div>
           {mode === 'public' && (
             <div style={{ flex: '1 1 200px' }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>Your Name (optional)</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>Your Name</label>
               <input value={name} onChange={e => setName(e.target.value)}
                 style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }} />
             </div>
           )}
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>TSC Number</label>
+            <input value={tscNumber} onChange={e => setTscNumber(e.target.value)}
+              placeholder="TSC/2020/123456" style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }} />
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>School Name</label>
+            <input value={school} onChange={e => setSchool(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)' }} />
+          </div>
           {checkingAccess && <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)' }}>Checking previous purchases…</span>}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted, #64748b)', marginTop: 6 }}>
           Already paid before? Enter the same number to unlock your downloads again — free, no need to pay twice.
+          Your Name, TSC Number and School are printed on the downloaded copy, so fill these in before downloading.
         </div>
       </div>
 
@@ -313,7 +369,9 @@ export default function SchemesMarketplace({
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button onClick={() => setPreviewScheme(s)} style={btnGhost}>Preview</button>
                 {unlocked ? (
-                  <button onClick={() => download(s)} style={btnSuccess}>Download</button>
+                  <button onClick={() => download(s)} disabled={downloadingId === s.id} style={btnSuccess}>
+                    {downloadingId === s.id ? 'Preparing…' : 'Download'}
+                  </button>
                 ) : (
                   <button onClick={() => setPayTarget(s)} style={btnPrimary}>Unlock — KES {price(s)}</button>
                 )}

@@ -950,6 +950,7 @@ function TeacherSchemes({ user, data, mySubjects }) {
       mode="portal"
       defaultPhone={user.phone || ''}
       defaultName={user.name || ''}
+      defaultSchool={data.schoolName || ''}
       termlyBundle={subjectNames.length > 0 ? {
         schoolId: data._schoolId,
         teacherId: user.staffId,

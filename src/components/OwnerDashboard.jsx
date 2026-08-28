@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import {
   listAllSchemes, uploadSchemeFile, createSchemeRecord,
-  deleteScheme, setSchemeActive,
+  deleteScheme, setSchemeActive, bulkSetSchemePrices,
 } from '../supabase';
 import { CURRICULUM_LEVELS } from '../data/initialData';
 
@@ -72,6 +72,7 @@ function SchemesManager() {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [showBulkPrice, setShowBulkPrice] = useState(false);
 
   function refresh() {
     setLoading(true);
@@ -100,6 +101,10 @@ function SchemesManager() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h1 style={{ margin: 0 }}>📘 Schemes of Work — Owner Dashboard</h1>
           <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setShowBulkPrice(true)}
+              style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>
+              💰 Bulk Price Update
+            </button>
             <button onClick={() => setShowBulkUpload(true)}
               style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>
               📦 Bulk Upload
@@ -154,6 +159,83 @@ function SchemesManager() {
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onDone={() => { setShowUpload(false); refresh(); }} />}
       {showBulkUpload && <BulkUploadModal onClose={() => setShowBulkUpload(false)} onDone={() => refresh()} />}
+      {showBulkPrice && (
+        <BulkPriceModal
+          subjects={[...new Set(schemes.map(s => s.subject))].sort()}
+          onClose={() => setShowBulkPrice(false)}
+          onDone={() => { setShowBulkPrice(false); refresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Lets the owner set price_system and/or price_public for every scheme at
+// once, or just the schemes matching one subject — no need to edit each
+// scheme's price individually, and no need to ask a developer to run SQL.
+function BulkPriceModal({ subjects, onClose, onDone }) {
+  const [scope, setScope] = useState('all'); // 'all' | subject name
+  const [priceSystem, setPriceSystem] = useState('');
+  const [pricePublic, setPricePublic] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function apply() {
+    const ps = priceSystem.trim() === '' ? null : Number(priceSystem);
+    const pp = pricePublic.trim() === '' ? null : Number(pricePublic);
+    if (ps == null && pp == null) { alert('Enter at least one price to update.'); return; }
+    if ((ps != null && (isNaN(ps) || ps < 0)) || (pp != null && (isNaN(pp) || pp < 0))) {
+      alert('Prices must be numbers, 0 or higher.'); return;
+    }
+    const scopeLabel = scope === 'all' ? 'ALL schemes (every subject, every grade)' : `every "${scope}" scheme`;
+    if (!window.confirm(`This will immediately change the live price for ${scopeLabel}. Continue?`)) return;
+
+    setSaving(true);
+    try {
+      const { count } = await bulkSetSchemePrices({
+        priceSystem: ps, pricePublic: pp,
+        subject: scope === 'all' ? null : scope,
+      });
+      alert(`Updated ${count} scheme${count === 1 ? '' : 's'}.`);
+      onDone();
+    } catch (e) {
+      alert(e.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#00000060', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ marginTop: 0 }}>💰 Bulk Price Update</h3>
+        <p style={{ fontSize: 13, color: '#64748b' }}>
+          Change the price for many schemes in one go — leave a field blank to leave that price untouched.
+        </p>
+
+        <Field label="Apply to">
+          <select value={scope} onChange={e => setScope(e.target.value)} style={inputStyle}>
+            <option value="all">All subjects (every scheme in the catalog)</option>
+            {subjects.map(s => <option key={s} value={s}>Only "{s}"</option>)}
+          </select>
+        </Field>
+
+        <Field label="System price (teacher portal), KES">
+          <input type="number" min="0" value={priceSystem} onChange={e => setPriceSystem(e.target.value)}
+            placeholder="Leave blank to keep unchanged" style={inputStyle} />
+        </Field>
+
+        <Field label="Public price, KES">
+          <input type="number" min="0" value={pricePublic} onChange={e => setPricePublic(e.target.value)}
+            placeholder="Leave blank to keep unchanged" style={inputStyle} />
+        </Field>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <button onClick={onClose} style={btnGhostSm} disabled={saving}>Cancel</button>
+          <button onClick={apply} disabled={saving}
+            style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer' }}>
+            {saving ? 'Applying…' : 'Apply'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

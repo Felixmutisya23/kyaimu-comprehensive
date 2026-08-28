@@ -1016,6 +1016,26 @@ export async function listAllSchemes() {
   return data || [];
 }
 
+// ── Owner-only: change price(s) for every scheme at once, or just the
+//    schemes matching a subject — this is the "edit the amount once and
+//    it changes everywhere" tool, used instead of editing each scheme's
+//    price individually one-by-one.
+//    priceSystem / pricePublic: pass null to leave that price untouched.
+//    subject: pass null/'' to apply to ALL subjects.
+export async function bulkSetSchemePrices({ priceSystem, pricePublic, subject }) {
+  const patch = {};
+  if (priceSystem != null) patch.price_system = priceSystem;
+  if (pricePublic != null) patch.price_public = pricePublic;
+  if (Object.keys(patch).length === 0) return { count: 0 };
+
+  let query = getSupabase().from('schemes_of_work').update(patch);
+  if (subject) query = query.eq('subject', subject);
+  // .select() so we get back how many rows were actually changed
+  const { data, error } = await query.select('id');
+  if (error) throw new Error('Failed to update prices: ' + error.message);
+  return { count: (data || []).length };
+}
+
 // ── Public: list only active schemes (for the marketplace / portal) ──
 export async function listActiveSchemes() {
   const { data, error } = await getSupabase()
@@ -1065,9 +1085,10 @@ export async function getSchemeDownloadUrl(storagePath) {
 }
 
 // ── Record a completed payment (called after InstaSend confirms) ────
-export async function recordSchemePurchase({ buyerPhone, buyerName, schemeId, isTermlyBundle, termlySchoolId, termlyTeacherId, termlySubjects, amountPaid, paymentRef }) {
+export async function recordSchemePurchase({ buyerPhone, buyerName, buyerTsc, buyerSchool, schemeId, isTermlyBundle, termlySchoolId, termlyTeacherId, termlySubjects, amountPaid, paymentRef }) {
   const { error } = await getSupabase().from('scheme_purchases').insert({
     buyer_phone: buyerPhone, buyer_name: buyerName || null,
+    buyer_tsc_number: buyerTsc || null, buyer_school: buyerSchool || null,
     scheme_id: schemeId || null,
     is_termly_bundle: !!isTermlyBundle,
     termly_school_id: termlySchoolId || null,
