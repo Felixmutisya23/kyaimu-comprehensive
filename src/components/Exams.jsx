@@ -962,13 +962,41 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {setupSubjectRows.map((row, i) => {
               const noMarks = (data.nonExaminableSubjects || []).includes(row.current.trim());
+              const paperCfg = (data.subjectPapersByClass || {})[selClass]?.[row.current.trim()];
+              const paperValue = paperCfg?.enabled ? (paperCfg.method || 'SUM') : 'NONE';
               return (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
                   value={row.current}
                   onChange={e => setSetupSubjectRows(rows => rows.map((r, ri) => ri === i ? { ...r, current: e.target.value } : r))}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minWidth: 140 }}
                 />
+                <select
+                  value={paperValue}
+                  disabled={!row.current.trim() || noMarks}
+                  title="Split this subject into Paper 1 + Paper 2 for exam marks entry — the subject stays ONE entry everywhere else (Timetable, Teacher assignment, Settings). The assigned teacher enters both papers; the class list, report form and mean/points/position all use the combined %."
+                  onChange={e => {
+                    const subName = row.current.trim();
+                    if (!subName) return;
+                    const val = e.target.value;
+                    setData(d => {
+                      const byClass = { ...(d.subjectPapersByClass || {}) };
+                      const forClass = { ...(byClass[selClass] || {}) };
+                      if (val === 'NONE') {
+                        delete forClass[subName];
+                      } else {
+                        forClass[subName] = { enabled: true, method: val };
+                      }
+                      byClass[selClass] = forClass;
+                      return { ...d, subjectPapersByClass: byClass };
+                    });
+                  }}
+                  style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6 }}
+                >
+                  <option value="NONE">Papers: None</option>
+                  <option value="SUM">2 Papers (Sum → %)</option>
+                  <option value="AVG">2 Papers (Average)</option>
+                </select>
                 <label
                   title="Subject still appears on Timetable and can be assigned to a teacher — it just won't get an exam-marks column."
                   style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: noMarks ? '#f59e0b' : 'var(--text-muted)', whiteSpace: 'nowrap', cursor: row.current.trim() ? 'pointer' : 'not-allowed' }}
@@ -1005,6 +1033,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
 
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -4, marginBottom: 10 }}>
           Tick <strong>No marks</strong> for subjects like Music or P.E. that are taught and timetabled but never graded — this applies school-wide by subject name, not just to {selClass}.
+          <br/>Set <strong>Papers</strong> for subjects examined as two papers (e.g. English, Kiswahili) — the subject stays ONE entry in Settings/Timetable/Teacher assignment; only here does the assigned teacher get two mark boxes (Paper 1, Paper 2), which combine into one % everywhere else.
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -1076,7 +1105,9 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
               if (renames.length > 0) {
                 // Migrate every exam for this class: for every student, move
                 // their score from the old subject key to the new one so
-                // nothing is lost when a subject is renamed.
+                // nothing is lost when a subject is renamed. Also carries
+                // over any Paper 1 / Paper 2 result keys for a paper-split
+                // subject, since those are derived from the subject name.
                 next = {
                   ...next,
                   exams: (d.exams || []).map(ex => {
@@ -1085,16 +1116,28 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                     Object.entries(ex.results || {}).forEach(([studentName, subjectScores]) => {
                       const updated = { ...subjectScores };
                       renames.forEach(({ from, to }) => {
-                        if (updated[from] !== undefined && updated[to] === undefined) {
-                          updated[to] = updated[from];
-                          delete updated[from];
-                        }
+                        [from, getPaperKey(from, 1), getPaperKey(from, 2)].forEach((fromKey, idx) => {
+                          const toKey = idx === 0 ? to : getPaperKey(to, idx);
+                          if (updated[fromKey] !== undefined && updated[toKey] === undefined) {
+                            updated[toKey] = updated[fromKey];
+                            delete updated[fromKey];
+                          }
+                        });
                       });
                       newResults[studentName] = updated;
                     });
                     return { ...ex, results: newResults };
                   }),
                 };
+                // Carry the Papers config itself (None/SUM/AVG) over to the new name.
+                const papersForClass = { ...((d.subjectPapersByClass || {})[selClass] || {}) };
+                renames.forEach(({ from, to }) => {
+                  if (papersForClass[from] !== undefined && papersForClass[to] === undefined) {
+                    papersForClass[to] = papersForClass[from];
+                    delete papersForClass[from];
+                  }
+                });
+                next = { ...next, subjectPapersByClass: { ...(d.subjectPapersByClass || {}), [selClass]: papersForClass } };
                 // Also move any teacher's marks-entry assignment from the old
                 // subject name to the new one, so renaming/combining a
                 // subject here doesn't silently strip a teacher's access —

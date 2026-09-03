@@ -1,4 +1,4 @@
-import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns } from '../data/initialData';
+import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns, getStudentExamHistory } from '../data/initialData';
 
 /* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
 function getFeeExpected(student, term, year, data) {
@@ -911,17 +911,13 @@ export function printReportForm(student, exam, data) {
   const bestSub   = scored[0];
   const weakSub   = scored[scored.length - 1];
 
-  // Previous exams trend
-  const prevExams = (data.exams || [])
-    .filter(e => e.class === exam.class && e.id !== exam.id)
-    .map(ex => {
-      const r  = ex.results[student.name] || {};
-      const ks = Object.keys(r);
-      if (!ks.length) return null;
-      const t  = ks.reduce((a, k) => a + (getScore(r[k]) ?? 0), 0);
-      const m  = +(t / ks.length).toFixed(1);
-      return { name: ex.name, total: t, mean: m, grade: getGrade(Math.round(m)) };
-    }).filter(Boolean);
+  // Full exam history for this student — every exam they have marks in,
+  // across every class/grade they've been in (not just this one), using
+  // the same group-aware stats as everything else, sorted chronologically.
+  const fullHistory = getStudentExamHistory(student, data);
+  // Exclude the exam currently being printed from the "previous" list —
+  // it's shown separately as "This Exam" below.
+  const prevExams = fullHistory.filter(h => h.examId !== exam.id);
 
   // Subject rows — one per individually-marked paper/subject (so Paper 1
   // and Paper 2 each still show their own raw mark and remark)...
@@ -1075,13 +1071,42 @@ export function printReportForm(student, exam, data) {
       </tbody>
     </table>
 
-    <!-- Trend -->
-    ${prevExams.length > 0 ? `
-    <div style="background:#fffbe6;border:1px solid #f59e0b50;border-radius:6px;padding:8px 14px;margin-bottom:14px;font-size:11px">
-      <strong style="color:#b45309">📈 Performance Trend: </strong>
-      ${prevExams.map(p => `${p.name}: <strong style="color:${gradeColor(p.grade.label)}">${p.grade.label} (${p.total})</strong>`).join(' → ')}
-      → <strong style="color:${gradeColor(grade.label)}">This Exam: ${grade.label} (${total})</strong>
-    </div>` : ''}
+    <!-- Progress across exams -->
+    ${prevExams.length > 0 ? (() => {
+      // Build the full chronological list including the exam being
+      // printed right now, so deltas chain continuously through it.
+      const fullTimeline = [...prevExams, { examId: exam.id, name: exam.name, term: exam.term, year: exam.year, mean, grade, total, __current: true }];
+      // Compute each entry's delta against the TRUE previous exam first
+      // (even one from years back), THEN cap to the most recent 6 for
+      // display — otherwise a student with many years of history would
+      // overflow the printed page width, and capping first would make
+      // the first visible column's delta look wrong (compared against
+      // nothing) instead of accurate.
+      const withDeltas = fullTimeline.map((h, i) => ({
+        ...h,
+        delta: i > 0 ? +(h.mean - fullTimeline[i - 1].mean).toFixed(1) : null,
+      }));
+      const timeline = withDeltas.slice(-6);
+      const progressRows = timeline.map(h => {
+        const delta = h.delta;
+        const arrow = delta === null ? '' : delta > 0 ? '▲' : delta < 0 ? '▼' : '→';
+        const arrowColor = delta === null ? '#94a3b8' : delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : '#94a3b8';
+        return `
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;background:${h.__current ? pri + '15' : '#fff'}">
+            <div style="font-size:10px;color:#64748b;white-space:nowrap">${h.name}${h.year ? ' ' + h.year : ''}</div>
+            <div style="font-weight:900;font-size:14px;color:${h.__current ? pri : '#222'}">${h.mean}</div>
+            <div style="font-size:9px"><span style="background:${gradeColor(h.grade.label)};color:#fff;padding:1px 6px;border-radius:8px;font-weight:800">${h.grade.label}</span></div>
+            ${delta !== null ? `<div style="font-size:10px;color:${arrowColor};font-weight:800;margin-top:2px">${arrow} ${delta > 0 ? '+' : ''}${delta}</div>` : '<div style="font-size:10px;color:#94a3b8;margin-top:2px">—</div>'}
+          </td>`;
+      }).join('');
+      return `
+      <div style="margin-bottom:14px">
+        <div style="font-weight:800;color:${pri};font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">📈 Progress Across Exams (Mean Score)${withDeltas.length > 6 ? ` — most recent ${timeline.length} of ${withDeltas.length}` : ''}</div>
+        <table style="width:100%;border-collapse:collapse">
+          <tr>${progressRows}</tr>
+        </table>
+      </div>`;
+    })() : ''}
 
     <!-- Comments -->
     <table style="width:100%;border-collapse:collapse;margin-bottom:12px">

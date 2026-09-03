@@ -135,6 +135,17 @@ export function getSubjectsForClass(className, data) {
 }
 
 /**
+ * getPaperKey
+ * The result-storage key used for one paper of a paper-split subject —
+ * e.g. getPaperKey('English', 1) -> "English (Paper 1)". Kept as one
+ * shared function so the exam-columns resolver and the marks-entry UI
+ * can never drift out of sync on the exact string used.
+ */
+export function getPaperKey(subject, paperNum) {
+  return `${subject} (Paper ${paperNum})`;
+}
+
+/**
  * getExamColumnsForClass
  * ─────────────────────
  * Returns the columns a teacher sees when entering exam marks for a class.
@@ -144,9 +155,16 @@ export function getSubjectsForClass(className, data) {
  *   { name, type:'group',  components, method } — combines multiple subjects (SUM or AVG)
  *
  * Priority:
- *   1. Exam-level overrides  (exam.subjectColumns — set per-exam by principal/class teacher)
- *   2. Level-template groups (data.subjectExamGroups[levelKey])
- *   3. Plain subject list    (getSubjectsForClass — the existing fallback)
+ *   1. Exam-level overrides (exam.subjectColumns — set per-exam by principal/class teacher)
+ *   2. Paper-split subjects (data.subjectPapersByClass[className] — set in
+ *      Exams → Setup Subjects) — a subject like "English" that has separate
+ *      Paper 1 / Paper 2 papers stays ONE subject everywhere else (Settings,
+ *      Timetable, Teacher assignment); only here does it become a 'group'
+ *      column combining its two paper result-keys. For a paper-split
+ *      subject, column.name is ALWAYS the plain subject name (never a
+ *      made-up combined name) — callers rely on this to check subject-
+ *      teacher visibility/permissions with a plain `mySubjects.includes()`.
+ *   3. Plain subject list (getSubjectsForClass) for everything else.
  *
  * The function ALWAYS filters out any subject not present in the school's
  * Settings (getSubjectsForClass) so rogue subjects like "Guidance & Counselling"
@@ -162,7 +180,7 @@ export function getExamColumnsForClass(className, data, examOverrides) {
   const settingsSubjects = new Set(getSubjectsForClass(className, data));
   const nonExaminable = new Set(data.nonExaminableSubjects || []);
   const examSubjects = new Set([...settingsSubjects].filter(s => !nonExaminable.has(s)));
-  const level = getCurriculumLevel(className);
+  const paperConfig = (data.subjectPapersByClass || {})[className] || {};
 
   // If exam has its own column overrides, use those
   if (examOverrides && examOverrides.length > 0) {
@@ -180,40 +198,22 @@ export function getExamColumnsForClass(className, data, examOverrides) {
       }));
   }
 
-  // Use level template groups if defined
-  if (level) {
-    const groups = (data.subjectExamGroups || {})[level.key] || [];
-    if (groups.length > 0) {
-      // Build columns from groups — single subjects that aren't part of any
-      // group still appear as plain columns
-      const groupedSubjects = new Set(groups.flatMap(g => g.components));
-      const columns = [];
-
-      // Add group columns first (in order defined)
-      groups.forEach(g => {
-        const validComponents = g.components.filter(c => examSubjects.has(c));
-        if (validComponents.length === 0) return;
-        if (validComponents.length === 1) {
-          // Only one component left — treat as single
-          columns.push({ name: g.name, type: 'single', subject: validComponents[0] });
-        } else {
-          columns.push({ name: g.name, type: 'group', components: validComponents, method: g.method || 'SUM' });
-        }
-      });
-
-      // Add ungrouped subjects as plain columns
-      [...examSubjects].forEach(sub => {
-        if (!groupedSubjects.has(sub)) {
-          columns.push({ name: sub, type: 'single', subject: sub });
-        }
-      });
-
-      return columns;
+  // Default — one column per subject; a subject flagged with a paper
+  // split becomes one 'group' column combining its Paper 1 + Paper 2
+  // result keys (see getPaperKey), everything else stays a plain
+  // 'single' column exactly as before.
+  return [...examSubjects].map(sub => {
+    const cfg = paperConfig[sub];
+    if (cfg && cfg.enabled) {
+      return {
+        name: sub,
+        type: 'group',
+        components: [getPaperKey(sub, 1), getPaperKey(sub, 2)],
+        method: cfg.method || 'SUM',
+      };
     }
-  }
-
-  // Default — one column per subject, no grouping
-  return [...examSubjects].map(sub => ({ name: sub, type: 'single', subject: sub }));
+    return { name: sub, type: 'single', subject: sub };
+  });
 }
 
 /**
@@ -295,6 +295,35 @@ export function hasCompletedAllColumns(studentClass, studentResults, data) {
   const columns = getExamColumnsForClass(studentClass, data, null);
   if (columns.length === 0) return false;
   return columns.every(col => isColumnComplete(col, studentResults));
+}
+
+/**
+ * getStudentExamHistory
+ * Every exam a given student has at least one recorded score in,
+ * sorted chronologically (year, then term, then exam type — opener
+ * before mid-term before end-of-term), each with that exam's
+ * group-aware mean/total/grade for the student. Used to show a
+ * student's progress across exams on their report form.
+ */
+export function getStudentExamHistory(student, data) {
+  return (data.exams || [])
+    .filter(ex => {
+      const res = (ex.results || {})[student.name];
+      return res && Object.keys(res).length > 0;
+    })
+    .map(ex => {
+      const res = ex.results[student.name];
+      const { total, mean, grade } = calcColumnStats(ex.class, res, data);
+      return {
+        examId: ex.id, name: ex.name, term: Number(ex.term), year: ex.year,
+        className: ex.class, total, mean: Math.round(mean * 10) / 10, grade,
+      };
+    })
+    .sort((a, b) =>
+      String(a.year).localeCompare(String(b.year)) ||
+      a.term - b.term ||
+      getExamTypeRank(a.name) - getExamTypeRank(b.name)
+    );
 }
 
 export function getAllSubjectsForSchool(data) {
@@ -476,7 +505,8 @@ export const INITIAL_DATA = {
   timetableRules:          [],
   extraSubjectsByLevel:    {},
   subjectOverridesByLevel: {},
-  subjectExamGroups:       {}, // { levelKey: [ { id, name, components: [subjectName], method: 'SUM'|'AVG' } ] }
+  subjectExamGroups:       {}, // DEPRECATED, no longer read anywhere — superseded by subjectPapersByClass (per-class paper split, set in Exams -> Setup Subjects). Left here only so old saved data doesn't error.
+  subjectPapersByClass:    {}, // { className: { subjectName: { enabled: true, method: 'SUM'|'AVG' } } } — set in Exams -> Setup Subjects. Marks a subject (e.g. "English") as split into Paper 1 + Paper 2 for exam entry only; the subject itself stays ONE entry in Settings/Timetable/Teacher assignment.
 };
 
 export function getAllClasses(data) {
