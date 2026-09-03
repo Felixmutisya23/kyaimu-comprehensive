@@ -1,4 +1,4 @@
-import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, getSubjectsForClass } from '../data/initialData';
+import { getGrade, getScore, getSiblingStreams, getStreamFromClass, getBaseClass, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns } from '../data/initialData';
 
 /* ── Fee helpers (mirrors FeesModule logic) ─────────────────────── */
 function getFeeExpected(student, term, year, data) {
@@ -251,34 +251,26 @@ export function computeRankings(exam, allStudents, data) {
     // Use the correct exam for this student's class
     const resultsObj = siblingExamMap[student.class] || exam.results || {};
     const res   = resultsObj[student.name] || {};
-    // Divide by the full subject list for the class, not just whichever
-    // subjects happen to have a score recorded for this student — see the
-    // same fix in Exams.jsx calcStats for why this matters.
-    const subs  = getSubjectsForClass(student.class, data);
-    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
-    return { total, mean, grade: getGrade(Math.round(mean)), results: res, subjects: subs };
+    // Uses the same group-aware column stats as Exams.jsx and the report
+    // form — a Paper 1 + Paper 2 group contributes ONE combined entry,
+    // not two separately-weighted ones.
+    const { total, mean, grade } = calcColumnStats(student.class, res, data);
+    return { total, mean: +mean.toFixed(1), grade, results: res, subjects: getSubjectsForClass(student.class, data) };
   }
 
   function calcStatsFromResults(studentName, resultsObj, studentClass) {
     const res   = resultsObj[studentName] || {};
-    const subs  = getSubjectsForClass(studentClass, data);
-    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean  = subs.length ? +(total / subs.length).toFixed(1) : 0;
-    return { total, mean, grade: getGrade(Math.round(mean)), results: res, subjects: subs };
+    const { total, mean, grade } = calcColumnStats(studentClass, res, data);
+    return { total, mean: +mean.toFixed(1), grade, results: res, subjects: getSubjectsForClass(studentClass, data) };
   }
 
   // A student only counts toward the class list / ranking once they have a
   // recorded score for EVERY subject set up for their class — a student
   // missing even one subject's mark is excluded entirely (not shown with
-  // zeros, not counted in the mean or position of anyone else).
+  // zeros, not counted in the mean or position of anyone else). For a
+  // grouped subject (Paper 1 + Paper 2), BOTH papers must be recorded.
   function hasCompletedAllExams(studentClass, res) {
-    const expected = getSubjectsForClass(studentClass, data);
-    if (expected.length === 0) return false;
-    return expected.every(sub => {
-      const cell = res[sub];
-      return cell !== undefined && cell !== null && getScore(cell) !== null && getScore(cell) !== undefined;
-    });
+    return hasCompletedAllColumns(studentClass, res, data);
   }
 
   // Overall: across ALL sibling streams — each student ranked using their OWN stream's exam
@@ -460,15 +452,11 @@ function renderResultSheet({
 
   const rows = students.map((s, idx) => {
     const res   = resultsMap[s.name] || {};
-    // Divide by the full subject list, not just whichever subjects this
-    // particular student happens to have a score entered for.
-    const subs  = subjects;
-    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const points = subs.reduce((a, k) => {
-      const sc = getScore(res[k]);
-      return a + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
-    }, 0);
-    const mean  = subs.length ? (total / subs.length).toFixed(1) : '—';
+    // Group-aware: a Paper 1 + Paper 2 subject contributes ONE combined
+    // entry here, matching the class list and report form — not a raw
+    // sum over `subjects` which still lists every individual paper.
+    const { total, mean: rawMean, points } = calcColumnStats(s.class, res, data);
+    const mean  = subjects.length ? rawMean.toFixed(1) : '—';
     const g     = getGrade(Math.round(parseFloat(mean) || 0));
     const pos   = s[posKey] || (idx + 1);
     const of_   = s[ofKey]  || students.length;
@@ -669,14 +657,7 @@ export function printClassList(ranked, subjects, exam, data, onlyCompleted = fal
     // re-number stream position within just this filtered group — so
     // "3 / 20" reflects 20 students who all sat everything, not 27 minus
     // gaps for students who didn't.
-    streamSorted = streamSorted.filter(s => {
-      const expected = getSubjectsForClass(s.class, data);
-      const res = s.results || {};
-      return expected.length > 0 && expected.every(k => {
-        const sc = getScore(res[k]);
-        return sc !== null && sc !== undefined;
-      });
-    });
+    streamSorted = streamSorted.filter(s => hasCompletedAllColumns(s.class, s.results || {}, data));
     if (!streamSorted.length) { alert('No students completed every subject in this exam — nothing to print.'); return; }
     streamSorted = streamSorted
       .slice()
@@ -818,25 +799,16 @@ export function printOverallClassList(exam, data, onlyCompleted = false) {
   // sat the whole exam, not a mix that's diluted by partial/no-shows.
   let rankPool = allStudents;
   if (onlyCompleted) {
-    rankPool = allStudents.filter(s => {
-      const res = resultsMap[s.name] || {};
-      const expected = getSubjectsForClass(s.class, data);
-      return expected.length > 0 && expected.every(k => {
-        const sc = getScore(res[k]);
-        return sc !== null && sc !== undefined;
-      });
-    });
+    rankPool = allStudents.filter(s => hasCompletedAllColumns(s.class, resultsMap[s.name] || {}, data));
     if (!rankPool.length) { alert('No students completed every subject in this exam — nothing to print.'); return; }
   }
 
   // Rank overall — sorted by total descending
   const withStats = rankPool.map(s => {
     const res   = resultsMap[s.name] || {};
-    const subs  = subjects;
-    const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean  = subs.length ? (total / subs.length).toFixed(1) : 0;
+    const { total, mean } = calcColumnStats(s.class, res, data);
     const stream = getStreamFromClass(s.class, data) || s.class;
-    return { ...s, results: res, total, mean: parseFloat(mean), stream };
+    return { ...s, results: res, total, mean: +mean.toFixed(1), stream };
   }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   // Assign overall positions
@@ -889,11 +861,6 @@ export function printReportForm(student, exam, data) {
   const res  = exam.results[student.name] || {};
   const subs = Object.keys(res);
   if (!subs.length) { alert('No results recorded for this student in this exam.'); return; }
-  // Total/mean/points must be divided by the full subject list for the
-  // class, not just the subjects this student happens to have entered —
-  // otherwise a student marked in 1 of 6 subjects gets a mean equal to
-  // that single score.
-  const expected = getSubjectsForClass(exam.class, data);
 
   const { primary: pri, accent: acc } = schoolColors(data);
   const stream    = getStreamFromClass(exam.class, data);
@@ -902,10 +869,13 @@ export function printReportForm(student, exam, data) {
   const { posMap, hasStreams } = computeRankings(exam, data.students, data);
   const pos = posMap[student.name] || {};
 
-  const total       = expected.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-  const mean        = expected.length ? +(total / expected.length).toFixed(1) : 0;
-  const grade       = getGrade(Math.round(mean));
-  const totalPoints = expected.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
+  // Total/mean/points use the group-aware column stats (Paper 1 + Paper 2
+  // combine into ONE weighted entry, matching the class list and rankings)
+  // — NOT a per-row sum of whatever's in `subs`, which still lists every
+  // individual subject (including each paper) for the detail rows below.
+  const { total, mean: rawMean, points: totalPoints } = calcColumnStats(exam.class, res, data);
+  const mean  = +rawMean.toFixed(1);
+  const grade = getGrade(Math.round(mean));
 
   // Fee info
   const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);
@@ -953,7 +923,8 @@ export function printReportForm(student, exam, data) {
       return { name: ex.name, total: t, mean: m, grade: getGrade(Math.round(m)) };
     }).filter(Boolean);
 
-  // Subject rows
+  // Subject rows — one per individually-marked paper/subject (so Paper 1
+  // and Paper 2 each still show their own raw mark and remark)...
   const subjectRows = subs.map((sub, idx) => {
     const score    = getScore(res[sub]);
     const g        = getGrade(score ?? 0);
@@ -972,6 +943,35 @@ export function printReportForm(student, exam, data) {
         <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-size:11px;color:#64748b">${clsAvg !== null ? clsAvg : '—'}</td>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${vsColor};font-size:13px">${vsClass}</td>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:left;font-size:11px;color:#555;font-style:italic">${autoSubjectComment(sub, score, g)}</td>
+      </tr>`;
+  }).join('');
+
+  // ...PLUS one highlighted combined-% row per configured paper group
+  // (e.g. "English Paper 1" + "English Paper 2" -> "English") — this is
+  // the figure that actually counts toward Total/Mean/Points/Position
+  // above, so it needs its own visible row, not just the two raw papers.
+  const examColumns  = getExamColumnsForClass(exam.class, data, null);
+  const groupColumns = examColumns.filter(c => c.type === 'group' && c.components.every(comp => subs.includes(comp)));
+  const groupRows = groupColumns.map(col => {
+    const combined = computeColumnScore(col, res);
+    const g        = getGrade(combined ?? 0);
+    const clsScores = streamStudents
+      .map(s => computeColumnScore(col, streamResults[s.name] || {}))
+      .filter(v => v !== null && v !== undefined);
+    const clsAvg  = clsScores.length ? Math.round(clsScores.reduce((a, b) => a + b, 0) / clsScores.length * 10) / 10 : null;
+    const vsClass = clsAvg !== null ? (combined >= clsAvg ? '▲' : '▼') : '';
+    const vsColor = clsAvg !== null ? (combined >= clsAvg ? '#10b981' : '#ef4444') : '#94a3b8';
+    return `
+      <tr style="background:#4f8ef712;border-top:2px solid #4f8ef760;border-bottom:2px solid #4f8ef760">
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:900;font-size:12px;color:#4f8ef7">${col.name} — Combined (${col.components.join(' + ')})</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:900;font-size:14px;color:#4f8ef7">${combined ?? '—'}%</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">
+          <span style="background:${gradeColor(g.label)}22;color:${gradeColor(g.label)};padding:3px 10px;border-radius:10px;font-weight:800;font-size:12px">${g.label}</span>
+        </td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700">${g.points}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-size:11px;color:#64748b">${clsAvg !== null ? clsAvg : '—'}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:900;color:${vsColor};font-size:13px">${vsClass}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:left;font-size:11px;color:#4f8ef7;font-style:italic">This combined % is what counts toward Total, Mean, Points and Position above.</td>
       </tr>`;
   }).join('');
 
@@ -1060,6 +1060,7 @@ export function printReportForm(student, exam, data) {
       </thead>
       <tbody>
         ${subjectRows}
+        ${groupRows}
         <tr style="background:${pri}15;font-weight:900">
           <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:13px">TOTAL / MEAN</td>
           <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;font-size:16px;color:${pri}">${total}</td>
@@ -1171,16 +1172,14 @@ export function printAllReportForms(exam, data) {
       : null;
   });
 
-  const expected = getSubjectsForClass(exam.class, data);
   const allPages = sorted.map(student => {
     const res  = streamResults[student.name] || {};
     const subs = Object.keys(res);
     if (!subs.length) return '';
 
-    const total       = expected.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-    const mean        = expected.length ? +(total / expected.length).toFixed(1) : 0;
+    const { total, mean: rawMean, points: totalPoints } = calcColumnStats(exam.class, res, data);
+    const mean        = +rawMean.toFixed(1);
     const grade       = getGrade(Math.round(mean));
-    const totalPoints = expected.reduce((a, k) => a + getGrade(getScore(res[k]) ?? 0).points, 0);
     const pos         = posMap[student.name] || {};
 
     const feeBalance  = getFeeBalance(student, exam.term, exam.year, data);

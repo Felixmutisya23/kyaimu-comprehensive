@@ -238,6 +238,65 @@ export function computeColumnScore(column, studentResults) {
   return null;
 }
 
+/**
+ * isColumnComplete
+ * A 'single' column is complete once its one subject has a score.
+ * A 'group' column (e.g. Paper 1 + Paper 2 combined into "English") is
+ * only complete once EVERY component has a score — a student with only
+ * Paper 1 entered is NOT done, even though computeColumnScore() would
+ * already return a (partial) number for that column.
+ */
+export function isColumnComplete(column, studentResults) {
+  if (column.type === 'single') {
+    const sc = getScore(studentResults[column.subject]);
+    return sc !== null && sc !== undefined;
+  }
+  if (column.type === 'group') {
+    return column.components.every(c => {
+      const sc = getScore(studentResults[c]);
+      return sc !== null && sc !== undefined;
+    });
+  }
+  return false;
+}
+
+/**
+ * calcColumnStats
+ * The ONE place total/mean/points/grade should be computed for a
+ * student, anywhere in the app (class list, report form, rankings,
+ * dashboards). Iterates over getExamColumnsForClass() — i.e. the
+ * SUBJECT-LEVEL view a parent/teacher actually sees — rather than raw
+ * result keys, so a grouped subject (e.g. Paper 1 + Paper 2 -> English)
+ * contributes ONE weighted entry to the mean, not two.
+ *
+ * Before this existed, several screens each summed getSubjectsForClass()
+ * (raw subject keys) independently — correct as long as no subject was
+ * ever grouped, but silently wrong (double-weighting each paper) the
+ * moment a Paper 1 / Paper 2 group was configured, and inconsistent
+ * between screens since each had its own copy of the same logic.
+ */
+export function calcColumnStats(studentClass, studentResults, data) {
+  const columns = getExamColumnsForClass(studentClass, data, null);
+  const total = columns.reduce((a, col) => a + (computeColumnScore(col, studentResults) ?? 0), 0);
+  const mean = columns.length ? total / columns.length : 0;
+  const points = columns.reduce((a, col) => {
+    const sc = computeColumnScore(col, studentResults);
+    return a + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
+  }, 0);
+  return { total, mean, points, grade: getGrade(Math.round(mean)), columns };
+}
+
+/**
+ * hasCompletedAllColumns
+ * Mirrors calcColumnStats: a student only "counts" for ranking/mean
+ * purposes once every column (not every raw subject) is complete.
+ */
+export function hasCompletedAllColumns(studentClass, studentResults, data) {
+  const columns = getExamColumnsForClass(studentClass, data, null);
+  if (columns.length === 0) return false;
+  return columns.every(col => isColumnComplete(col, studentResults));
+}
+
 export function getAllSubjectsForSchool(data) {
   const classes = getAllClasses(data);
   const all = new Set();

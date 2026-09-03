@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, isTeachingStaff, getExamTypeRank } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns, isTeachingStaff, getExamTypeRank } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 import { deleteJsonRowDirect, applyExamScorePatch, removeExamScore, saveSubjectsByClassDirect } from '../supabase';
 
@@ -184,38 +184,25 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       const sibExam   = findSiblingExam(student.class);
       const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
       const res   = resultsObj[student.name] || {};
-      // Always divide by the FULL set of subjects offered for this
-      // student's class — not just whichever subjects happen to have a
-      // score recorded for this particular student so far. Using
-      // Object.keys(res) here used to mean a student marked in only 1 of
-      // 6 subjects got a "mean" equal to that single score, which could
-      // be wildly higher or lower than a classmate marked in all 6 —
-      // total marks and mean must be computed on the same denominator
-      // for every student to be comparable.
-      const subs  = getSubjectsForClass(student.class, data);
-      const total = subs.reduce((a, k) => a + (getScore(res[k]) ?? 0), 0);
-      const mean  = subs.length ? Math.round(total / subs.length) : 0;
-      const points = subs.reduce((a, k) => {
-        const sc = getScore(res[k]);
-        return a + (sc === null || sc === undefined ? 0 : getGrade(sc).points);
-      }, 0);
-      return { total, mean, grade: getGrade(mean), results: res, subs, points };
+      // Uses the same group-aware column stats as every other screen
+      // (report form, rankings) — a Paper 1 + Paper 2 group contributes
+      // ONE combined entry here, not two separately-weighted ones.
+      const { total, mean, points, grade, columns } = calcColumnStats(student.class, res, data);
+      const subs = getSubjectsForClass(student.class, data);
+      return { total, mean: Math.round(mean), grade: getGrade(Math.round(mean)), results: res, subs, points, columns };
     }
 
     // A student only appears on the class list / counts toward anyone's
     // position once they have a recorded score for EVERY subject set up
     // for their class — missing even one subject excludes them entirely,
     // rather than showing them with zeros and letting them affect the mean.
+    // (For a grouped subject like Paper 1 + Paper 2, BOTH papers must be
+    // in — see isColumnComplete / hasCompletedAllColumns.)
     function hasCompletedAllExams(student) {
-      const expected = getSubjectsForClass(student.class, data);
-      if (expected.length === 0) return false;
       const sibExam    = findSiblingExam(student.class);
       const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
       const res = resultsObj[student.name] || {};
-      return expected.every(sub => {
-        const sc = getScore(res[sub]);
-        return sc !== null && sc !== undefined;
-      });
+      return hasCompletedAllColumns(student.class, res, data);
     }
 
     // This stream's students only
@@ -848,8 +835,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                       return (
                         <td key={colName} style={{ ...TS.td, textAlign: 'center', position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                            <span title={col.type === 'group' ? col.components.map(c => `${c}: ${getScore(s.results[c]) ?? '—'}`).join(', ') : ''}
-                              style={{ color: col.type === 'group' ? '#4f8ef7' : 'inherit', fontWeight: col.type === 'group' ? 700 : 'inherit' }}>
+                            <span style={{ color: col.type === 'group' ? '#4f8ef7' : 'inherit', fontWeight: col.type === 'group' ? 700 : 'inherit' }}>
                               {score ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
                             </span>
                             {score !== null && canEditSingle && (
@@ -868,6 +854,11 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
                                 style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '1px 4px', borderRadius: 4, opacity: 0.7 }}>✕</button>
                             )}
                           </div>
+                          {col.type === 'group' && (
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                              {col.components.map(c => `${c.replace(col.name, '').trim() || c}: ${getScore(s.results[c]) ?? '—'}`).join(' · ')}
+                            </div>
+                          )}
                         </td>
                       );
                     })}

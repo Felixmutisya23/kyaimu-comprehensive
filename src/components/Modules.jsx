@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, Alert, ProgressBar, Icon } from './UI';
 import { GRADES_CBC, CURRICULUM_LEVELS, getAllClasses, getSubjectsForClass, getCurriculumLevel, generateSlug, getExamColumnsForClass } from '../data/initialData';
-import { uploadGalleryPhoto, deleteGalleryPhoto } from '../supabase';
+import { uploadGalleryPhoto, deleteGalleryPhoto, generateId } from '../supabase';
 import { printFeeReceipt, renderSchoolStamp } from '../utils/print';
 import ClassRepairTool from './ClassRepairTool';
 
@@ -1070,6 +1070,26 @@ export function Settings({ data, setData }) {
     });
   }
 
+  // Exam paper groups (e.g. "English" = "English Paper 1" + "English Paper
+  // 2" combined) — feeds getExamColumnsForClass, which every total/mean/
+  // points/position calculation across the app now goes through.
+  const [showGroupEditor, setShowGroupEditor] = useState(null); // levelKey or null
+  function addExamGroup(levelKey, group) {
+    setData(d => {
+      const byLevel = { ...(d.subjectExamGroups || {}) };
+      byLevel[levelKey] = [...(byLevel[levelKey] || []), { id: generateId(), ...group }];
+      return { ...d, subjectExamGroups: byLevel };
+    });
+  }
+  function deleteExamGroup(levelKey, groupId) {
+    if (!window.confirm('Remove this group? The subjects go back to being scored individually.')) return;
+    setData(d => {
+      const byLevel = { ...(d.subjectExamGroups || {}) };
+      byLevel[levelKey] = (byLevel[levelKey] || []).filter(g => g.id !== groupId);
+      return { ...d, subjectExamGroups: byLevel };
+    });
+  }
+
   // Class management
   const [showAddClass, setShowAddClass] = useState(false);
   const [newClassLevel, setNewClassLevel] = useState('');
@@ -1446,6 +1466,30 @@ export function Settings({ data, setData }) {
                         + Add subject to {level.label}
                       </button>
                     )}
+
+                    {/* Exam paper groups — e.g. English Paper 1 + Paper 2 combined into one graded subject */}
+                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                        Exam Paper Groups
+                      </div>
+                      {((data.subjectExamGroups || {})[key] || []).map(g => (
+                        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 0' }}>
+                          <span style={{ background: '#4f8ef720', color: '#4f8ef7', border: '1px solid #4f8ef740', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>
+                            {g.name}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            = {g.components.join(' + ')} ({g.method === 'AVG' ? 'averaged' : 'summed'})
+                          </span>
+                          <button onClick={() => deleteExamGroup(key, g.id)} title="Remove group"
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, marginLeft: 'auto' }}>×</button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setShowGroupEditor({ levelKey: key, levelLabel: level.label, availableSubjects: allSubs })}
+                        style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--text-muted)', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: 11, marginTop: 6 }}>
+                        + Combine subjects (e.g. Paper 1 + Paper 2)
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1978,7 +2022,110 @@ export function Settings({ data, setData }) {
           <Btn onClick={addClass} disabled={!newClassName.trim()}>Add Class</Btn>
         </div>
       </Modal>
+
+      {showGroupEditor && (
+        <ExamGroupEditorModal
+          levelKey={showGroupEditor.levelKey}
+          levelLabel={showGroupEditor.levelLabel}
+          availableSubjects={showGroupEditor.availableSubjects}
+          existingGroups={(data.subjectExamGroups || {})[showGroupEditor.levelKey] || []}
+          onSave={group => { addExamGroup(showGroupEditor.levelKey, group); setShowGroupEditor(null); }}
+          onClose={() => setShowGroupEditor(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Lets the principal combine 2+ subjects that share one grade (typically
+// "X Paper 1" + "X Paper 2") into a single graded subject. Everything
+// downstream — class list, report form, rankings, mean/points — already
+// reads from getExamColumnsForClass, so creating a group here is the
+// ONLY step needed to make Paper 1 + Paper 2 behave as one subject
+// everywhere in the app.
+function ExamGroupEditorModal({ levelKey, levelLabel, availableSubjects, existingGroups, onSave, onClose }) {
+  const [name, setName] = useState('');
+  const [method, setMethod] = useState('SUM');
+  const [selected, setSelected] = useState([]);
+
+  // A subject already used in another group for this level can't be
+  // reused in a second group — that would be ambiguous (which group
+  // "owns" its score?).
+  const alreadyGrouped = new Set(existingGroups.flatMap(g => g.components));
+  const pickable = availableSubjects.filter(s => !alreadyGrouped.has(s));
+
+  function toggle(s) {
+    setSelected(sel => sel.includes(s) ? sel.filter(x => x !== s) : [...sel, s]);
+  }
+
+  function save() {
+    if (!name.trim()) { alert('Give the combined subject a name — e.g. "English".'); return; }
+    if (selected.length < 2) { alert('Pick at least 2 subjects to combine — e.g. "English Paper 1" and "English Paper 2".'); return; }
+    onSave({ name: name.trim(), method, components: selected });
+  }
+
+  return (
+    <Modal onClose={onClose} title={`Combine Subjects — ${levelLabel}`}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+        For subjects examined as separate papers (e.g. English Paper 1 + Paper 2, Kiswahili Paper 1 + Paper 2)
+        that should be scored as ONE subject on the class list, report form, and in the mean/points/position —
+        both papers still get their own mark-entry column, but everywhere else they show up combined.
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Combined subject name</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. English"
+          style={{ width: '100%', padding: '6px 8px', marginTop: 4 }} />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>How should the papers combine?</label>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button onClick={() => setMethod('SUM')}
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+              background: method === 'SUM' ? '#4f8ef7' : 'var(--surface2)', color: method === 'SUM' ? '#fff' : 'var(--text)',
+              border: '1px solid ' + (method === 'SUM' ? '#4f8ef7' : 'var(--border)') }}>
+            Add together (SUM)
+          </button>
+          <button onClick={() => setMethod('AVG')}
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+              background: method === 'AVG' ? '#4f8ef7' : 'var(--surface2)', color: method === 'AVG' ? '#fff' : 'var(--text)',
+              border: '1px solid ' + (method === 'AVG' ? '#4f8ef7' : 'var(--border)') }}>
+            Average (AVG)
+          </button>
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+          Most KNEC-style papers (out of e.g. 30 + 70 = 100%) use SUM. Use AVG only if each paper is already out of 100.
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+          Select the papers to combine ({selected.length} selected)
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+          {pickable.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              No ungrouped subjects available. Add subjects like "English Paper 1" and "English Paper 2" to this level first, above.
+            </div>
+          )}
+          {pickable.map(s => (
+            <button key={s} onClick={() => toggle(s)}
+              style={{ padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                background: selected.includes(s) ? '#10b98120' : 'var(--surface2)',
+                color: selected.includes(s) ? '#10b981' : 'var(--text)',
+                border: '1px solid ' + (selected.includes(s) ? '#10b98160' : 'var(--border)') }}>
+              {selected.includes(s) ? '✓ ' : ''}{s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={!name.trim() || selected.length < 2}>Create Group</Btn>
+      </div>
+    </Modal>
   );
 }
 

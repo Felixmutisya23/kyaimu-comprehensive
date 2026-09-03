@@ -419,8 +419,8 @@ export default function SchemesMarketplace({
 function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
   const [err, setErr]         = useState('');
   const [isPdf, setIsPdf]     = useState(true);
-  const canvas1 = useRef(null);
-  const canvas2 = useRef(null);
+  const [previewCount, setPreviewCount] = useState(2);
+  const canvasRefs = useRef([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -434,8 +434,14 @@ function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
       .then(async url => {
         const doc = await pdfjsLib.getDocument(url).promise;
         if (cancelled) return;
-        await renderPage(doc, 1, canvas1.current);
-        if (doc.numPages > 1) await renderPage(doc, 2, canvas2.current);
+        // Preview roughly half the document so longer schemes give a
+        // fairer look, but cap it and never show the whole thing (a
+        // short 2-page scheme would otherwise reveal 100% for free).
+        const count = Math.min(4, Math.max(1, Math.ceil(doc.numPages / 2)), doc.numPages - 1 || 1);
+        setPreviewCount(count);
+        for (let i = 1; i <= count; i++) {
+          await renderPage(doc, i, canvasRefs.current[i - 1]);
+        }
       })
       .catch(e => setErr(e.message));
     return () => { cancelled = true; };
@@ -448,13 +454,31 @@ function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
     canvasEl.width = viewport.width;
     canvasEl.height = viewport.height;
     await page.render({ canvasContext: canvasEl.getContext('2d'), viewport }).promise;
+
+    // A screenshot of this page can't be prevented outright — no webpage
+    // can block the OS's own screenshot tools. What this CAN do is make
+    // any screenshot/photo of the preview carry a visible, traceable
+    // watermark, the same way the paid download carries the buyer's own
+    // name — a strong deterrent against sharing the preview around.
+    const ctx = canvasEl.getContext('2d');
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#000';
+    ctx.font = `${Math.round(canvasEl.width / 22)}px sans-serif`;
+    ctx.translate(canvasEl.width / 2, canvasEl.height / 2);
+    ctx.rotate(-Math.PI / 8);
+    const label = 'PREVIEW ONLY — NOT FOR SHARING';
+    for (let row = -3; row <= 3; row++) {
+      ctx.fillText(label, -canvasEl.width * 0.6, row * (canvasEl.height / 6));
+    }
+    ctx.restore();
   }
 
   return (
     <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ ...modalBoxStyle, maxWidth: 700, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>{scheme.subject} — {scheme.class_name} (Preview, page 1–2)</h3>
+          <h3 style={{ margin: 0 }}>{scheme.subject} — {scheme.class_name} (Preview)</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
         {err && <div style={{ color: '#ef4444' }}>{err}</div>}
@@ -463,13 +487,23 @@ function PreviewModal({ scheme, onClose, onUnlock, unlocked, onDownload }) {
             📄 This is a Word document — a page preview isn't available, but the full document is exactly as described. Unlock to download.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', margin: '16px 0' }}>
-            <canvas ref={canvas1} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
-            <canvas ref={canvas2} style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001' }} />
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', margin: '16px 0', userSelect: 'none' }}
+            onContextMenu={e => e.preventDefault()}
+          >
+            {Array.from({ length: previewCount }).map((_, i) => (
+              <canvas
+                key={i}
+                ref={el => (canvasRefs.current[i] = el)}
+                onContextMenu={e => e.preventDefault()}
+                onDragStart={e => e.preventDefault()}
+                style={{ maxWidth: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 2px 8px #0001', pointerEvents: 'none' }}
+              />
+            ))}
           </div>
         )}
         <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted, #64748b)', marginBottom: 12 }}>
-          This is a 2-page preview — unlock to view and download the full document.
+          This is a {previewCount}-page preview — unlock to view and download the full document.
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
           {unlocked ? (
