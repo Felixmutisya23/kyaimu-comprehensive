@@ -326,6 +326,29 @@ export function getStudentExamHistory(student, data) {
     );
 }
 
+/**
+ * getEntryColumns
+ * Expands a plain subject list (e.g. ['English','MATHS']) into the
+ * actual input columns a teacher fills in when entering marks. A
+ * subject flagged with a paper split (Exams -> Setup Subjects) becomes
+ * TWO columns — Paper 1 and Paper 2 — each still saved under its own
+ * getPaperKey() result key; everything else stays a single column.
+ */
+export function getEntryColumns(subjectList, className, data) {
+  const paperConfig = (data.subjectPapersByClass || {})[className] || {};
+  const cols = [];
+  subjectList.forEach(sub => {
+    const cfg = paperConfig[sub];
+    if (cfg && cfg.enabled) {
+      cols.push({ subject: sub, key: getPaperKey(sub, 1), label: `${sub} P1`, isPaper: true, paperGroup: sub, paperPos: 1, method: cfg.method || 'SUM' });
+      cols.push({ subject: sub, key: getPaperKey(sub, 2), label: `${sub} P2`, isPaper: true, paperGroup: sub, paperPos: 2, method: cfg.method || 'SUM' });
+    } else {
+      cols.push({ subject: sub, key: sub, label: sub, isPaper: false });
+    }
+  });
+  return cols;
+}
+
 export function getAllSubjectsForSchool(data) {
   const classes = getAllClasses(data);
   const all = new Set();

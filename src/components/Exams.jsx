@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
-import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns, isTeachingStaff, getExamTypeRank } from '../data/initialData';
+import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns, getEntryColumns, getPaperKey, isTeachingStaff, getExamTypeRank } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
 import { deleteJsonRowDirect, applyExamScorePatch, removeExamScore, saveSubjectsByClassDirect } from '../supabase';
 
@@ -309,14 +309,18 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   /* ── Open score entry ─────────────────────────────── */
   function openEnterScores(exam) {
     const subs = enterableSubjects;
+    // Expand any paper-split subject (e.g. "English" with Paper 1+2
+    // configured in Exams -> Setup Subjects) into its two entry columns —
+    // each still saved under its own getPaperKey() result key.
+    const cols = getEntryColumns(subs, exam.class, data);
     setEnterExam(exam);
-    setEnterSubjects(subs);
+    setEnterSubjects(cols);
     const init = {};
     classStudents.forEach(st => {
       init[st.name] = {};
-      subs.forEach(sub => {
-        const existing = exam.results[st.name]?.[sub];
-        init[st.name][sub] = getScore(existing) ?? '';
+      cols.forEach(col => {
+        const existing = exam.results[st.name]?.[col.key];
+        init[st.name][col.key] = getScore(existing) ?? '';
       });
     });
     setScores(init);
@@ -327,10 +331,10 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   async function saveScores() {
     const patches = [];
     classStudents.forEach(st => {
-      enterSubjects.forEach(sub => {
-        const v = Number(scores[st.name]?.[sub]);
-        if (!isNaN(v) && scores[st.name]?.[sub] !== '') {
-          patches.push({ studentName: st.name, subject: sub, score: v, submittedBy: user.staffId, locked: false });
+      enterSubjects.forEach(col => {
+        const v = Number(scores[st.name]?.[col.key]);
+        if (!isNaN(v) && scores[st.name]?.[col.key] !== '') {
+          patches.push({ studentName: st.name, subject: col.key, score: v, submittedBy: user.staffId, locked: false });
         }
       });
     });
@@ -1431,25 +1435,63 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr>
                 <th style={{ ...TS.th, position: 'sticky', left: 0, zIndex: 20, background: 'var(--table-header-bg, #1e40af)', minWidth: 140 }}>Student</th>
-                {enterSubjects.map(s => <th key={s} style={{ ...TS.th, whiteSpace: 'nowrap', minWidth: 70 }}>{s}</th>)}
+                {enterSubjects.map(col => (
+                  <React.Fragment key={col.key}>
+                    <th style={{ ...TS.th, whiteSpace: 'nowrap', minWidth: 70 }}>{col.label}</th>
+                    {col.isPaper && col.paperPos === 2 && (
+                      <th style={{ ...TS.th, whiteSpace: 'nowrap', minWidth: 70, background: '#4f8ef730', color: '#4f8ef7' }}>
+                        {col.paperGroup} %
+                      </th>
+                    )}
+                  </React.Fragment>
+                ))}
               </tr>
             </thead>
             <tbody>
               {classStudents.map((st, idx) => (
                 <tr key={st.id} style={{ background: idx % 2 === 0 ? 'var(--surface)' : 'var(--table-row-alt)' }}>
                   <td style={{ ...TS.td, fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'inherit', zIndex: 5, borderRight: '2px solid var(--border)', minWidth: 140 }}>{st.name}</td>
-                  {enterSubjects.map(sub => (
-                    <td key={sub} style={{ ...TS.td, padding: '4px 6px', textAlign: 'center' }}>
-                      <input type="number" min={0} max={100} value={scores[st.name]?.[sub] ?? ''}
-                        onChange={e => setScores(prev => ({ ...prev, [st.name]: { ...prev[st.name], [sub]: e.target.value } }))}
-                        style={{ width: 58, textAlign: 'center', padding: '5px 4px' }} />
-                    </td>
-                  ))}
+                  {enterSubjects.map(col => {
+                    // Live combined % preview, right after Paper 2 — read-only,
+                    // computed from whatever's currently typed for both papers
+                    // (even before saving), so the teacher sees the % that will
+                    // actually count toward this student's total/mean/position.
+                    let combinedPreview = null;
+                    if (col.isPaper && col.paperPos === 2) {
+                      const p1Key = getPaperKey(col.paperGroup, 1);
+                      const p1 = Number(scores[st.name]?.[p1Key]);
+                      const p2 = Number(scores[st.name]?.[col.key]);
+                      const p1Valid = scores[st.name]?.[p1Key] !== '' && !isNaN(p1);
+                      const p2Valid = scores[st.name]?.[col.key] !== '' && !isNaN(p2);
+                      if (p1Valid && p2Valid) {
+                        combinedPreview = col.method === 'AVG' ? Math.round((p1 + p2) / 2) : p1 + p2;
+                      }
+                    }
+                    return (
+                      <React.Fragment key={col.key}>
+                        <td style={{ ...TS.td, padding: '4px 6px', textAlign: 'center' }}>
+                          <input type="number" min={0} max={100} value={scores[st.name]?.[col.key] ?? ''}
+                            onChange={e => setScores(prev => ({ ...prev, [st.name]: { ...prev[st.name], [col.key]: e.target.value } }))}
+                            style={{ width: 58, textAlign: 'center', padding: '5px 4px' }} />
+                        </td>
+                        {col.isPaper && col.paperPos === 2 && (
+                          <td style={{ ...TS.td, padding: '4px 6px', textAlign: 'center', background: '#4f8ef712', fontWeight: 700, color: combinedPreview !== null ? '#4f8ef7' : 'var(--text-muted)' }}>
+                            {combinedPreview !== null ? `${combinedPreview}%` : '—'}
+                          </td>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {enterSubjects.some(c => c.isPaper) && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 14 }}>
+            The highlighted <strong>%</strong> column shows the combined score that will actually count toward this student's total, mean, and position — Paper 1 and Paper 2 are still saved and shown separately everywhere else (class list, report form).
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={() => setShowEnter(false)}>Cancel</Btn>
           <Btn variant="success" onClick={saveScores}>Save Scores</Btn>

@@ -313,9 +313,12 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
   const isPrincipal = user.role === 'principal';
   const classes = getAllClasses(data);
 
-  const [view,     setView]     = useState('class');   // 'class' | 'personal'
+  const [view,     setView]     = useState('class');   // 'class' | 'personal' | 'block'
   const [selClass, setSelClass] = useState(user.classTeacherOf || classes[0] || '');
   const [editMode, setEditMode] = useState(false);
+
+  // Block timetable (whole-school, staff-room wall view) state
+  const [blockDay, setBlockDay] = useState(DAYS[0]);
 
   // Generator modal state
   const [showGen,    setShowGen]    = useState(false);
@@ -351,6 +354,25 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
     });
     return s;
   }, [conflicts, selClass]);
+
+  // Map of `day::bellIdx::cls` -> conflict, used by the whole-school Block
+  // Timetable so every class's clash is visible at a glance, not just the
+  // currently-selected class.
+  const conflictCellMap = useMemo(() => {
+    const m = {};
+    conflicts.forEach(c => {
+      c.entries.forEach(e => { m[`${c.day}::${c.bellIdx}::${e.cls}`] = c; });
+    });
+    return m;
+  }, [conflicts]);
+
+  /** Look up a teacher's display name from a staffId, for cells/prints that
+   *  need to show WHO is teaching (block timetable, print-outs). */
+  function teacherName(teacherId) {
+    if (!teacherId) return '';
+    const t = (data.teachers || []).find(t => t.staffId === teacherId || t.id === teacherId);
+    return t ? t.name : '';
+  }
 
   /* ── Personal timetable ─────────────────────────────── */
   function buildPersonalTimetable() {
@@ -462,6 +484,7 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
   /* ── Print helpers ──────────────────────────────────── */
   function printClassTT() {
     const w = window.open('', '_blank');
+    if (!w) { alert('Your browser blocked the print pop-up. Please allow pop-ups for this site and try again.'); return; }
     const rows = data.bells.map((b, i) => {
       const c = TC[b.type] || TC.lesson;
       return `<tr>
@@ -474,7 +497,9 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
         }).join('')}
       </tr>`;
     }).join('');
-    w.document.write(`<html><body style="font-family:sans-serif;padding:24px">
+    w.document.write(`<html><head><title>${selClass} Timetable</title>
+      <style>@page { size: A4 landscape; margin: 12mm; } @media print { .no-print { display: none !important; } }</style>
+      </head><body style="font-family:sans-serif;padding:24px">
       <h2 style="text-align:center">${selClass} — Weekly Timetable</h2>
       <p style="text-align:center;color:#777;font-size:12px;margin-bottom:16px">${data.schoolName}</p>
       <table border="1" style="width:100%;border-collapse:collapse;font-size:12px">
@@ -486,8 +511,13 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
       <p style="text-align:right;font-size:10px;color:#aaa;margin-top:8px">
         Printed: ${new Date().toLocaleDateString('en-KE')}
       </p>
+      <div class="no-print" style="margin-top:16px;text-align:center">
+        <button onclick="window.print()" style="padding:10px 28px;background:#4f8ef7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+          🖨 Print Timetable
+        </button>
+      </div>
     </body></html>`);
-    w.print();
+    w.document.close();
   }
 
   function printPersonalTT() {
@@ -495,7 +525,10 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
       (a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.bell.time.localeCompare(b.bell.time)
     );
     const w = window.open('', '_blank');
-    w.document.write(`<html><body style="font-family:sans-serif;padding:24px">
+    if (!w) { alert('Your browser blocked the print pop-up. Please allow pop-ups for this site and try again.'); return; }
+    w.document.write(`<html><head><title>${user.name} Timetable</title>
+      <style>@page { size: A4 portrait; margin: 12mm; } @media print { .no-print { display: none !important; } }</style>
+      </head><body style="font-family:sans-serif;padding:24px">
       <h2 style="text-align:center">Personal Timetable — ${user.name}</h2>
       <p style="text-align:center;color:#777;font-size:12px;margin-bottom:16px">${data.schoolName} · All Classes</p>
       <table border="1" style="width:100%;border-collapse:collapse;font-size:12px">
@@ -512,9 +545,88 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
         </tbody>
       </table>
       <p style="margin-top:12px;font-size:11px;color:#aaa">Total: ${sorted.length} lessons/week</p>
+      <div class="no-print" style="margin-top:16px;text-align:center">
+        <button onclick="window.print()" style="padding:10px 28px;background:#4f8ef7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+          🖨 Print My Timetable
+        </button>
+      </div>
     </body></html>`);
-    w.print();
+    w.document.close();
   }
+
+  /** Prints the whole-school Block Timetable: one landscape page per day,
+   *  every class side by side, meant to be pinned up in the staff room. */
+  function printBlockTT() {
+    const w = window.open('', '_blank');
+    if (!w) { alert('Your browser blocked the print pop-up. Please allow pop-ups for this site and try again.'); return; }
+
+    const dayTable = (day) => {
+      const rows = data.bells.map((b, i) => {
+        const c = TC[b.type] || TC.lesson;
+        if (b.type !== 'lesson') {
+          return `<tr>
+            <td style="padding:4px 8px;font-weight:600;white-space:nowrap;color:${c.text};font-size:11px">${b.time}</td>
+            <td colspan="${classes.length}" style="text-align:center;padding:4px 8px;background:${c.bg};color:${c.text};font-weight:600;font-size:11px">
+              ${b.label}${b.duration ? ` (${b.duration}min)` : ''}
+            </td>
+          </tr>`;
+        }
+        const cells = classes.map(cls => {
+          const slot = resolveSlot(((data.timetable[cls] || {})[day] || [])[i]);
+          const conflict = !!conflictCellMap[`${day}::${i}::${cls}`];
+          if (!slot || !slot.subject) return `<td style="text-align:center;padding:4px 6px;font-size:10px;color:#bbb">—</td>`;
+          const col = subjectColor(slot.subject);
+          const clashMark = conflict ? ' <span style="color:#ef4444">⚠</span>' : '';
+          const teacher = slot.teacherId ? `<div style="font-size:8px;color:#888">${teacherName(slot.teacherId) || ''}</div>` : '';
+          return `<td style="text-align:center;padding:3px 5px;font-size:10px;background:${conflict ? '#ef444415' : `${col}12`}">
+            <div style="color:${col};font-weight:600">${slot.subject}${clashMark}</div>
+            ${teacher}
+          </td>`;
+        }).join('');
+        return `<tr>
+          <td style="padding:4px 8px;font-weight:600;white-space:nowrap;color:${c.text};font-size:11px">${b.time}</td>
+          ${cells}
+        </tr>`;
+      }).join('');
+
+      return `
+        <h2 style="text-align:center;margin-bottom:2px">${data.schoolName || 'School'} — Block Timetable</h2>
+        <p style="text-align:center;color:#777;font-size:12px;margin:0 0 14px">${day} · All Classes</p>
+        <table border="1" style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr style="background:#f5f5f5">
+            <th style="padding:5px 8px">Time</th>
+            ${classes.map(c => `<th style="padding:5px 8px">${c}</th>`).join('')}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    };
+
+    const pages = DAYS.map((day, i) => `
+      <div style="${i > 0 ? 'page-break-before: always;' : ''} padding: 16px;">
+        ${dayTable(day)}
+      </div>
+    `).join('');
+
+    w.document.write(`<html><head><title>Block Timetable — ${data.schoolName || 'School'}</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font-family: sans-serif; }
+        @media print { .no-print { display: none !important; } }
+      </style>
+      </head><body>
+        <div class="no-print" style="padding:14px;text-align:center;background:#fff;border-bottom:1px solid #eee;position:sticky;top:0">
+          <button onclick="window.print()" style="padding:10px 28px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">
+            🖨 Print Block Timetable (${DAYS.length} pages)
+          </button>
+        </div>
+        ${pages}
+        <p style="text-align:right;font-size:10px;color:#aaa;padding:0 16px 16px">
+          Printed: ${new Date().toLocaleDateString('en-KE')}
+        </p>
+      </body></html>`);
+    w.document.close();
+  }
+
 
   /* ─────────────────────────────────────────────────────
      RENDER
@@ -527,6 +639,10 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
         <button onClick={() => setView('class')}
           style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'class' ? 'var(--surface)' : 'transparent', color: view === 'class' ? 'var(--text)' : 'var(--text-muted)' }}>
           Class Timetable
+        </button>
+        <button onClick={() => setView('block')}
+          style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: view === 'block' ? 'var(--surface)' : 'transparent', color: view === 'block' ? '#7c3aed' : 'var(--text-muted)' }}>
+          Block Timetable
         </button>
         {!isPrincipal && (
           <button onClick={() => setView('personal')}
@@ -617,6 +733,148 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
       )}
 
       {/* ════════════════════════════════════════════════
+          BLOCK TIMETABLE — whole school, one page per day,
+          every class side-by-side. This is the version meant
+          to be printed and pinned up in the staff room.
+      ════════════════════════════════════════════════ */}
+      {view === 'block' && (
+        <div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Day tabs */}
+            <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 8 }}>
+              {DAYS.map(d => (
+                <button key={d} onClick={() => setBlockDay(d)}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: blockDay === d ? 'var(--surface)' : 'transparent', color: blockDay === d ? 'var(--text)' : 'var(--text-muted)' }}>
+                  {d.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+
+            {conflicts.length > 0 && (
+              <button onClick={() => setShowConflicts(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, background: '#ef444420', border: '1px solid #ef444440', color: '#ef4444', fontSize: 12, cursor: 'pointer' }}>
+                <Icon name="alert" size={13} />
+                {conflicts.length} whole-school conflict{conflicts.length !== 1 ? 's' : ''}
+              </button>
+            )}
+
+            <div style={{ marginLeft: 'auto' }}>
+              <Btn variant="ghost" size="sm" onClick={printBlockTT}>
+                <Icon name="print" size={13} /> Print Block Timetable
+              </Btn>
+            </div>
+          </div>
+
+          {conflicts.length === 0 && (
+            <Alert type="success" style={{ marginBottom: 12 }}>
+              No teacher is double-booked anywhere in the school — every subject teacher's schedule is clash-free.
+            </Alert>
+          )}
+
+          <Card noPad style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 + classes.length * 110 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...TH, width: 70 }}>Time</th>
+                  <th style={{ ...TH, width: 100 }}>Bell</th>
+                  {classes.map(c => <th key={c} style={{ ...TH, minWidth: 100 }}>{c}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {data.bells.map((b, i) => {
+                  const c = TC[b.type] || TC.lesson;
+                  // Non-lesson bells (break/lunch/assembly/end) are the same
+                  // for every class — merge into one row instead of repeating
+                  // the label across every column.
+                  if (b.type !== 'lesson') {
+                    return (
+                      <tr key={b.id || i}>
+                        <td style={{ ...TD, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{b.time}</td>
+                        <td colSpan={1 + classes.length} style={{ ...TD, background: c.bg, color: c.text, fontWeight: 600, textAlign: 'center', fontSize: 12 }}>
+                          {b.label}{b.duration > 0 ? ` (${b.duration}min)` : ''}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={b.id || i}>
+                      <td style={{ ...TD, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{b.time}</td>
+                      <td style={{ ...TD, fontSize: 11, color: 'var(--text-sub)' }}>
+                        <div>{b.label}</div>
+                        {b.duration > 0 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{b.duration}min</div>}
+                      </td>
+                      {classes.map(cls => {
+                        const slot = resolveSlot(((data.timetable[cls] || {})[blockDay] || [])[i]);
+                        const conflict = conflictCellMap[`${blockDay}::${i}::${cls}`];
+                        const isMyLesson = !isPrincipal && slot && (
+                          (user.staffId && slot.teacherId === user.staffId) ||
+                          (user.teacherSubjects || []).some(s => s.subject === slot.subject && (s.classes || []).includes(cls))
+                        );
+                        const col = slot?.subject
+                          ? (isMyLesson ? '#10b981' : subjectColor(slot.subject))
+                          : c.text;
+                        return (
+                          <td key={cls} style={{
+                            ...TD, padding: 5,
+                            background: conflict ? '#ef444412' : 'transparent',
+                            outline: conflict ? '2px solid #ef444460' : 'none',
+                            outlineOffset: -2,
+                          }}>
+                            {slot?.subject ? (
+                              <div style={{
+                                background: `${col}20`,
+                                borderLeft: `3px solid ${col}`,
+                                borderRadius: 4,
+                                padding: '4px 8px',
+                                fontSize: 11,
+                                color: col,
+                                fontWeight: isMyLesson ? 700 : 600,
+                              }}>
+                                {slot.double && !slot.doubleSecond && (
+                                  <span style={{ fontSize: 9, opacity: 0.6, marginRight: 3 }}>◼◼</span>
+                                )}
+                                {slot.subject}
+                                {conflict && (
+                                  <span title="Teacher collision" style={{ marginLeft: 4, color: '#ef4444', fontSize: 10 }}>⚠</span>
+                                )}
+                                {slot.teacherId && (
+                                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400, marginTop: 1 }}>
+                                    {teacherName(slot.teacherId) || slot.teacherId}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--border)', fontSize: 10 }}>—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+
+          <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+            {!isPrincipal && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)' }}>
+                <div style={{ width: 14, height: 14, background: '#10b98120', borderLeft: '3px solid #10b981', borderRadius: 2 }} />
+                Your lessons
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)' }}>
+              <div style={{ width: 14, height: 14, background: '#ef444420', border: '2px solid #ef444460', borderRadius: 2 }} />
+              Teacher clash
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-sub)' }}>
+              <span style={{ fontSize: 9 }}>◼◼</span> Double lesson
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
           CLASS TIMETABLE
       ════════════════════════════════════════════════ */}
       {view === 'class' && (
@@ -666,7 +924,7 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
 
           {/* Conflict banner for this class */}
           {conflictSet.size > 0 && (
-            <Alert type="error" style={{ marginBottom: 12 }}>
+            <Alert type="danger" style={{ marginBottom: 12 }}>
               <Icon name="alert" size={14} />
               {conflictSet.size} collision{conflictSet.size !== 1 ? 's' : ''} detected in this timetable — a teacher is double-booked at the highlighted slots.
             </Alert>
@@ -696,8 +954,17 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
                         const slot     = resolveSlot((tt[day] || [])[i]);
                         const isSpecial = b.type !== 'lesson';
                         const isConflict = conflictSet.has(`${day}::${i}`);
-                        const isMyLesson = !isPrincipal && slot && (user.teacherSubjects || []).some(s =>
-                          s.subject === slot.subject && s.classes.includes(selClass)
+                        // Match either by staffId (authoritative — set whenever a
+                        // teacher is assigned via Rules or the edit-mode dropdown)
+                        // or, as a legacy fallback, by subject name + class list.
+                        // Matching by staffId alone previously meant a teacher's own
+                        // lessons could fail to highlight green if their profile's
+                        // teacherSubjects list didn't happen to include this class.
+                        const isMyLesson = !isPrincipal && slot && (
+                          (user.staffId && slot.teacherId === user.staffId) ||
+                          (user.teacherSubjects || []).some(s =>
+                            s.subject === slot.subject && (s.classes || []).includes(selClass)
+                          )
                         );
 
                         const displayLabel = slot?.subject
@@ -733,7 +1000,24 @@ export default function Timetable({ data, setData, user , isDark, themeVars }) {
                                 />
                                 <select
                                   value={slot?.teacherId || ''}
-                                  onChange={e => updateCell(day, i, { teacherId: e.target.value })}
+                                  onChange={e => {
+                                    const newTeacherId = e.target.value;
+                                    updateCell(day, i, { teacherId: newTeacherId });
+                                    // Instant feedback: warn immediately if this
+                                    // teacher is already booked elsewhere in the
+                                    // school at this exact day/period, rather than
+                                    // waiting for the passive conflict banner.
+                                    if (newTeacherId) {
+                                      const clash = Object.entries(data.timetable).find(([c, cTT]) => {
+                                        if (c === selClass) return false;
+                                        const other = (cTT[day] || [])[i];
+                                        return other && other.teacherId === newTeacherId;
+                                      });
+                                      if (clash) {
+                                        alert(`Heads up: ${teacherName(newTeacherId) || 'This teacher'} is already teaching ${clash[0]} on ${day} at ${b.time}. This will show as a conflict until resolved.`);
+                                      }
+                                    }
+                                  }}
                                   title="Teacher for this slot — required for collision detection to catch double-bookings"
                                   style={{ width: '100%', padding: '3px 4px', fontSize: 10, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}
                                 >
