@@ -187,7 +187,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       // Uses the same group-aware column stats as every other screen
       // (report form, rankings) — a Paper 1 + Paper 2 group contributes
       // ONE combined entry here, not two separately-weighted ones.
-      const { total, mean, points, grade, columns } = calcColumnStats(student.class, res, data);
+      const { total, mean, points, grade, columns } = calcColumnStats(student.class, res, data, resultsObj);
       const subs = getSubjectsForClass(student.class, data);
       return { total, mean: Math.round(mean), grade: getGrade(Math.round(mean)), results: res, subs, points, columns };
     }
@@ -202,7 +202,7 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
       const sibExam    = findSiblingExam(student.class);
       const resultsObj = sibExam ? (sibExam.results || {}) : (exam.results || {});
       const res = resultsObj[student.name] || {};
-      return hasCompletedAllColumns(student.class, res, data);
+      return hasCompletedAllColumns(student.class, res, data, resultsObj);
     }
 
     // This stream's students only
@@ -311,8 +311,10 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     const subs = enterableSubjects;
     // Expand any paper-split subject (e.g. "English" with Paper 1+2
     // configured in Exams -> Setup Subjects) into its two entry columns —
-    // each still saved under its own getPaperKey() result key.
-    const cols = getEntryColumns(subs, exam.class, data);
+    // each still saved under its own getPaperKey() result key. Passing
+    // exam.results lets this exam keep a single box if it already has a
+    // flat score for that subject (see resolveExamColumns).
+    const cols = getEntryColumns(subs, exam.class, data, exam.results);
     setEnterExam(exam);
     setEnterSubjects(cols);
     const init = {};

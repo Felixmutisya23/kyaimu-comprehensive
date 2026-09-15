@@ -261,22 +261,62 @@ export function isColumnComplete(column, studentResults) {
 }
 
 /**
+ * resolveExamColumns
+ * The real fix for a subtle but serious correctness problem: the Papers
+ * setting (Exams -> Setup Subjects) lives on the CLASS, but exams are
+ * created over time. Without this function, turning Papers ON for a
+ * class would retroactively reinterpret every PAST exam's plain
+ * "English" score as if it needed two papers (silently losing that
+ * student's mark, since nothing was ever entered under the Paper 1/2
+ * keys) — and turning it OFF later would do the same in reverse to
+ * future exams that already collected two papers.
+ *
+ * Instead, each exam's own stored results are treated as the source of
+ * truth: if ANY student in THIS exam already has a plain flat score
+ * under the base subject name, this exam is locked in as single-paper
+ * forever, regardless of what the class's Papers setting says today.
+ * An exam with no data yet for that subject freely follows whatever the
+ * class's live Papers setting is at the moment marks are first entered
+ * for it — which is exactly how a school gets real per-exam control:
+ * toggle Papers off before creating an exam that should stay one paper,
+ * then back on for the next one, without disturbing anything already
+ * recorded.
+ *
+ * examResultsAll = the WHOLE exam's results object (every student), not
+ * one student's slice — pass null/undefined to skip the check entirely
+ * and just use the class's live default (e.g. when previewing what a
+ * brand new, not-yet-created exam would look like).
+ */
+export function resolveExamColumns(className, data, examResultsAll) {
+  const liveColumns = getExamColumnsForClass(className, data, null);
+  if (!examResultsAll) return liveColumns;
+  return liveColumns.map(col => {
+    if (col.type !== 'group') return col;
+    const hasLegacyFlatScore = Object.values(examResultsAll).some(r => {
+      const sc = getScore(r?.[col.name]);
+      return sc !== null && sc !== undefined;
+    });
+    return hasLegacyFlatScore ? { name: col.name, type: 'single', subject: col.name } : col;
+  });
+}
+
+/**
  * calcColumnStats
  * The ONE place total/mean/points/grade should be computed for a
  * student, anywhere in the app (class list, report form, rankings,
- * dashboards). Iterates over getExamColumnsForClass() — i.e. the
- * SUBJECT-LEVEL view a parent/teacher actually sees — rather than raw
- * result keys, so a grouped subject (e.g. Paper 1 + Paper 2 -> English)
- * contributes ONE weighted entry to the mean, not two.
+ * dashboards). Iterates over resolveExamColumns() — i.e. the
+ * SUBJECT-LEVEL view a parent/teacher actually sees, locked to what THIS
+ * exam actually recorded — rather than raw result keys, so a grouped
+ * subject (e.g. Paper 1 + Paper 2 -> English) contributes ONE weighted
+ * entry to the mean, not two, and never retroactively reinterprets an
+ * older exam's plain score.
  *
- * Before this existed, several screens each summed getSubjectsForClass()
- * (raw subject keys) independently — correct as long as no subject was
- * ever grouped, but silently wrong (double-weighting each paper) the
- * moment a Paper 1 / Paper 2 group was configured, and inconsistent
- * between screens since each had its own copy of the same logic.
+ * examResultsAll: pass the exam's full results object (all students) so
+ * the legacy-protection check in resolveExamColumns can run. Safe to
+ * omit for one-off previews; every real call site should pass it.
  */
-export function calcColumnStats(studentClass, studentResults, data) {
-  const columns = getExamColumnsForClass(studentClass, data, null);
+export function calcColumnStats(studentClass, studentResults, data, examResultsAll = null) {
+  const columns = resolveExamColumns(studentClass, data, examResultsAll);
   const total = columns.reduce((a, col) => a + (computeColumnScore(col, studentResults) ?? 0), 0);
   const mean = columns.length ? total / columns.length : 0;
   const points = columns.reduce((a, col) => {
@@ -289,10 +329,11 @@ export function calcColumnStats(studentClass, studentResults, data) {
 /**
  * hasCompletedAllColumns
  * Mirrors calcColumnStats: a student only "counts" for ranking/mean
- * purposes once every column (not every raw subject) is complete.
+ * purposes once every column (not every raw subject) is complete, using
+ * the same per-exam-locked column resolution.
  */
-export function hasCompletedAllColumns(studentClass, studentResults, data) {
-  const columns = getExamColumnsForClass(studentClass, data, null);
+export function hasCompletedAllColumns(studentClass, studentResults, data, examResultsAll = null) {
+  const columns = resolveExamColumns(studentClass, data, examResultsAll);
   if (columns.length === 0) return false;
   return columns.every(col => isColumnComplete(col, studentResults));
 }
@@ -302,7 +343,8 @@ export function hasCompletedAllColumns(studentClass, studentResults, data) {
  * Every exam a given student has at least one recorded score in,
  * sorted chronologically (year, then term, then exam type — opener
  * before mid-term before end-of-term), each with that exam's
- * group-aware mean/total/grade for the student. Used to show a
+ * group-aware mean/total/grade for the student — correctly locked to
+ * whatever paper structure THAT exam actually used. Used to show a
  * student's progress across exams on their report form.
  */
 export function getStudentExamHistory(student, data) {
@@ -313,7 +355,7 @@ export function getStudentExamHistory(student, data) {
     })
     .map(ex => {
       const res = ex.results[student.name];
-      const { total, mean, grade } = calcColumnStats(ex.class, res, data);
+      const { total, mean, grade } = calcColumnStats(ex.class, res, data, ex.results);
       return {
         examId: ex.id, name: ex.name, term: Number(ex.term), year: ex.year,
         className: ex.class, total, mean: Math.round(mean * 10) / 10, grade,
@@ -333,15 +375,23 @@ export function getStudentExamHistory(student, data) {
  * subject flagged with a paper split (Exams -> Setup Subjects) becomes
  * TWO columns — Paper 1 and Paper 2 — each still saved under its own
  * getPaperKey() result key; everything else stays a single column.
+ *
+ * examResultsAll: pass the SPECIFIC exam's full results object so a
+ * subject that this exam already recorded as one flat score keeps
+ * showing ONE box here too — consistent with resolveExamColumns, so
+ * entry, totals, and history all agree on what shape this exam is.
  */
-export function getEntryColumns(subjectList, className, data) {
-  const paperConfig = (data.subjectPapersByClass || {})[className] || {};
+export function getEntryColumns(subjectList, className, data, examResultsAll = null) {
+  const resolvedCols = resolveExamColumns(className, data, examResultsAll);
+  const colByName = {};
+  resolvedCols.forEach(c => { colByName[c.name] = c; });
   const cols = [];
   subjectList.forEach(sub => {
-    const cfg = paperConfig[sub];
-    if (cfg && cfg.enabled) {
-      cols.push({ subject: sub, key: getPaperKey(sub, 1), label: `${sub} P1`, isPaper: true, paperGroup: sub, paperPos: 1, method: cfg.method || 'SUM' });
-      cols.push({ subject: sub, key: getPaperKey(sub, 2), label: `${sub} P2`, isPaper: true, paperGroup: sub, paperPos: 2, method: cfg.method || 'SUM' });
+    const rc = colByName[sub];
+    if (rc && rc.type === 'group') {
+      rc.components.forEach((compKey, idx) => {
+        cols.push({ subject: sub, key: compKey, label: `${sub} P${idx + 1}`, isPaper: true, paperGroup: sub, paperPos: idx + 1, method: rc.method });
+      });
     } else {
       cols.push({ subject: sub, key: sub, label: sub, isPaper: false });
     }
