@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Modal, Btn, Tag, FormGroup, FormRow, SectionTitle, GradeBadge, Alert, Icon } from './UI';
 import { getGrade, GRADES_CBC, canEnterScores, getClassTeacherStaffId, getTeacherSubjects, getAllClasses, getScore, getStreamFromClass, getSiblingStreams, getSubjectsForClass, getExamColumnsForClass, computeColumnScore, calcColumnStats, hasCompletedAllColumns, getEntryColumns, getPaperKey, isTeachingStaff, getExamTypeRank } from '../data/initialData';
 import { printClassList, printReportForm, printAllReportForms, printOverallClassList, computeRankings, printSubjectPerformance } from '../utils/print';
+import { downloadMarksheet, parseMarksheetFile, reconcileMarksheet } from '../utils/marksheet';
 import { deleteJsonRowDirect, applyExamScorePatch, removeExamScore, saveSubjectsByClassDirect } from '../supabase';
 
 export default function Exams({ data, setData, user, flushSave , isDark, themeVars }) {
@@ -85,6 +86,12 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
   const [scores, setScores]     = useState({});
   const [enterSubjects, setEnterSubjects] = useState([]);
   const [enterExam, setEnterExam] = useState(null);
+
+  // ── Marksheet download / upload (whole-class, all-subjects Excel file) ──
+  const [showMarksheetUpload, setShowMarksheetUpload] = useState(false);
+  const [marksheetError, setMarksheetError] = useState('');
+  const [marksheetPreview, setMarksheetPreview] = useState(null); // { patches, newStudents, matchedCount, warnings, mismatches }
+  const [marksheetBusy, setMarksheetBusy] = useState(false);
 
   const classExams     = data.exams.filter(e => e.class === selClass);
   const selExam        = classExams.find(e => e.id === selExamId) || classExams[0] || null;
@@ -359,6 +366,73 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
     } catch (e) {
       console.error('Save scores failed:', e);
       alert('Could not save — check your connection and try again.');
+    }
+  }
+
+  /* ── Marksheet download / upload ──────────────────────────────
+     One Excel file per class+exam with every subject this user is
+     allowed to enter (same scope as "Enter My Scores"), including
+     Paper 1/2 split columns, one row per student. Download it, fill
+     it in anywhere (phone, laptop, print it), upload it back — any
+     admission number/name on the sheet that isn't an existing
+     student is created and slotted into this exam's class. ──── */
+  function handleDownloadMarksheet() {
+    if (!selExam) return;
+    const cols = getEntryColumns(enterableSubjects, selExam.class, data, selExam.results);
+    downloadMarksheet(selExam, data, classStudents, cols);
+  }
+
+  function handleMarksheetFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !selExam) return;
+    setMarksheetError('');
+    setMarksheetPreview(null);
+    setMarksheetBusy(true);
+    parseMarksheetFile(file)
+      .then(parsed => {
+        const cols = getEntryColumns(enterableSubjects, selExam.class, data, selExam.results);
+        const result = reconcileMarksheet(parsed, selExam, data, cols, user.staffId);
+        setMarksheetPreview(result);
+      })
+      .catch(err => setMarksheetError(typeof err === 'string' ? err : (err?.message || 'Could not read that file.')))
+      .finally(() => setMarksheetBusy(false));
+  }
+
+  async function confirmMarksheetImport() {
+    if (!marksheetPreview || !selExam) return;
+    const { patches, newStudents } = marksheetPreview;
+    if (patches.length === 0 && newStudents.length === 0) { setShowMarksheetUpload(false); return; }
+    setMarksheetBusy(true);
+    try {
+      // Add any brand-new students first so applyExamScorePatch has a
+      // student to attach their marks to under the exact same name.
+      if (newStudents.length > 0) {
+        setData(d => ({ ...d, students: [...d.students, ...newStudents] }));
+      }
+      let mergedResults = selExam.results;
+      if (patches.length > 0) {
+        const merged = await applyExamScorePatch(data._schoolId, selExam.id, patches);
+        mergedResults = merged.results;
+      }
+      const ctStaffId = getClassTeacherStaffId(selClass, data);
+      const notif = (ctStaffId && ctStaffId !== user.staffId)
+        ? [{ id: Date.now(), to: ctStaffId, from: user.name, message: `${user.name} uploaded a marksheet for ${selClass} · ${selExam.name} (${patches.length} score${patches.length !== 1 ? 's' : ''}${newStudents.length ? `, ${newStudents.length} new student${newStudents.length !== 1 ? 's' : ''}` : ''})`, date: new Date().toISOString().split('T')[0], read: false }]
+        : [];
+      setData(d => ({
+        ...d,
+        exams: d.exams.map(ex => ex.id === selExam.id ? { ...ex, results: mergedResults } : ex),
+        notifications: [...(d.notifications || []), ...notif],
+      }));
+      if (flushSave) setTimeout(() => flushSave(), 50);
+      setShowMarksheetUpload(false);
+      setMarksheetPreview(null);
+      alert(`Marksheet imported: ${patches.length} score${patches.length !== 1 ? 's' : ''} saved${newStudents.length ? `, ${newStudents.length} new student${newStudents.length !== 1 ? 's' : ''} added` : ''}.`);
+    } catch (e) {
+      console.error('Marksheet import failed:', e);
+      setMarksheetError('Could not save — check your connection and try again.');
+    } finally {
+      setMarksheetBusy(false);
     }
   }
 
@@ -666,6 +740,16 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           {selExam && enterableSubjects.length > 0 && (
             <Btn variant="ghost" size="sm" onClick={() => openEnterScores(selExam)}>
               <Icon name="edit" size={13} /> Enter My Scores
+            </Btn>
+          )}
+          {selExam && enterableSubjects.length > 0 && (
+            <Btn variant="ghost" size="sm" onClick={handleDownloadMarksheet}>
+              <Icon name="download" size={13} /> Download Marksheet
+            </Btn>
+          )}
+          {selExam && enterableSubjects.length > 0 && (
+            <Btn variant="ghost" size="sm" onClick={() => { setMarksheetError(''); setMarksheetPreview(null); setShowMarksheetUpload(true); }}>
+              <Icon name="upload" size={13} /> Upload Marksheet
             </Btn>
           )}
           {selExam && (isClassTeacher || isPrincipal) && (
@@ -1498,6 +1582,84 @@ export default function Exams({ data, setData, user, flushSave , isDark, themeVa
           <Btn variant="ghost" onClick={() => setShowEnter(false)}>Cancel</Btn>
           <Btn variant="success" onClick={saveScores}>Save Scores</Btn>
         </div>
+      </Modal>
+
+      {/* Upload Marksheet Modal */}
+      <Modal show={showMarksheetUpload} onClose={() => { setShowMarksheetUpload(false); setMarksheetPreview(null); setMarksheetError(''); }} title={`Upload Marksheet — ${selClass}${selExam ? ` · ${selExam.name}` : ''}`}>
+        {!marksheetPreview ? (
+          <>
+            <Alert type="info">
+              <Icon name="alert" size={14} />
+              Choose the filled-in Excel/CSV file downloaded earlier for this class and exam. Any admission number or name that doesn't match an existing student will be added as a new student in {selClass}.
+            </Alert>
+            <div style={{ marginTop: 14 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <Icon name="upload" size={14} /> {marksheetBusy ? 'Reading file…' : 'Choose File'}
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleMarksheetFile} disabled={marksheetBusy} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {marksheetError && (
+              <Alert type="warning" style={{ marginTop: 14 }}>
+                <Icon name="alert" size={14} /> {marksheetError}
+              </Alert>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <Btn variant="ghost" onClick={() => setShowMarksheetUpload(false)}>Cancel</Btn>
+            </div>
+          </>
+        ) : (
+          <>
+            {marksheetPreview.mismatches.map((m, i) => (
+              <Alert key={i} type="warning" style={{ marginBottom: 8 }}>
+                <Icon name="alert" size={14} /> {m}
+              </Alert>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 140, background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Existing Students Matched</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981' }}>{marksheetPreview.matchedCount}</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 140, background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>New Students Found</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#4f8ef7' }}>{marksheetPreview.newStudents.length}</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 140, background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Scores To Save</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{marksheetPreview.patches.length}</div>
+              </div>
+            </div>
+            {marksheetPreview.newStudents.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#4f8ef7', marginBottom: 6 }}>New students who will be added to {selClass}:</div>
+                <div style={{ maxHeight: 130, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
+                  {marksheetPreview.newStudents.map((s, i) => (
+                    <div key={i} style={{ fontSize: 12, padding: '3px 0', color: 'var(--text)' }}>
+                      {s.name} {s.admNo ? <span style={{ color: 'var(--text-muted)' }}>— Adm No {s.admNo}</span> : <span style={{ color: 'var(--text-muted)' }}>— no admission no. yet</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {marksheetPreview.warnings.length > 0 && (
+              <Alert type="warning" style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, maxHeight: 140, overflowY: 'auto' }}>
+                  {marksheetPreview.warnings.map((w, i) => <div key={i} style={{ marginBottom: 3 }}>⚠ {w}</div>)}
+                </div>
+              </Alert>
+            )}
+            {marksheetError && (
+              <Alert type="warning" style={{ marginBottom: 14 }}>
+                <Icon name="alert" size={14} /> {marksheetError}
+              </Alert>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setMarksheetPreview(null)}>Choose Different File</Btn>
+              <Btn variant="success" onClick={confirmMarksheetImport} disabled={marksheetBusy || (marksheetPreview.patches.length === 0 && marksheetPreview.newStudents.length === 0)}>
+                {marksheetBusy ? 'Saving…' : `Import ${marksheetPreview.patches.length} Score${marksheetPreview.patches.length !== 1 ? 's' : ''}${marksheetPreview.newStudents.length ? ` + ${marksheetPreview.newStudents.length} New Student${marksheetPreview.newStudents.length !== 1 ? 's' : ''}` : ''}`}
+              </Btn>
+            </div>
+          </>
+        )}
       </Modal>
 
       {/* Edit Request Modal */}
