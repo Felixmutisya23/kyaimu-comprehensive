@@ -437,6 +437,7 @@ function renderResultSheet({
   title, subtitle, students, subjects, resultsMap,
   showStream, posLabel, posKey, ofKey,
   subjectStats, pri, acc, data, exam,
+  statsMap = null,
 }) {
   // Header
   const hdr = schoolHeader(data);
@@ -455,7 +456,8 @@ function renderResultSheet({
     // Group-aware: a Paper 1 + Paper 2 subject contributes ONE combined
     // entry here, matching the class list and report form — not a raw
     // sum over `subjects` which still lists every individual paper.
-    const { total, mean: rawMean, points } = calcColumnStats(s.class, res, data, resultsMap);
+    const { total, mean: rawMean, points } = calcColumnStats(
+      s.class, (statsMap || resultsMap)[s.name] || {}, data, statsMap || resultsMap);
     const mean  = subjects.length ? rawMean.toFixed(1) : '—';
     const g     = getGrade(Math.round(parseFloat(mean) || 0));
     const pos   = s[posKey] || (idx + 1);
@@ -756,7 +758,17 @@ export function printOverallClassList(exam, data, onlyCompleted = false) {
     return prefix || key;
   }
 
-  // Re-build resultsMap with normalised subject keys — no marks lost
+  // Keep each student's ORIGINAL results (keys spelled the way their own
+  // class's subject list spells them). Totals, means, points and the
+  // "sat every subject" check MUST be computed from these, because
+  // calcColumnStats()/hasCompletedAllColumns() look marks up by the
+  // student's own class's subject names. Using the normalised map for
+  // that made a West-stream student lose any subject spelled differently
+  // from the first stream (e.g. "CREATIVE arts" vs "creative arts").
+  const statsMap = { ...resultsMap };
+
+  // Re-build resultsMap with normalised subject keys — used for DISPLAY
+  // only (so streams with different spellings share one column)
   allStudents.forEach(s => {
     const raw = resultsMap[s.name] || {};
     const normalised = {};
@@ -799,14 +811,14 @@ export function printOverallClassList(exam, data, onlyCompleted = false) {
   // sat the whole exam, not a mix that's diluted by partial/no-shows.
   let rankPool = allStudents;
   if (onlyCompleted) {
-    rankPool = allStudents.filter(s => hasCompletedAllColumns(s.class, resultsMap[s.name] || {}, data, resultsMap));
+    rankPool = allStudents.filter(s => hasCompletedAllColumns(s.class, statsMap[s.name] || {}, data, statsMap));
     if (!rankPool.length) { alert('No students completed every subject in this exam — nothing to print.'); return; }
   }
 
   // Rank overall — sorted by total descending
   const withStats = rankPool.map(s => {
     const res   = resultsMap[s.name] || {};
-    const { total, mean } = calcColumnStats(s.class, res, data, resultsMap);
+    const { total, mean } = calcColumnStats(s.class, statsMap[s.name] || {}, data, statsMap);
     const stream = getStreamFromClass(s.class, data) || s.class;
     return { ...s, results: res, total, mean: +mean.toFixed(1), stream };
   }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
@@ -836,6 +848,7 @@ export function printOverallClassList(exam, data, onlyCompleted = false) {
     ofKey:       'overallOf',
     subjectStats,
     pri, acc, data, exam,
+    statsMap,
   });
 
   const w = window.open('', '_blank');
